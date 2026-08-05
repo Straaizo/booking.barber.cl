@@ -1,0 +1,55 @@
+@import url("https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,100..900;1,9..144,100..900&family=Archivo:wght@100..900&display=swap");
+@import "tailwindcss";
+
+@theme {
+  --font-display: "Fraunces", ui-serif, Georgia, serif;
+  --font-sans: "Archivo", ui-sans-serif, system-ui, sans-serif;
+
+  --color-negro-barbero: #1c1b19;
+  --color-hueso: #f3eee3;
+  --color-cobre: #a85c32;
+  --color-cobre-oscuro: #7a4324;
+  --color-verde-barberia: #2f4538;
+  --color-laton: #b08d57;
+
+  --color-gris-calido-100: #e9e4d9;
+  --color-gris-calido-200: #d8d1c3;
+  --color-gris-calido-400: #8b847a;
+  --color-gris-calido-500: #6b6459;
+  --color-gris-calido-700: #4a453f;
+
+  /* Firma de movimiento: misma curva de entrada en todo el sitio */
+  --ease-entrada: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-salida: cubic-bezier(0.7, 0, 0.84, 0);
+  --ease-rebote: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  background-color: var(--color-hueso);
+  color: var(--color-negro-barbero);
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-display);
+}
+
+.numeros-tabulares {
+  font-variant-numeric: tabular-nums;
+}
+
+.versalitas {
+  font-variant-caps: small-caps;
+  letter-spacing: 0.03em;
+}
+
+/* Cursor propio en desktop con puntero fino; en touch se conserva el cursor nativo */
+@media (hover: hover) and (pointer: fine) {
+  .tiene-cursor-propio,
+  .tiene-cursor-propio * {
+    cursor: none;
+  }
+}

@@ -1,0 +1,28 @@
+import { useQuery } from '@tanstack/react-query'
+import { supabase } from '../../../services/supabaseClient'
+
+async function obtenerBarberiaPorSlug(slug) {
+  const { data, error } = await supabase
+    .from('barberias')
+    .select(
+      `
+      id, slug, nombre, telefono_whatsapp, email_contacto, direccion, logo_url, estado_id,
+      personalizacion (color_primario, eslogan, descripcion, banner_url),
+      servicios (id, nombre, duracion_minutos, precio_clp, precio_oferta, oferta_activa, oferta_vence, activo),
+      barberos (id, nombre, activo)
+    `
+    )
+    .eq('slug', slug)
+    .single()
+
+  if (error) throw error
+  return data
+}
+
+export function useBarberiaPorSlug(slug) {
+  return useQuery({
+    queryKey: ['barberia', slug],
+    queryFn: () => obtenerBarberiaPorSlug(slug),
+    enabled: Boolean(slug),
+  })
+}

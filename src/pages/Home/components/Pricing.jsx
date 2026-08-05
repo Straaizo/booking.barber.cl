@@ -1,0 +1,167 @@
+import { Button } from '../../../components/common/Button'
+import { ScrollReveal } from '../../../components/animations/ScrollReveal'
+import { StaggerReveal } from '../../../components/animations/StaggerReveal'
+import { AnimatedNumber } from '../../../components/animations/AnimatedNumber'
+import { formatoCLP } from '../../../utils/formatos'
+
+const PLANES = [
+  { clave: 'solo', nombre: 'Solo', precio: 5000, destacado: false },
+  { clave: 'equipo', nombre: 'Equipo', precio: 6000, destacado: true },
+  { clave: 'estudio', nombre: 'Estudio', precio: 7000, destacado: false },
+]
+
+const FILAS = [
+  { etiqueta: 'Barberos', solo: '1', equipo: 'Hasta 3', estudio: 'Ilimitados' },
+  { etiqueta: 'Página propia', solo: true, equipo: true, estudio: true },
+  { etiqueta: 'Reservas ilimitadas', solo: true, equipo: true, estudio: true },
+  { etiqueta: 'Notificación por correo', solo: true, equipo: true, estudio: true },
+  { etiqueta: 'Notificación automática por WhatsApp', solo: false, equipo: true, estudio: true },
+  { etiqueta: 'Ofertas ilimitadas', solo: false, equipo: true, estudio: true },
+  { etiqueta: 'Personalización de marca', solo: false, equipo: false, estudio: true },
+]
+
+function Marca({ valor }) {
+  if (typeof valor === 'string') {
+    return <span className="text-sm text-negro-barbero">{valor}</span>
+  }
+  return valor ? (
+    <span className="text-cobre">✓</span>
+  ) : (
+    <span className="text-gris-calido-400">—</span>
+  )
+}
+
+export function Pricing() {
+  return (
+    <section id="planes" className="px-6 py-20 md:px-10 md:py-28">
+      <div className="grid grid-cols-12 gap-x-6">
+        <div className="col-span-12 mb-10 md:col-span-2 md:mb-0">
+          <ScrollReveal>
+            <span className="versalitas text-xs text-gris-calido-500">— 02 / Planes</span>
+          </ScrollReveal>
+        </div>
+
+        <div className="col-span-12 md:col-span-9 md:col-start-4">
+          <ScrollReveal>
+            <h2 className="font-display text-3xl font-light leading-tight tracking-tight md:text-5xl">
+              Un pago mensual fijo. <em className="not-italic text-cobre">Sin letra chica.</em>
+            </h2>
+          </ScrollReveal>
+
+          {/* Desktop / tablet: tabla comparativa de una sola pieza */}
+          <StaggerReveal className="mt-14 hidden lg:block">
+            <table className="w-full border-collapse text-left">
+              <thead>
+                <tr>
+                  <th className="w-1/4 border-b border-cobre/25 pb-6" />
+                  {PLANES.map((plan) => (
+                    <th
+                      key={plan.clave}
+                      className={`border-b border-cobre/25 px-4 pb-6 align-bottom ${
+                        plan.destacado ? 'bg-cobre/5' : ''
+                      }`}
+                    >
+                      <span className="font-display block text-2xl font-light tracking-tight text-negro-barbero">
+                        {plan.nombre}
+                      </span>
+                      <span className="numeros-tabulares mt-2 block text-3xl font-semibold text-negro-barbero">
+                        <AnimatedNumber valor={plan.precio} formatear={formatoCLP} />
+                        <span className="ml-1 text-sm font-normal text-gris-calido-500">/mes</span>
+                      </span>
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {FILAS.map((fila) => (
+                  <tr key={fila.etiqueta}>
+                    <td className="border-b border-gris-calido-200 py-4 pr-4 text-sm text-gris-calido-700">
+                      {fila.etiqueta}
+                    </td>
+                    {PLANES.map((plan) => (
+                      <td
+                        key={plan.clave}
+                        className={`border-b border-gris-calido-200 px-4 py-4 ${
+                          plan.destacado ? 'bg-cobre/5' : ''
+                        }`}
+                      >
+                        <Marca valor={fila[plan.clave]} />
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+                <tr>
+                  <td className="py-6" />
+                  {PLANES.map((plan) => (
+                    <td key={plan.clave} className={`px-4 py-6 ${plan.destacado ? 'bg-cobre/5' : ''}`}>
+                      <Button
+                        href="mailto:hola@bookingbarber.cl?subject=Quiero%20mi%20barbería%20en%20booking.barber.cl"
+                        className={`w-full ${
+                          plan.destacado ? '' : 'bg-negro-barbero hover:bg-black'
+                        }`}
+                      >
+                        Elegir {plan.nombre}
+                      </Button>
+                    </td>
+                  ))}
+                </tr>
+              </tbody>
+            </table>
+          </StaggerReveal>
+
+          {/* Mobile y tablet (hasta 1024px): una composición distinta, no la
+              tabla encogida — un plan a la vez, deslizable, con las mismas
+              filas como lista. A 768px la tabla de 4 columnas queda demasiado
+              angosta para el margen editorial asimétrico; el carrusel resuelve
+              mejor ese rango que forzar la tabla. */}
+          <div className="mt-10 -mx-6 flex snap-x snap-mandatory gap-4 overflow-x-auto px-6 pb-4 lg:hidden">
+            {PLANES.map((plan) => (
+              <div
+                key={plan.clave}
+                className={`w-[85vw] shrink-0 snap-center rounded-2xl border p-6 sm:w-72 ${
+                  plan.destacado
+                    ? 'border-cobre bg-cobre/5'
+                    : 'border-gris-calido-200 bg-white/60'
+                }`}
+              >
+                {plan.destacado && (
+                  <span className="versalitas mb-3 inline-block text-xs text-cobre">
+                    — Más elegido
+                  </span>
+                )}
+                <span className="font-display block text-2xl font-light tracking-tight text-negro-barbero">
+                  {plan.nombre}
+                </span>
+                <span className="numeros-tabulares mt-1 block text-3xl font-semibold text-negro-barbero">
+                  {formatoCLP(plan.precio)}
+                  <span className="ml-1 text-sm font-normal text-gris-calido-500">/mes</span>
+                </span>
+
+                <ul className="mt-6 flex flex-col gap-3 border-t border-gris-calido-200 pt-6">
+                  {FILAS.map((fila) => (
+                    <li
+                      key={fila.etiqueta}
+                      className="flex items-center justify-between gap-3 text-sm"
+                    >
+                      <span className="text-gris-calido-700">{fila.etiqueta}</span>
+                      <Marca valor={fila[plan.clave]} />
+                    </li>
+                  ))}
+                </ul>
+
+                <Button
+                  href="mailto:hola@bookingbarber.cl?subject=Quiero%20mi%20barbería%20en%20booking.barber.cl"
+                  className={`mt-6 block w-full ${
+                    plan.destacado ? '' : 'bg-negro-barbero hover:bg-black'
+                  }`}
+                >
+                  Elegir {plan.nombre}
+                </Button>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
+  )
+}
