@@ -48,7 +48,7 @@ export function HowItWorks() {
               key={paso.numero}
               className="flex flex-col gap-2 border-t border-cobre/25 py-8 first:border-t-0 first:pt-0 md:grid md:grid-cols-12 md:items-baseline md:gap-4 md:py-10"
             >
-              <span className="numeros-tabulares text-sm text-cobre md:col-span-1">
+              <span className="numeros-tabulares text-sm text-cobre-texto md:col-span-1">
                 {paso.numero}
               </span>
               <h3 className="font-display text-2xl font-light leading-tight tracking-tight md:col-span-6 md:text-4xl">

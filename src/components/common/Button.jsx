@@ -34,7 +34,10 @@ export function Button({ as = 'a', className = '', ...props }) {
       onMouseLeave={resetear}
       style={{ x: springX, y: springY }}
       whileTap={{ scale: 0.96 }}
-      className={`inline-block rounded-lg bg-cobre px-7 py-3.5 text-center font-semibold tracking-tight text-hueso transition-colors duration-200 hover:bg-cobre-oscuro focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-laton ${className}`}
+      // bg-cobre-oscuro (no bg-cobre): hueso sobre cobre da 4.28:1, no pasa AA
+      // en texto normal — cobre-oscuro sí (6.83:1). El cobre claro queda para
+      // uso gráfico (líneas, bordes, fondos grandes), no para superficies con texto.
+      className={`inline-block rounded-lg bg-cobre-oscuro px-7 py-3.5 text-center font-semibold tracking-tight text-hueso transition-[filter] duration-200 hover:brightness-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-laton ${className}`}
       {...props}
     />
   )

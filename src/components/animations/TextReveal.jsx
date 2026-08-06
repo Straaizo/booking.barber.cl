@@ -1,14 +1,15 @@
 import { motion } from 'framer-motion'
-import { EASE_ENTRADA } from './easing'
+import { EASE_ENTRADA, DURACION_LENTA, STAGGER_TEXTO } from './easing'
+import { usePrefersReducedMotion } from '../../hooks/usePrefersReducedMotion'
 
 const contenedor = {
   oculto: {},
-  visible: { transition: { staggerChildren: 0.045 } },
+  visible: { transition: { staggerChildren: STAGGER_TEXTO } },
 }
 
 const palabra = {
   oculto: { y: '110%' },
-  visible: { y: '0%', transition: { duration: 0.8, ease: EASE_ENTRADA } },
+  visible: { y: '0%', transition: { duration: DURACION_LENTA, ease: EASE_ENTRADA } },
 }
 
 // Divide el texto en palabras, marcando como itálica cualquier segmento entre
@@ -28,11 +29,41 @@ function tokenizar(texto) {
   return palabras
 }
 
+function renderPalabras(palabras) {
+  return palabras.map(({ texto: palabraTexto, esItalica }, indice) => (
+    <span key={indice}>
+      <span className="inline-block overflow-hidden pb-1 align-top">
+        <motion.span
+          variants={palabra}
+          className={`inline-block ${esItalica ? 'font-display italic' : ''}`}
+        >
+          {palabraTexto}
+        </motion.span>
+      </span>
+      {indice < palabras.length - 1 ? ' ' : ''}
+    </span>
+  ))
+}
+
 // Revela un titular palabra por palabra con máscara (overflow-hidden), no un
-// fade plano. Cada palabra vive en su propio contenedor recortado para que la
-// animación de entrada no se vea "flotando" fuera de su línea.
+// fade plano. Con prefers-reduced-motion activo, el texto aparece completo sin
+// máscara ni desplazamiento — solo se anima cuando animar no cuesta claridad.
 export function TextReveal({ texto, as: Elemento = 'h1', className = '', delay = 0 }) {
   const palabras = tokenizar(texto)
+  const prefiereReducido = usePrefersReducedMotion()
+
+  if (prefiereReducido) {
+    return (
+      <Elemento className={className}>
+        {palabras.map(({ texto: palabraTexto, esItalica }, indice) => (
+          <span key={indice} className={esItalica ? 'font-display italic' : ''}>
+            {palabraTexto}
+            {indice < palabras.length - 1 ? ' ' : ''}
+          </span>
+        ))}
+      </Elemento>
+    )
+  }
 
   return (
     <motion.div
@@ -42,23 +73,7 @@ export function TextReveal({ texto, as: Elemento = 'h1', className = '', delay =
       viewport={{ once: true, margin: '-80px' }}
       transition={{ delayChildren: delay }}
     >
-      <Elemento className={className}>
-        {palabras.map(({ texto: palabraTexto, esItalica }, indice) => (
-          // El espacio va FUERA del span con overflow-hidden: adentro, el navegador
-          // lo recorta como si fuera un espacio final de línea y las palabras se pegan.
-          <span key={indice}>
-            <span className="inline-block overflow-hidden pb-1 align-top">
-              <motion.span
-                variants={palabra}
-                className={`inline-block ${esItalica ? 'font-display italic' : ''}`}
-              >
-                {palabraTexto}
-              </motion.span>
-            </span>
-            {indice < palabras.length - 1 ? ' ' : ''}
-          </span>
-        ))}
-      </Elemento>
+      <Elemento className={className}>{renderPalabras(palabras)}</Elemento>
     </motion.div>
   )
 }

@@ -37,7 +37,7 @@ export function PasoServicio({ servicios, onSeleccionar }) {
                     <span className="block text-xs text-gris-calido-400 line-through">
                       {formatoCLP(servicio.precio_clp)}
                     </span>
-                    <span className="block text-base font-semibold text-cobre">
+                    <span className="block text-base font-semibold text-cobre-texto">
                       {formatoCLP(servicio.precio_oferta)}
                     </span>
                   </>

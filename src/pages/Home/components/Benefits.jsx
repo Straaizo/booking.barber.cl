@@ -42,7 +42,7 @@ export function Benefits() {
               indice % 2 === 1 ? 'md:ml-32' : ''
             }`}
           >
-            <span className="numeros-tabulares text-sm text-cobre">{beneficio.numero}</span>
+            <span className="numeros-tabulares text-sm text-cobre-claro">{beneficio.numero}</span>
             <div className="max-w-sm">
               <h3 className="font-display text-2xl font-light tracking-tight md:text-3xl">
                 {beneficio.titulo}

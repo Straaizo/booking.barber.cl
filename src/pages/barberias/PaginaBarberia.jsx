@@ -54,7 +54,7 @@ export function PaginaBarberia() {
             />
             {personalizacion.eslogan && (
               <ScrollReveal delay={0.1}>
-                <p className="versalitas mt-2 text-sm text-cobre">{personalizacion.eslogan}</p>
+                <p className="versalitas mt-2 text-sm text-cobre-claro">{personalizacion.eslogan}</p>
               </ScrollReveal>
             )}
           </div>

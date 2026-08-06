@@ -2,6 +2,7 @@ import { createBrowserRouter, Navigate, RouterProvider } from 'react-router-dom'
 import { Home } from '../pages/Home/Home'
 import { PaginaBarberia } from '../pages/barberias/PaginaBarberia'
 import { RutaBarberia } from '../pages/barberias/RutaBarberia'
+import { RutaDemo } from '../pages/demo/RutaDemo'
 import { Login } from '../pages/Login/Login'
 import { RutaProtegida } from './RutaProtegida'
 import { PanelBarbero } from '../pages/panel/PanelBarbero'
@@ -22,6 +23,11 @@ const router = createBrowserRouter([
   {
     path: '/barberias/:slug',
     element: <RutaBarberia />,
+    children: [{ index: true, element: <PaginaBarberia /> }],
+  },
+  {
+    path: '/demo',
+    element: <RutaDemo />,
     children: [{ index: true, element: <PaginaBarberia /> }],
   },
   {

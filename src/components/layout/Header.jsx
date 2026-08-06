@@ -4,7 +4,7 @@ export function Header() {
   return (
     <header className="flex items-center justify-between px-6 py-6 md:px-10 md:py-8">
       <span className="font-display text-xl font-semibold italic tracking-tight text-negro-barbero">
-        booking<span className="text-cobre">.</span>barber.cl
+        booking<span className="text-cobre-texto">.</span>barber.cl
       </span>
       <HoverLink
         href="#planes"

@@ -1,7 +1,10 @@
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../../../services/supabaseClient'
+import { esBarberoDemo, HORARIOS_DEMO } from '../../../config/demo'
 
 async function obtenerHorarios(barberoId) {
+  if (esBarberoDemo(barberoId)) return HORARIOS_DEMO
+
   const { data, error } = await supabase
     .from('horarios_disponibles')
     .select('id, dia_semana, hora_inicio, hora_fin')

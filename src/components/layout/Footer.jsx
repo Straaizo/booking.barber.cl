@@ -3,6 +3,9 @@ import { HoverLink } from '../common/HoverLink'
 import { SectionRule } from '../common/SectionRule'
 import { TextReveal } from '../animations/TextReveal'
 import { ScrollReveal } from '../animations/ScrollReveal'
+import { linkWhatsApp } from '../../utils/formatos'
+
+const NUMERO_WHATSAPP_CONTACTO = import.meta.env.VITE_WHATSAPP_CONTACTO
 
 export function Footer({ showModelCredit = false, variante = 'marketing' }) {
   const esMinimal = variante === 'minimal'
@@ -16,8 +19,19 @@ export function Footer({ showModelCredit = false, variante = 'marketing' }) {
             as="h2"
             className="max-w-3xl font-display text-4xl font-light leading-[1.05] tracking-tight md:text-6xl"
           />
-          <ScrollReveal delay={0.15} className="mt-8">
+          <ScrollReveal delay={0.15} className="mt-8 flex flex-col items-start gap-5 sm:flex-row sm:items-center">
             <Button href="#planes">Quiero mi barbería en booking.barber.cl</Button>
+            {NUMERO_WHATSAPP_CONTACTO && (
+              <HoverLink
+                href={linkWhatsApp(
+                  NUMERO_WHATSAPP_CONTACTO,
+                  'Hola, quiero información sobre booking.barber.cl para mi barbería'
+                )}
+                className="text-sm font-medium text-gris-calido-200"
+              >
+                O escríbenos por WhatsApp ↗
+              </HoverLink>
+            )}
           </ScrollReveal>
         </div>
       )}

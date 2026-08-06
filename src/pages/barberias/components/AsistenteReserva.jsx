@@ -21,7 +21,7 @@ function ProgresoAsistente({ etiquetas, indiceActivo }) {
     <div className="mb-8">
       <div className="versalitas mb-3 flex justify-between text-xs text-gris-calido-500">
         <span>
-          <span className="numeros-tabulares text-cobre">{String(indiceActivo + 1).padStart(2, '0')}</span>
+          <span className="numeros-tabulares text-cobre-texto">{String(indiceActivo + 1).padStart(2, '0')}</span>
           {' / '}
           <span className="numeros-tabulares">{String(total).padStart(2, '0')}</span>
         </span>

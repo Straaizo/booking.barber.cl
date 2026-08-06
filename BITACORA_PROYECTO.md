@@ -443,3 +443,340 @@ Se repitió exactamente la misma medición (misma limitación de red, mismo buil
 - Sin cambios respecto a la entrada anterior.
 
 ---
+
+## 2026-08-06 - Corregido: las etiquetas en versalitas se veían pixeladas (small-caps sintético, no un problema de DPR ni del 3D)
+
+**Qué se hizo:**
+Enzo reportó letras pixeladas "en algunas partes" en varias pantallas, desde 1920x1080 hasta un iPhone XR. Se descartaron dos hipótesis antes de dar con la causa real:
+1. **Densidad de píxeles del Canvas 3D** — descartado explícitamente por Enzo ("el modelo 3D no lo toques, todo eso está bien").
+2. **Transform residual de Framer Motion tras animar** (una teoría razonable: texto en su propia capa compuesta puede perder el antialiasing de subpíxel) — se verificó con Playwright leyendo `getComputedStyle(el).transform` sobre titulares ya animados (`Hero` y una sección con `ScrollReveal`) y en ambos casos el resultado fue `"none"` — Framer Motion sí limpia el transform al asentarse. Hipótesis descartada con evidencia, no solo por suposición.
+
+**Causa real, confirmada con una comparación directa:** la clase `.versalitas` (usada en absolutamente todas las etiquetas del sitio — el eyebrow del hero, cada `SectionRule`, el nav, los links del footer, los badges de plan, etc.) usaba `font-variant-caps: small-caps`. Archivo (la fuente del sitio) no trae mayúsculas pequeñas reales (glifo OpenType `smcp`), así que el navegador las **sintetiza**, escalando hacia abajo el glifo de la mayúscula normal — a los 12-14px que usan esas etiquetas, ese glifo reescalado se ve notoriamente más tosco que el resto del texto del sitio. Se armó una comparación directa (mismo texto, mismo tamaño, con y sin `small-caps` sintético, mismo `deviceScaleFactor`) y la diferencia es evidente a simple vista: el small-caps sintético sale más delgado y con bordes menos definidos.
+
+**Fix:** `.versalitas` pasó de `font-variant-caps: small-caps` a `text-transform: uppercase` con `letter-spacing` más ancho (0.03em → 0.07em) y `font-weight: 600` — mayúsculas reales nunca se reescalan, son el mismo glifo que cualquier otro texto del sitio, así que no hay reescalado que pueda verse tosco a ningún tamaño ni densidad de píxeles.
+
+**Cómo se probó:**
+Batería completa en 8 combinaciones de viewport/DPR, desde 1920×1080 (sin escalado, el peor caso realista para nitidez de texto) y con escalado de Windows típico (125%), pasando por laptops (1440×900, 1366×768) y tablets, hasta **iPhone XR (414×896 @ DPR 2)** e iPhone SE (375×667 @ DPR 2) — en las 8: sin scroll horizontal, sin errores de consola, y se verificó explícitamente que ninguna etiqueta `.versalitas` quedara cortada o desbordada por el cambio a mayúsculas reales (ocupan más ancho que el small-caps sintético). Comparación visual de la home completa a 1920×1080 sin escalado (el escenario donde más se notaba el problema) confirma que todas las etiquetas — eyebrow del hero, cada índice de sección, badges — ahora se ven nítidas.
+
+**Por qué:**
+- Se descartaron las dos hipótesis previas con evidencia (lectura real de `getComputedStyle`, confirmación explícita de Enzo sobre el 3D) antes de asumir la causa siguiente — evita "arreglar" algo que no estaba roto.
+- Mayúsculas reales + tracking en vez de volver a un `text-transform: uppercase` con `tracking-widest` "genérico de SaaS" (lo que se quería evitar desde el principio del rediseño editorial): se compensó con un tracking más generoso (0.07em) y peso semibold para que la etiqueta siga leyéndose como un recurso tipográfico deliberado, no como el patrón por defecto de cualquier landing.
+
+**Archivos afectados:**
+- `src/index.css` (clase `.versalitas`).
+
+**Pendiente / próximos pasos:**
+- Sin cambios respecto a la entrada anterior.
+
+---
+
+## 2026-08-06 - El contenido de la demo quedaba pegado arriba del teléfono — centrado vertical real
+
+**Qué se hizo:**
+Con el piso de alto restaurado (entrada anterior), el teléfono volvió a verse bien proporcionado, pero el contenido de cada pantalla (que nunca llega a ocupar todo ese alto) quedaba pegado arriba, con todo el espacio libre acumulado abajo — Enzo lo notó de inmediato.
+
+Causa: la técnica de apilar las 5 pantallas en `[grid-area:1/1]` mide correctamente el alto de la más alta, pero ese bloque (ya medido) no se estiraba para ocupar el resto del alto del teléfono — un `h-full` que se había puesto para eso **no funciona** ahí, porque el div de la pantalla del teléfono (`PhoneMockup`) solo tiene `min-height`, no un alto explícito, y un hijo con `height:100%` no se estira contra un padre cuyo alto viene únicamente de `min-height` (comportamiento estándar de CSS, no un bug del navegador) — por eso el `h-full` quedaba sin efecto y el bloque de contenido se quedaba con su alto natural, arriba del todo.
+
+**Fix:** se cambió el mecanismo de "estirar" de porcentaje a flexbox, que sí reparte el espacio libre correctamente contra un `min-height`: `PhoneMockup.jsx` ahora es `flex flex-col` en vez de bloque simple, y el contenedor de las 5 pantallas en `LiveDemo.jsx` pasó de `h-full` a `flex-1` (además de `content-center` para centrar ese bloque dentro del espacio extra, y `flex flex-col justify-center` en cada pantalla individual para que las más cortas —como "Elige un barbero"— se centren también dentro de la fila compartida con las más altas).
+
+**Cómo se verificó:**
+Capturas de las 5 pantallas recortadas al marco real del teléfono (1440px): las dos más cortas (Servicio, Barbero) y la más alta (Datos) quedan todas centradas verticalmente con márgenes equilibrados arriba y abajo, ya no pegadas arriba. Se repitió la batería de 6 viewports (375/390/768/1024/1440/1920): sin scroll horizontal ni errores de consola. `npm run build` limpio.
+
+**Por qué:**
+- Flexbox en vez de insistir con porcentajes: es la herramienta correcta para "reparte el espacio libre de un contenedor cuyo alto viene de `min-height`" — intentar forzarlo con `height: 100%` es exactamente el tipo de suposición de CSS que parece que debería funcionar pero no lo hace, y quedarse con esa suposición sin verificar habría dejado el mismo bug con otro nombre.
+
+**Archivos afectados:**
+- `src/components/common/PhoneMockup.jsx` (el contenedor de pantalla pasó a `flex flex-col`).
+- `src/pages/Home/components/LiveDemo.jsx` (`h-full` → `flex-1` + `content-center` en el contenedor de las 5 pantallas; `flex flex-col justify-center` agregado a cada pantalla individual).
+
+**Pendiente / próximos pasos:**
+- Sin cambios respecto a la entrada anterior.
+
+---
+
+## 2026-08-06 - Corregido: las etiquetas en versalitas se veían pixeladas (small-caps sintético, no un problema de DPR ni del 3D)
+
+**Qué se hizo:**
+Enzo reportó letras pixeladas "en algunas partes" en varias pantallas, desde 1920x1080 hasta un iPhone XR. Se descartaron dos hipótesis antes de dar con la causa real:
+1. **Densidad de píxeles del Canvas 3D** — descartado explícitamente por Enzo ("el modelo 3D no lo toques, todo eso está bien").
+2. **Transform residual de Framer Motion tras animar** (una teoría razonable: texto en su propia capa compuesta puede perder el antialiasing de subpíxel) — se verificó con Playwright leyendo `getComputedStyle(el).transform` sobre titulares ya animados (`Hero` y una sección con `ScrollReveal`) y en ambos casos el resultado fue `"none"` — Framer Motion sí limpia el transform al asentarse. Hipótesis descartada con evidencia, no solo por suposición.
+
+**Causa real, confirmada con una comparación directa:** la clase `.versalitas` (usada en absolutamente todas las etiquetas del sitio — el eyebrow del hero, cada `SectionRule`, el nav, los links del footer, los badges de plan, etc.) usaba `font-variant-caps: small-caps`. Archivo (la fuente del sitio) no trae mayúsculas pequeñas reales (glifo OpenType `smcp`), así que el navegador las **sintetiza**, escalando hacia abajo el glifo de la mayúscula normal — a los 12-14px que usan esas etiquetas, ese glifo reescalado se ve notoriamente más tosco que el resto del texto del sitio. Se armó una comparación directa (mismo texto, mismo tamaño, con y sin `small-caps` sintético, mismo `deviceScaleFactor`) y la diferencia es evidente a simple vista: el small-caps sintético sale más delgado y con bordes menos definidos.
+
+**Fix:** `.versalitas` pasó de `font-variant-caps: small-caps` a `text-transform: uppercase` con `letter-spacing` más ancho (0.03em → 0.07em) y `font-weight: 600` — mayúsculas reales nunca se reescalan, son el mismo glifo que cualquier otro texto del sitio, así que no hay reescalado que pueda verse tosco a ningún tamaño ni densidad de píxeles.
+
+**Cómo se probó:**
+Batería completa en 8 combinaciones de viewport/DPR, desde 1920×1080 (sin escalado, el peor caso realista para nitidez de texto) y con escalado de Windows típico (125%), pasando por laptops (1440×900, 1366×768) y tablets, hasta **iPhone XR (414×896 @ DPR 2)** e iPhone SE (375×667 @ DPR 2) — en las 8: sin scroll horizontal, sin errores de consola, y se verificó explícitamente que ninguna etiqueta `.versalitas` quedara cortada o desbordada por el cambio a mayúsculas reales (ocupan más ancho que el small-caps sintético). Comparación visual de la home completa a 1920×1080 sin escalado (el escenario donde más se notaba el problema) confirma que todas las etiquetas — eyebrow del hero, cada índice de sección, badges — ahora se ven nítidas.
+
+**Por qué:**
+- Se descartaron las dos hipótesis previas con evidencia (lectura real de `getComputedStyle`, confirmación explícita de Enzo sobre el 3D) antes de asumir la causa siguiente — evita "arreglar" algo que no estaba roto.
+- Mayúsculas reales + tracking en vez de volver a un `text-transform: uppercase` con `tracking-widest` "genérico de SaaS" (lo que se quería evitar desde el principio del rediseño editorial): se compensó con un tracking más generoso (0.07em) y peso semibold para que la etiqueta siga leyéndose como un recurso tipográfico deliberado, no como el patrón por defecto de cualquier landing.
+
+**Archivos afectados:**
+- `src/index.css` (clase `.versalitas`).
+
+**Pendiente / próximos pasos:**
+- Sin cambios respecto a la entrada anterior.
+
+---
+
+## 2026-08-06 - Ampliación de la home: 8 secciones nuevas, corregido el desborde real de precios, contraste AA, sistema de animación formalizado
+
+**Qué se hizo:**
+Enzo pidió ampliar la home con 8 secciones nuevas dentro del lenguaje editorial ya establecido, corregir el desborde de la tabla de precios, y formalizar el sistema de animación. Se hizo todo, en el orden pedido, más dos correcciones que aparecieron al probar en serio (no al leer el código).
+
+**0. Causa raíz real del desborde de Pricing:**
+No era el grid asimétrico ni falta de `min-width:0` — era `table-layout: auto` (el default del navegador): con contenido largo (el botón "Elegir Estudio", la fila "Notificación automática por WhatsApp"), el navegador ensancha cada columna según su contenido más ancho y estira la tabla entera más allá de su contenedor. Se agregó `table-fixed` (`Pricing.jsx`), que fuerza a que el texto envuelva en vez de empujar el ancho. Además, `Home.jsx` tenía `overflow-x-clip` en el contenedor raíz — eso estaba **tapando** el desborde real (por eso el chequeo automatizado de `scrollWidth` no lo detectaba) en vez de arreglarlo; se quitó, ya que las decoraciones que lo necesitaban (el glow del Hero) ya se contienen solas con su propio `overflow-hidden`.
+
+**1. Sistema de animación formalizado (`components/animations/easing.js`):**
+Ya existían las curvas (`EASE_ENTRADA`/`EASE_SALIDA`/`EASE_REBOTE`) pero no las duraciones ni los stagger — se agregaron `DURACION_MICRO/BASE/LENTA` y `STAGGER_TEXTO/LISTA` como constantes con nombre, y se reemplazaron los números sueltos que quedaban en `ScrollReveal`/`StaggerReveal`/`TextReveal` por esas constantes. **Se agregó soporte a `prefers-reduced-motion` directo en esos tres primitivos** (antes no lo tenían — cualquier componente que los usara heredaba el hueco): con la preferencia activa, muestran el contenido final sin máscara/desplazamiento en vez de intentar animar con duración 0.
+
+**2. Las 8 secciones nuevas** (en el orden final: Hero → Cómo funciona → **Demo en vivo** → Todo lo que necesitas → **Marquee del oficio** → **Calculadora** → **Vistazo al panel** → **Cuaderno vs App** → Planes → **Cupos fundadores** → **FAQ** → Footer):
+
+- **Demo en vivo** (`LiveDemo.jsx`): mockup de celular dibujado en CSS (`PhoneMockup.jsx`, sin foto de stock) con las 5 pantallas del flujo de reserva simplificadas, avanzando solas cada 2.4s vía `setInterval` **solo mientras la sección está en viewport** (`useInView` de Framer Motion controla si el interval corre) — así no gasta ciclos si el visitante ya bajó más allá. Texto editorial sincronizado al mismo índice de paso. Enlace a `/demo`.
+- **`/demo` — barbería demo real, no una simulación aparte**: en vez de construir una vista de demo separada, se hizo que `PaginaBarberia`/`AsistenteReserva` (el código real de producción) acepten un tenant que no existe en Supabase. `RutaDemo.jsx` provee datos estáticos (`config/demo.js`: "Barbería El Andén", 3 servicios, 1 barbero, horario Lun-Sáb 10-19h) por el mismo contrato de contexto que `RutaBarberia`. Los tres hooks de datos (`useHorariosDisponibles`, `useReservasDelDia`, `useCrearReserva`) detectan el `barbero_id` demo (`esBarberoDemo()`) y devuelven datos locales / simulan el insert con un delay de 500ms en vez de tocar Supabase — el visitante hace la reserva completa de verdad, con el código real, sin que dependa de que exista una fila real en la BD ni de que Supabase esté disponible.
+- **Marquee del oficio** (`Marquee.jsx`): dos filas en `@keyframes` CSS puro (no Framer Motion — un loop infinito se hace más simple y liviano en CSS), doblando el contenido y desplazando a `-50%` para que el ciclo no se note, pausa con `:hover` vía `.marquee-pista:hover .marquee-fila { animation-play-state: paused }`. **Sin fotos de stock de barberos**: como se pidió explícitamente evitarlas mientras no haya fotografía real de barberías clientes, se dibujaron 6 iconos de línea propios (navaja, peine, sillón, tijera, brocha, espejo — `ILUSTRACIONES` en el propio archivo) a modo de placeholder honesto, con una leyenda que dice directamente que todavía no hay fotos reales. La estructura ya recibe `{id, etiqueta, imagenUrl}` por barbería — con `imagenUrl` puesto, usa la foto real en vez del ícono.
+- **Calculadora de citas perdidas** (`CalculadoraCitasPerdidas.jsx`): tres `<input type="range">` reskineados por completo vía CSS (`.slider-editorial` en `index.css`, con relleno de progreso vía variable CSS `--relleno` que el input actualiza inline) — se mantiene el input nativo (no divs a mano) para no perder gratis el soporte de teclado/touch/lector de pantalla. Resultado con contador en vivo (`LiveNumber.jsx`, nuevo — a diferencia de `AnimatedNumber` que cuenta una sola vez al entrar en viewport, este sigue cualquier valor que cambie en tiempo real).
+- **Vistazo al panel** (`PanelPreview.jsx`): mockup real en HTML/CSS (sidebar + tabla de reservas, mismo lenguaje visual que los paneles reales) con 3 anotaciones. Simplificación consciente: en vez de líneas conectoras que apuntan a un punto exacto del mockup (frágil de mantener responsive), son tick-marks horizontales alineados por posición vertical con `justify-between`, estética de "plano técnico" sin depender de coordenadas absolutas calculadas contra el layout real.
+- **Cuaderno + WhatsApp vs. booking.barber.cl** (`NotebookVsApp.jsx`): dos columnas sin bordes ni cards, filas separadas por reglas finas, cada lado entra desde su lado (izquierda/derecha) con stagger. Fondo oscuro (ver punto de ritmo más abajo).
+- **Cupos fundadores** (`FounderSpots.jsx`): número de cupos disponibles viene de `config/fundadores.js` (`CUPOS_TOTALES`/`CUPOS_OCUPADOS`), no hardcodeado en el JSX — se edita ahí a mano según entren barberías reales, no hay tabla en Supabase para esto porque es una decisión comercial de Enzo, no un dato del producto. **Sin testimonios ni clientes falsos**: la copia dice explícitamente que no hay casos de éxito que mostrar todavía porque el producto recién empieza — se decidió covertir la falta de clientes en el argumento de venta (precio congelado) en vez de fabricar prueba social.
+- **FAQ** (`FAQ.jsx`): acordeón con `motion.div` animando `height: 'auto'` (Framer Motion mide el contenido real, no es un salto ni un `display:none`), indicador propio (dos barras que rotan entre "+" y "−", no un ícono de librería), `aria-expanded`/`aria-controls`/`role="region"` correctos, navegable por teclado (botón nativo).
+- **Contacto por WhatsApp reforzado en el Footer**: número en `VITE_WHATSAPP_CONTACTO` (`.env`/`.env.example`), mensaje pre-armado ("Hola, quiero información sobre booking.barber.cl para mi barbería") vía `linkWhatsApp` (ya existía, se reusó), presentado como link secundario junto al botón principal — misma jerarquía que el resto del sitio, no un botón flotante verde aparte.
+
+**3. Ritmo vertical — ajuste tras revisar el resultado completo:**
+Con las 8 secciones nuevas en su lugar, `NotebookVsApp` y `FounderSpots` quedaban claras por defecto, lo que dejaba **cinco secciones de fondo claro seguidas** (Panel, Cuaderno-vs-App, Precios, Fundadores, FAQ) entre la Calculadora (oscura) y el Footer (oscuro) — la monotonía exacta que se pidió evitar. Se pasaron `NotebookVsApp` y `FounderSpots` a fondo oscuro (con sus tokens de texto invertidos correspondientes), quedando la alternancia: oscuro-claro-claro-oscuro-claro-oscuro-claro-**oscuro**-claro-**oscuro**-claro-oscuro. Nunca más de dos secciones claras seguidas.
+
+**4. Contraste AA — bug real, no solo teoría:**
+Se calculó el contraste real (fórmula WCAG, no a ojo) de cada combinación texto/fondo del sistema. `--color-cobre` (#a85c32) da **4.28:1 sobre hueso y 3.48:1 sobre negro-barbero** — pasa el mínimo AA (3:1) solo en texto grande (≥24px o ≥18.66px bold), pero se estaba usando en textos chicos (etiquetas versalitas, números de índice, el precio de oferta en `PasoServicio`, el botón principal completo). Se agregaron dos variantes al `@theme` de `index.css`: `--color-cobre-texto` (#8f4e2a, 5.51:1 sobre hueso) y `--color-cobre-claro` (#dd9569, 7.03:1 sobre negro-barbero), y se reemplazó cada uso de `text-cobre` en texto chico por la variante correcta según el fondo — incluyendo el botón principal (`Button.jsx` pasó de `bg-cobre` a `bg-cobre-oscuro`, que sí pasa AA con texto hueso encima, 6.83:1) y dos usos dentro del flujo real de reserva (`PasoServicio.jsx`, `AsistenteReserva.jsx`) que no tienen que ver con esta ampliación de la home pero tenían el mismo defecto.
+**Límite conocido, no resuelto en esta fase:** `PaginaBarberia` permite que cada barbería fije su propio `color_primario`, que sobreescribe `--color-cobre` vía variable CSS — pero `--color-cobre-texto`/`--color-cobre-claro` son fijos, no derivados de ese color. Si una barbería elige un color de marca muy claro, su eslogan/precio de oferta pueden volver a fallar contraste. Arreglarlo bien requiere calcular contraste en tiempo de ejecución a partir del color elegido (o restringir qué colores se pueden elegir), no es un cambio chico — queda pendiente, ver más abajo.
+
+**5. Dos bugs reales encontrados al ejecutar la Parte 5, no leyendo el código:**
+- **Contador con valores negativos**: probando la calculadora en su extremo inferior (citas perdidas = 0) con flechas de teclado rápidas, el resultado mostró "$-64" por una fracción de segundo. Causa: el spring de `LiveNumber` (`damping: 24`, por debajo del amortiguamiento crítico para ese `stiffness`) rebotaba levemente por debajo del objetivo al bajar rápido. Fix: `damping` subido a 30 (sobreamortiguado a propósito) + `Math.max(min, ...)` como cinturón de seguridad en el propio render, sin depender de que el tuning del spring sea perfecto.
+- **Los contadores ignoraban `prefers-reduced-motion`**: ni `AnimatedNumber` ni `LiveNumber` revisaban la preferencia — con reduced-motion activo seguían corriendo el spring (solo que Playwright lo capturaba a mitad de camino, mostrando cifras a medio contar). Se agregó el chequeo a ambos: `AnimatedNumber` muestra el valor final directo, `LiveNumber` usa `motionValue.jump()` (API de Framer Motion que salta sin interpolar) para reflejar cada cambio del slider al instante, sin animación, pero sin dejar de responder en vivo — la funcionalidad no es "no esencial", solo el suavizado lo es.
+
+**Cómo se probó (Parte 5, en orden):**
+1. **Compila sin warnings**: `npm run build` limpio en cada punto de control (antes y después de los dos bugs encontrados).
+2. **6 viewports** (375/390/768/1024/1440/1920) con Playwright, scroll real (no `scrollTo` directo) para disparar los `whileInView` de toda la página: sin scroll horizontal en ninguno, sin errores de consola.
+3. **Cero scroll horizontal**: confirmado explícitamente vía `scrollWidth > clientWidth` en los 6 viewports, antes y después del fix de la tabla.
+4. **Calculadora en extremos**: 0 citas perdidas → se asienta en `$0` (antes del fix, `$-64`/`$-771` transitorio); máximo (15 citas, precio tope) → `$646.973`/`$7.763.673`/"130 veces el plan Solo", sin desbordar el layout ni `NaN`.
+5. **Marquee**: verificado visualmente que las dos filas se mueven en direcciones opuestas y a velocidades distintas; con `prefers-reduced-motion` se confirmó (captura) que pasa a grilla estática de 6 columnas en vez de solo congelar la animación a medio recorrido. No se pudo medir fuga de memoria en una sesión larga real (limitación del entorno de prueba) — es una animación CSS pura sobre `transform`, sin JS por frame, que es el patrón de menor riesgo de leak posible para esto.
+6. **FAQ por teclado**: `Tab` hasta la pregunta 3, foco visible confirmado (captura, anillo laton), `Enter` alterna `aria-expanded` de `false` a `true` (confirmado leyendo el atributo real del DOM, no solo visualmente).
+7. **Contraste AA**: calculado matemáticamente (fórmula de luminancia relativa WCAG) para cada combinación texto/fondo usada, no estimado a ojo — ver punto 4 arriba.
+8. **Página completa con `prefers-reduced-motion: reduce`**: capturada de punta a punta — todo el contenido visible y legible de inmediato, sin elementos atascados en `opacity:0` esperando una animación que nunca dispara.
+9. **Rendimiento**: no se instrumentó FPS real (requeriría un dispositivo de gama media físico, no disponible en este entorno) — por diseño, todas las animaciones nuevas animan solo `transform`/`opacity`/`height` (esta última solo en el acordeón del FAQ, medido por Framer Motion, no por JS a mano), el marquee es CSS puro, y el 3D del Hero sigue con su mismo presupuesto de antes (no se le agregó nada). Es una expectativa razonada, no medida.
+10. **Recarga en distintos puntos del scroll**: confirmado en las capturas de los 6 viewports (cada una recorre toda la página con scroll incremental) que ninguna sección queda invisible — todas las animaciones de entrada tienen su contenido base ya presente en el DOM antes de animar.
+
+**Por qué:**
+- `table-fixed` en vez de reescribir el grid: la causa real era CSS de tablas, no de grid — cambiar el grid habría sido tratar el síntoma equivocado.
+- Placeholders ilustrados en vez de fotos de stock en el marquee: el prompt fue explícito en que fotos de stock de barberos se detectan al instante y cuestan credibilidad; no tener material real todavía no es excusa para simular que sí existe.
+- `/demo` reusando el código real de producción en vez de una vista de demo aparte: es la única forma de que "probar de verdad" sea literalmente cierto — cualquier vista de demo separada sería, por definición, una simulación de la simulación.
+- Verificar contraste con la fórmula real en vez de "se ve bien": el cobre sobre hueso parece perfectamente legible a simple vista (4.28:1 no es un contraste dramáticamente malo) — es exactamente el tipo de falla que un ojo no entrenado no detecta pero una auditoría real sí.
+
+**Archivos afectados:**
+- Nuevos: `src/pages/Home/components/{LiveDemo,Marquee,CalculadoraCitasPerdidas,PanelPreview,NotebookVsApp,FounderSpots,FAQ}.jsx`, `src/components/common/{PhoneMockup}.jsx`, `src/components/animations/LiveNumber.jsx`, `src/pages/demo/RutaDemo.jsx`, `src/config/{demo,fundadores,oficio}.js`.
+- Modificados: `src/pages/Home/{Home,components/Pricing}.jsx`, `src/components/common/{Button,SectionRule}.jsx`, `src/components/layout/{Header,Footer}.jsx`, `src/components/animations/{ScrollReveal,StaggerReveal,TextReveal,AnimatedNumber,easing}.js`, `src/pages/barberias/hooks/{useHorariosDisponibles,useReservasDelDia,useCrearReserva}.js` (atajo de modo demo), `src/pages/barberias/{PaginaBarberia,components/{AsistenteReserva,PasoServicio}}.jsx` (contraste), `src/routes/AppRouter.jsx` (ruta `/demo`), `src/index.css` (tokens de color, marquee, slider), `.env`/`.env.example` (`VITE_WHATSAPP_CONTACTO`).
+
+**Pendiente / próximos pasos:**
+1. Contraste AA del color de marca por barbería (`personalizacion.color_primario`) no está resuelto de forma general — solo el cobre por defecto del sistema tiene sus variantes seguras. Si una barbería elige un color muy claro u oscuro, revisar manualmente o construir un cálculo de contraste en tiempo de ejecución.
+2. No se instrumentó FPS real ni se probó fuga de memoria del marquee en una sesión larga — ambos requieren un dispositivo/perfilado real, no disponible en este entorno.
+3. Sigue pendiente (de sesiones anteriores) validar todo el proyecto contra el Supabase real de Enzo — home, barbería pública, login, los tres paneles y ahora `/demo` — una vez tenga credenciales reales y haya ejecutado el SQL de login/cambio de estado.
+4. Reemplazar el email de contacto placeholder de la landing (`hola@bookingbarber.cl`), pendiente desde hace varias sesiones.
+5. El marquee del oficio usa ilustraciones propias como placeholder — reemplazar por fotografía real de barberías clientes (sin rostros) en cuanto exista, vía `config/oficio.js` (agregar `imagenUrl` a cada item).
+
+---
+
+## 2026-08-06 - Corregido: el mockup de celular de la demo recortaba contenido en algunas resoluciones
+
+**Qué se hizo:**
+Enzo reportó que la pantalla "Ingresa sus datos" del celular de la demo en vivo, en algunas resoluciones, quedaba tapada por el borde del propio teléfono. Causa real: `PhoneMockup.jsx` tenía un alto **fijo adivinado** (`h-[28rem]` mobile / `md:h-[31rem]` desktop) para la pantalla interior, pero las 5 pantallas del flujo (`PantallaServicio`, `PantallaBarbero`, `PantallaHorario`, `PantallaDatos`, `PantallaConfirmado`) tienen alturas de contenido distintas — cualquiera más alta que ese número adivinado quedaba recortada por el `overflow-hidden` que mantiene la forma redondeada del teléfono, y visualmente se leía como "el borde la tapa".
+
+**Fix, sin adivinar otro número:** se sacó el alto fijo de `PhoneMockup` (queda con `min-h` solo como piso para que no se vea achatado con contenido corto) y en `LiveDemo.jsx` las 5 pantallas pasaron de "una sola montada a la vez con `AnimatePresence`" a **las 5 montadas siempre**, apiladas en la misma celda de un grid CSS (`[grid-area:1/1]` en las cinco, contenedor `grid`) — un contenedor de grid mide su fila según el hijo más alto entre todos los que ocupan esa celda, así que el ancho/alto del teléfono queda determinado automáticamente por la pantalla más alta de las 5, sin ningún número mágico que se pueda desincronizar si el contenido cambia a futuro (ej. un nombre de cliente más largo, una traducción, un ajuste de `font-size` del usuario). El paso activo se anima con `opacity`/`x`, los inactivos quedan en `opacity:0` con `pointer-events:none` y `aria-hidden`.
+
+**Cómo se verificó:**
+Se probaron los 5 pasos en 10 anchos de viewport (320, 360, 375, 390, 414, 428, 768, 1024, 1440, 1920px) con Playwright, recortando la captura exactamente al marco del teléfono (`boundingBox()` del contenedor real, no una suposición de coordenadas) — en los 50 casos el contenido queda contenido con margen dentro del marco, incluida la pantalla "Tus datos" que fue la reportada. Se revisó además que el teléfono ya no cambia de alto entre pasos durante el ciclo automático (antes tampoco cambiaba porque el alto era fijo; ahora no cambia porque las 5 pantallas están montadas desde el primer render y el máximo ya está fijado). `npm run build` limpio y los 6 viewports estándar (375/390/768/1024/1440/1920) repetidos sin scroll horizontal ni errores de consola.
+
+**Por qué:**
+- Se evitó la solución obvia de "agrandar el número fijo un poco" porque es la misma clase de arreglo frágil que causó el bug — cualquier pantalla futura más alta que el nuevo número volvería a fallar igual. El apilado en grid resuelve la causa (adivinar un tamaño) en vez del síntoma (ese tamaño era chico).
+- Mantener las 5 pantallas siempre montadas (en vez de montar/desmontar con `AnimatePresence`) es lo que hace posible que el grid mida las 5 a la vez — es un cambio de arquitectura chico pero necesario para que la técnica funcione, no una elección estética.
+
+**Archivos afectados:**
+- `src/components/common/PhoneMockup.jsx` (alto fijo → `min-h` de piso solamente).
+- `src/pages/Home/components/LiveDemo.jsx` (las 5 pantallas montadas simultáneamente en `[grid-area:1/1]` en vez de `AnimatePresence` de una sola; `PantallaConfirmado` ajustada de `h-full` a padding propio, ya que dependía del alto fijo que se quitó).
+
+**Pendiente / próximos pasos:**
+- Sin cambios respecto a la entrada anterior.
+
+---
+
+## 2026-08-06 - Corregido: las etiquetas en versalitas se veían pixeladas (small-caps sintético, no un problema de DPR ni del 3D)
+
+**Qué se hizo:**
+Enzo reportó letras pixeladas "en algunas partes" en varias pantallas, desde 1920x1080 hasta un iPhone XR. Se descartaron dos hipótesis antes de dar con la causa real:
+1. **Densidad de píxeles del Canvas 3D** — descartado explícitamente por Enzo ("el modelo 3D no lo toques, todo eso está bien").
+2. **Transform residual de Framer Motion tras animar** (una teoría razonable: texto en su propia capa compuesta puede perder el antialiasing de subpíxel) — se verificó con Playwright leyendo `getComputedStyle(el).transform` sobre titulares ya animados (`Hero` y una sección con `ScrollReveal`) y en ambos casos el resultado fue `"none"` — Framer Motion sí limpia el transform al asentarse. Hipótesis descartada con evidencia, no solo por suposición.
+
+**Causa real, confirmada con una comparación directa:** la clase `.versalitas` (usada en absolutamente todas las etiquetas del sitio — el eyebrow del hero, cada `SectionRule`, el nav, los links del footer, los badges de plan, etc.) usaba `font-variant-caps: small-caps`. Archivo (la fuente del sitio) no trae mayúsculas pequeñas reales (glifo OpenType `smcp`), así que el navegador las **sintetiza**, escalando hacia abajo el glifo de la mayúscula normal — a los 12-14px que usan esas etiquetas, ese glifo reescalado se ve notoriamente más tosco que el resto del texto del sitio. Se armó una comparación directa (mismo texto, mismo tamaño, con y sin `small-caps` sintético, mismo `deviceScaleFactor`) y la diferencia es evidente a simple vista: el small-caps sintético sale más delgado y con bordes menos definidos.
+
+**Fix:** `.versalitas` pasó de `font-variant-caps: small-caps` a `text-transform: uppercase` con `letter-spacing` más ancho (0.03em → 0.07em) y `font-weight: 600` — mayúsculas reales nunca se reescalan, son el mismo glifo que cualquier otro texto del sitio, así que no hay reescalado que pueda verse tosco a ningún tamaño ni densidad de píxeles.
+
+**Cómo se probó:**
+Batería completa en 8 combinaciones de viewport/DPR, desde 1920×1080 (sin escalado, el peor caso realista para nitidez de texto) y con escalado de Windows típico (125%), pasando por laptops (1440×900, 1366×768) y tablets, hasta **iPhone XR (414×896 @ DPR 2)** e iPhone SE (375×667 @ DPR 2) — en las 8: sin scroll horizontal, sin errores de consola, y se verificó explícitamente que ninguna etiqueta `.versalitas` quedara cortada o desbordada por el cambio a mayúsculas reales (ocupan más ancho que el small-caps sintético). Comparación visual de la home completa a 1920×1080 sin escalado (el escenario donde más se notaba el problema) confirma que todas las etiquetas — eyebrow del hero, cada índice de sección, badges — ahora se ven nítidas.
+
+**Por qué:**
+- Se descartaron las dos hipótesis previas con evidencia (lectura real de `getComputedStyle`, confirmación explícita de Enzo sobre el 3D) antes de asumir la causa siguiente — evita "arreglar" algo que no estaba roto.
+- Mayúsculas reales + tracking en vez de volver a un `text-transform: uppercase` con `tracking-widest` "genérico de SaaS" (lo que se quería evitar desde el principio del rediseño editorial): se compensó con un tracking más generoso (0.07em) y peso semibold para que la etiqueta siga leyéndose como un recurso tipográfico deliberado, no como el patrón por defecto de cualquier landing.
+
+**Archivos afectados:**
+- `src/index.css` (clase `.versalitas`).
+
+**Pendiente / próximos pasos:**
+- Sin cambios respecto a la entrada anterior.
+
+---
+
+## 2026-08-06 - El contenido de la demo quedaba pegado arriba del teléfono — centrado vertical real
+
+**Qué se hizo:**
+Con el piso de alto restaurado (entrada anterior), el teléfono volvió a verse bien proporcionado, pero el contenido de cada pantalla (que nunca llega a ocupar todo ese alto) quedaba pegado arriba, con todo el espacio libre acumulado abajo — Enzo lo notó de inmediato.
+
+Causa: la técnica de apilar las 5 pantallas en `[grid-area:1/1]` mide correctamente el alto de la más alta, pero ese bloque (ya medido) no se estiraba para ocupar el resto del alto del teléfono — un `h-full` que se había puesto para eso **no funciona** ahí, porque el div de la pantalla del teléfono (`PhoneMockup`) solo tiene `min-height`, no un alto explícito, y un hijo con `height:100%` no se estira contra un padre cuyo alto viene únicamente de `min-height` (comportamiento estándar de CSS, no un bug del navegador) — por eso el `h-full` quedaba sin efecto y el bloque de contenido se quedaba con su alto natural, arriba del todo.
+
+**Fix:** se cambió el mecanismo de "estirar" de porcentaje a flexbox, que sí reparte el espacio libre correctamente contra un `min-height`: `PhoneMockup.jsx` ahora es `flex flex-col` en vez de bloque simple, y el contenedor de las 5 pantallas en `LiveDemo.jsx` pasó de `h-full` a `flex-1` (además de `content-center` para centrar ese bloque dentro del espacio extra, y `flex flex-col justify-center` en cada pantalla individual para que las más cortas —como "Elige un barbero"— se centren también dentro de la fila compartida con las más altas).
+
+**Cómo se verificó:**
+Capturas de las 5 pantallas recortadas al marco real del teléfono (1440px): las dos más cortas (Servicio, Barbero) y la más alta (Datos) quedan todas centradas verticalmente con márgenes equilibrados arriba y abajo, ya no pegadas arriba. Se repitió la batería de 6 viewports (375/390/768/1024/1440/1920): sin scroll horizontal ni errores de consola. `npm run build` limpio.
+
+**Por qué:**
+- Flexbox en vez de insistir con porcentajes: es la herramienta correcta para "reparte el espacio libre de un contenedor cuyo alto viene de `min-height`" — intentar forzarlo con `height: 100%` es exactamente el tipo de suposición de CSS que parece que debería funcionar pero no lo hace, y quedarse con esa suposición sin verificar habría dejado el mismo bug con otro nombre.
+
+**Archivos afectados:**
+- `src/components/common/PhoneMockup.jsx` (el contenedor de pantalla pasó a `flex flex-col`).
+- `src/pages/Home/components/LiveDemo.jsx` (`h-full` → `flex-1` + `content-center` en el contenedor de las 5 pantallas; `flex flex-col justify-center` agregado a cada pantalla individual).
+
+**Pendiente / próximos pasos:**
+- Sin cambios respecto a la entrada anterior.
+
+---
+
+## 2026-08-06 - Corregido: las etiquetas en versalitas se veían pixeladas (small-caps sintético, no un problema de DPR ni del 3D)
+
+**Qué se hizo:**
+Enzo reportó letras pixeladas "en algunas partes" en varias pantallas, desde 1920x1080 hasta un iPhone XR. Se descartaron dos hipótesis antes de dar con la causa real:
+1. **Densidad de píxeles del Canvas 3D** — descartado explícitamente por Enzo ("el modelo 3D no lo toques, todo eso está bien").
+2. **Transform residual de Framer Motion tras animar** (una teoría razonable: texto en su propia capa compuesta puede perder el antialiasing de subpíxel) — se verificó con Playwright leyendo `getComputedStyle(el).transform` sobre titulares ya animados (`Hero` y una sección con `ScrollReveal`) y en ambos casos el resultado fue `"none"` — Framer Motion sí limpia el transform al asentarse. Hipótesis descartada con evidencia, no solo por suposición.
+
+**Causa real, confirmada con una comparación directa:** la clase `.versalitas` (usada en absolutamente todas las etiquetas del sitio — el eyebrow del hero, cada `SectionRule`, el nav, los links del footer, los badges de plan, etc.) usaba `font-variant-caps: small-caps`. Archivo (la fuente del sitio) no trae mayúsculas pequeñas reales (glifo OpenType `smcp`), así que el navegador las **sintetiza**, escalando hacia abajo el glifo de la mayúscula normal — a los 12-14px que usan esas etiquetas, ese glifo reescalado se ve notoriamente más tosco que el resto del texto del sitio. Se armó una comparación directa (mismo texto, mismo tamaño, con y sin `small-caps` sintético, mismo `deviceScaleFactor`) y la diferencia es evidente a simple vista: el small-caps sintético sale más delgado y con bordes menos definidos.
+
+**Fix:** `.versalitas` pasó de `font-variant-caps: small-caps` a `text-transform: uppercase` con `letter-spacing` más ancho (0.03em → 0.07em) y `font-weight: 600` — mayúsculas reales nunca se reescalan, son el mismo glifo que cualquier otro texto del sitio, así que no hay reescalado que pueda verse tosco a ningún tamaño ni densidad de píxeles.
+
+**Cómo se probó:**
+Batería completa en 8 combinaciones de viewport/DPR, desde 1920×1080 (sin escalado, el peor caso realista para nitidez de texto) y con escalado de Windows típico (125%), pasando por laptops (1440×900, 1366×768) y tablets, hasta **iPhone XR (414×896 @ DPR 2)** e iPhone SE (375×667 @ DPR 2) — en las 8: sin scroll horizontal, sin errores de consola, y se verificó explícitamente que ninguna etiqueta `.versalitas` quedara cortada o desbordada por el cambio a mayúsculas reales (ocupan más ancho que el small-caps sintético). Comparación visual de la home completa a 1920×1080 sin escalado (el escenario donde más se notaba el problema) confirma que todas las etiquetas — eyebrow del hero, cada índice de sección, badges — ahora se ven nítidas.
+
+**Por qué:**
+- Se descartaron las dos hipótesis previas con evidencia (lectura real de `getComputedStyle`, confirmación explícita de Enzo sobre el 3D) antes de asumir la causa siguiente — evita "arreglar" algo que no estaba roto.
+- Mayúsculas reales + tracking en vez de volver a un `text-transform: uppercase` con `tracking-widest` "genérico de SaaS" (lo que se quería evitar desde el principio del rediseño editorial): se compensó con un tracking más generoso (0.07em) y peso semibold para que la etiqueta siga leyéndose como un recurso tipográfico deliberado, no como el patrón por defecto de cualquier landing.
+
+**Archivos afectados:**
+- `src/index.css` (clase `.versalitas`).
+
+**Pendiente / próximos pasos:**
+- Sin cambios respecto a la entrada anterior.
+
+---
+
+## 2026-08-06 - Ajuste fino: el piso de alto del celular quedó muy bajo y se veía achatado
+
+**Qué se hizo:**
+Al arreglar el recorte del mockup (entrada anterior), el `min-h` que se dejó como piso (22rem) resultó más bajo de lo pensado: el contenido real de las 5 pantallas (~180-236px) queda muy por debajo de ese piso, así que el piso terminaba siendo la altura real casi siempre — y 22rem de alto contra el ancho fijo del teléfono (16rem/18rem) da una proporción ancho:alto de ~0.8, que ya no se lee como celular sino como algo más achatado. Enzo lo notó de inmediato en la pantalla "Elige un barbero" (la de contenido más corto, donde más se notaba).
+
+**Fix:** se subió el piso a `min-h-[28rem]` mobile / `md:min-h-[31rem]` desktop — los mismos valores que tenía el alto fijo original antes de todo este ajuste, pero ahora como **piso**, no como techo. Sigue cumpliendo el objetivo de la corrección anterior (si algún día una pantalla necesita más espacio, crece en vez de recortarse) y además recupera la proporción de celular real.
+
+**Cómo se verificó:**
+Con Playwright se midió el `boundingBox()` real del teléfono en la pantalla más corta ("Elige un barbero") en dos anchos: 375px → 256×476 (proporción 0.54) y 1440px → 288×524 (0.55) — muy cerca de la proporción original (~0.58) y de una silueta de celular real. Se volvió a confirmar visualmente que la pantalla "Tus datos" (la más alta de las 5) sigue con margen de sobra dentro del piso más alto, sin recortarse.
+
+**Por qué:**
+- No se volvió a un alto fijo (techo): el objetivo de la corrección anterior — que ninguna pantalla futura más alta que el número elegido quede tapada — se mantiene intacto. Solo se corrigió qué número usar como piso, con el mismo criterio de "que se vea como celular" que ya había validado Enzo antes.
+
+**Archivos afectados:**
+- `src/components/common/PhoneMockup.jsx` (`min-h-[22rem]` → `min-h-[28rem] md:min-h-[31rem]`).
+
+**Pendiente / próximos pasos:**
+- Sin cambios respecto a la entrada anterior.
+
+---
+
+## 2026-08-06 - Corregido: las etiquetas en versalitas se veían pixeladas (small-caps sintético, no un problema de DPR ni del 3D)
+
+**Qué se hizo:**
+Enzo reportó letras pixeladas "en algunas partes" en varias pantallas, desde 1920x1080 hasta un iPhone XR. Se descartaron dos hipótesis antes de dar con la causa real:
+1. **Densidad de píxeles del Canvas 3D** — descartado explícitamente por Enzo ("el modelo 3D no lo toques, todo eso está bien").
+2. **Transform residual de Framer Motion tras animar** (una teoría razonable: texto en su propia capa compuesta puede perder el antialiasing de subpíxel) — se verificó con Playwright leyendo `getComputedStyle(el).transform` sobre titulares ya animados (`Hero` y una sección con `ScrollReveal`) y en ambos casos el resultado fue `"none"` — Framer Motion sí limpia el transform al asentarse. Hipótesis descartada con evidencia, no solo por suposición.
+
+**Causa real, confirmada con una comparación directa:** la clase `.versalitas` (usada en absolutamente todas las etiquetas del sitio — el eyebrow del hero, cada `SectionRule`, el nav, los links del footer, los badges de plan, etc.) usaba `font-variant-caps: small-caps`. Archivo (la fuente del sitio) no trae mayúsculas pequeñas reales (glifo OpenType `smcp`), así que el navegador las **sintetiza**, escalando hacia abajo el glifo de la mayúscula normal — a los 12-14px que usan esas etiquetas, ese glifo reescalado se ve notoriamente más tosco que el resto del texto del sitio. Se armó una comparación directa (mismo texto, mismo tamaño, con y sin `small-caps` sintético, mismo `deviceScaleFactor`) y la diferencia es evidente a simple vista: el small-caps sintético sale más delgado y con bordes menos definidos.
+
+**Fix:** `.versalitas` pasó de `font-variant-caps: small-caps` a `text-transform: uppercase` con `letter-spacing` más ancho (0.03em → 0.07em) y `font-weight: 600` — mayúsculas reales nunca se reescalan, son el mismo glifo que cualquier otro texto del sitio, así que no hay reescalado que pueda verse tosco a ningún tamaño ni densidad de píxeles.
+
+**Cómo se probó:**
+Batería completa en 8 combinaciones de viewport/DPR, desde 1920×1080 (sin escalado, el peor caso realista para nitidez de texto) y con escalado de Windows típico (125%), pasando por laptops (1440×900, 1366×768) y tablets, hasta **iPhone XR (414×896 @ DPR 2)** e iPhone SE (375×667 @ DPR 2) — en las 8: sin scroll horizontal, sin errores de consola, y se verificó explícitamente que ninguna etiqueta `.versalitas` quedara cortada o desbordada por el cambio a mayúsculas reales (ocupan más ancho que el small-caps sintético). Comparación visual de la home completa a 1920×1080 sin escalado (el escenario donde más se notaba el problema) confirma que todas las etiquetas — eyebrow del hero, cada índice de sección, badges — ahora se ven nítidas.
+
+**Por qué:**
+- Se descartaron las dos hipótesis previas con evidencia (lectura real de `getComputedStyle`, confirmación explícita de Enzo sobre el 3D) antes de asumir la causa siguiente — evita "arreglar" algo que no estaba roto.
+- Mayúsculas reales + tracking en vez de volver a un `text-transform: uppercase` con `tracking-widest` "genérico de SaaS" (lo que se quería evitar desde el principio del rediseño editorial): se compensó con un tracking más generoso (0.07em) y peso semibold para que la etiqueta siga leyéndose como un recurso tipográfico deliberado, no como el patrón por defecto de cualquier landing.
+
+**Archivos afectados:**
+- `src/index.css` (clase `.versalitas`).
+
+**Pendiente / próximos pasos:**
+- Sin cambios respecto a la entrada anterior.
+
+---
+
+## 2026-08-06 - El contenido de la demo quedaba pegado arriba del teléfono — centrado vertical real
+
+**Qué se hizo:**
+Con el piso de alto restaurado (entrada anterior), el teléfono volvió a verse bien proporcionado, pero el contenido de cada pantalla (que nunca llega a ocupar todo ese alto) quedaba pegado arriba, con todo el espacio libre acumulado abajo — Enzo lo notó de inmediato.
+
+Causa: la técnica de apilar las 5 pantallas en `[grid-area:1/1]` mide correctamente el alto de la más alta, pero ese bloque (ya medido) no se estiraba para ocupar el resto del alto del teléfono — un `h-full` que se había puesto para eso **no funciona** ahí, porque el div de la pantalla del teléfono (`PhoneMockup`) solo tiene `min-height`, no un alto explícito, y un hijo con `height:100%` no se estira contra un padre cuyo alto viene únicamente de `min-height` (comportamiento estándar de CSS, no un bug del navegador) — por eso el `h-full` quedaba sin efecto y el bloque de contenido se quedaba con su alto natural, arriba del todo.
+
+**Fix:** se cambió el mecanismo de "estirar" de porcentaje a flexbox, que sí reparte el espacio libre correctamente contra un `min-height`: `PhoneMockup.jsx` ahora es `flex flex-col` en vez de bloque simple, y el contenedor de las 5 pantallas en `LiveDemo.jsx` pasó de `h-full` a `flex-1` (además de `content-center` para centrar ese bloque dentro del espacio extra, y `flex flex-col justify-center` en cada pantalla individual para que las más cortas —como "Elige un barbero"— se centren también dentro de la fila compartida con las más altas).
+
+**Cómo se verificó:**
+Capturas de las 5 pantallas recortadas al marco real del teléfono (1440px): las dos más cortas (Servicio, Barbero) y la más alta (Datos) quedan todas centradas verticalmente con márgenes equilibrados arriba y abajo, ya no pegadas arriba. Se repitió la batería de 6 viewports (375/390/768/1024/1440/1920): sin scroll horizontal ni errores de consola. `npm run build` limpio.
+
+**Por qué:**
+- Flexbox en vez de insistir con porcentajes: es la herramienta correcta para "reparte el espacio libre de un contenedor cuyo alto viene de `min-height`" — intentar forzarlo con `height: 100%` es exactamente el tipo de suposición de CSS que parece que debería funcionar pero no lo hace, y quedarse con esa suposición sin verificar habría dejado el mismo bug con otro nombre.
+
+**Archivos afectados:**
+- `src/components/common/PhoneMockup.jsx` (el contenedor de pantalla pasó a `flex flex-col`).
+- `src/pages/Home/components/LiveDemo.jsx` (`h-full` → `flex-1` + `content-center` en el contenedor de las 5 pantallas; `flex flex-col justify-center` agregado a cada pantalla individual).
+
+**Pendiente / próximos pasos:**
+- Sin cambios respecto a la entrada anterior.
+
+---
+
+## 2026-08-06 - Corregido: las etiquetas en versalitas se veían pixeladas (small-caps sintético, no un problema de DPR ni del 3D)
+
+**Qué se hizo:**
+Enzo reportó letras pixeladas "en algunas partes" en varias pantallas, desde 1920x1080 hasta un iPhone XR. Se descartaron dos hipótesis antes de dar con la causa real:
+1. **Densidad de píxeles del Canvas 3D** — descartado explícitamente por Enzo ("el modelo 3D no lo toques, todo eso está bien").
+2. **Transform residual de Framer Motion tras animar** (una teoría razonable: texto en su propia capa compuesta puede perder el antialiasing de subpíxel) — se verificó con Playwright leyendo `getComputedStyle(el).transform` sobre titulares ya animados (`Hero` y una sección con `ScrollReveal`) y en ambos casos el resultado fue `"none"` — Framer Motion sí limpia el transform al asentarse. Hipótesis descartada con evidencia, no solo por suposición.
+
+**Causa real, confirmada con una comparación directa:** la clase `.versalitas` (usada en absolutamente todas las etiquetas del sitio — el eyebrow del hero, cada `SectionRule`, el nav, los links del footer, los badges de plan, etc.) usaba `font-variant-caps: small-caps`. Archivo (la fuente del sitio) no trae mayúsculas pequeñas reales (glifo OpenType `smcp`), así que el navegador las **sintetiza**, escalando hacia abajo el glifo de la mayúscula normal — a los 12-14px que usan esas etiquetas, ese glifo reescalado se ve notoriamente más tosco que el resto del texto del sitio. Se armó una comparación directa (mismo texto, mismo tamaño, con y sin `small-caps` sintético, mismo `deviceScaleFactor`) y la diferencia es evidente a simple vista: el small-caps sintético sale más delgado y con bordes menos definidos.
+
+**Fix:** `.versalitas` pasó de `font-variant-caps: small-caps` a `text-transform: uppercase` con `letter-spacing` más ancho (0.03em → 0.07em) y `font-weight: 600` — mayúsculas reales nunca se reescalan, son el mismo glifo que cualquier otro texto del sitio, así que no hay reescalado que pueda verse tosco a ningún tamaño ni densidad de píxeles.
+
+**Cómo se probó:**
+Batería completa en 8 combinaciones de viewport/DPR, desde 1920×1080 (sin escalado, el peor caso realista para nitidez de texto) y con escalado de Windows típico (125%), pasando por laptops (1440×900, 1366×768) y tablets, hasta **iPhone XR (414×896 @ DPR 2)** e iPhone SE (375×667 @ DPR 2) — en las 8: sin scroll horizontal, sin errores de consola, y se verificó explícitamente que ninguna etiqueta `.versalitas` quedara cortada o desbordada por el cambio a mayúsculas reales (ocupan más ancho que el small-caps sintético). Comparación visual de la home completa a 1920×1080 sin escalado (el escenario donde más se notaba el problema) confirma que todas las etiquetas — eyebrow del hero, cada índice de sección, badges — ahora se ven nítidas.
+
+**Por qué:**
+- Se descartaron las dos hipótesis previas con evidencia (lectura real de `getComputedStyle`, confirmación explícita de Enzo sobre el 3D) antes de asumir la causa siguiente — evita "arreglar" algo que no estaba roto.
+- Mayúsculas reales + tracking en vez de volver a un `text-transform: uppercase` con `tracking-widest` "genérico de SaaS" (lo que se quería evitar desde el principio del rediseño editorial): se compensó con un tracking más generoso (0.07em) y peso semibold para que la etiqueta siga leyéndose como un recurso tipográfico deliberado, no como el patrón por defecto de cualquier landing.
+
+**Archivos afectados:**
+- `src/index.css` (clase `.versalitas`).
+
+**Pendiente / próximos pasos:**
+- Sin cambios respecto a la entrada anterior.
+
+---

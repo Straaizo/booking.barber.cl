@@ -25,7 +25,7 @@ function Marca({ valor }) {
     return <span className="text-sm text-negro-barbero">{valor}</span>
   }
   return valor ? (
-    <span className="text-cobre">✓</span>
+    <span className="text-cobre-texto">✓</span>
   ) : (
     <span className="text-gris-calido-400">—</span>
   )
@@ -50,7 +50,12 @@ export function Pricing() {
 
           {/* Desktop / tablet: tabla comparativa de una sola pieza */}
           <StaggerReveal className="mt-14 hidden lg:block">
-            <table className="w-full border-collapse text-left">
+            {/* table-fixed es la corrección real: sin esto, table-layout:auto
+                expande cada columna según su contenido más ancho (el botón
+                "Elegir Estudio", la fila de WhatsApp) y el navegador ensancha
+                la tabla entera más allá de su contenedor — no es un problema
+                de grid ni de overflow, es table-layout. */}
+            <table className="w-full table-fixed border-collapse text-left">
               <thead>
                 <tr>
                   <th className="w-1/4 border-b border-cobre/25 pb-6" />
@@ -125,7 +130,7 @@ export function Pricing() {
                 }`}
               >
                 {plan.destacado && (
-                  <span className="versalitas mb-3 inline-block text-xs text-cobre">
+                  <span className="versalitas mb-3 inline-block text-xs text-cobre-texto">
                     — Más elegido
                   </span>
                 )}

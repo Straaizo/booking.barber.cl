@@ -11,6 +11,11 @@
   --color-cobre-oscuro: #7a4324;
   --color-verde-barberia: #2f4538;
   --color-laton: #b08d57;
+  /* --color-cobre no pasa AA en texto chico (solo sirve para gráfica: botones,
+     líneas, bordes, o texto grande ≥18.66px bold / 24px regular). Para texto
+     chico en cobre, usar una de estas dos según el fondo: */
+  --color-cobre-texto: #8f4e2a; /* sobre fondos claros (hueso, blancos) */
+  --color-cobre-claro: #dd9569; /* sobre fondos oscuros (negro-barbero) */
 
   --color-gris-calido-100: #e9e4d9;
   --color-gris-calido-200: #d8d1c3;
@@ -41,9 +46,17 @@ h3 {
   font-variant-numeric: tabular-nums;
 }
 
+/* Antes usaba font-variant-caps: small-caps. Archivo no trae versalitas reales
+   (glifo smcp), así que el navegador las sintetiza escalando la mayúscula hacia
+   abajo — a los 12-14px que usan las etiquetas del sitio, esa reescala se ve
+   notoriamente más tosca/pixelada que el resto del texto (confirmado
+   comparando lado a lado el mismo texto con small-caps sintético vs.
+   mayúsculas reales). Mayúsculas reales con tracking no tienen ese problema:
+   son el mismo glifo que cualquier otro texto, nunca reescalado. */
 .versalitas {
-  font-variant-caps: small-caps;
-  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  font-weight: 600;
 }
 
 /* Cursor propio en desktop con puntero fino; en touch se conserva el cursor nativo */
@@ -52,4 +65,84 @@ h3 {
   .tiene-cursor-propio * {
     cursor: none;
   }
+}
+
+/* Marquee infinito: la pista dobla su contenido y se desplaza -50%, así el
+   loop no se nota — solo transform, nada de layout. Se pausa con :hover. */
+@keyframes marquee-izquierda {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+@keyframes marquee-derecha {
+  from {
+    transform: translateX(-50%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+.marquee-fila {
+  animation: marquee-izquierda 42s linear infinite;
+}
+.marquee-fila-inversa {
+  animation-name: marquee-derecha;
+  animation-duration: 58s;
+}
+.marquee-pista:hover .marquee-fila {
+  animation-play-state: paused;
+}
+@media (prefers-reduced-motion: reduce) {
+  .marquee-fila {
+    animation: none;
+  }
+}
+
+/* Slider editorial: input[type=range] reskineado por completo, no el control
+   nativo del navegador. Se mantiene <input type="range"> (no divs a mano)
+   para conservar gratis el soporte de teclado, touch y lectores de pantalla. */
+.slider-editorial {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 44px;
+  background: transparent;
+  cursor: pointer;
+}
+.slider-editorial::-webkit-slider-runnable-track {
+  height: 2px;
+  background: linear-gradient(
+    to right,
+    var(--color-cobre-oscuro) var(--relleno, 0%),
+    var(--color-gris-calido-200) var(--relleno, 0%)
+  );
+}
+.slider-editorial::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 22px;
+  height: 22px;
+  margin-top: -10px;
+  border-radius: 50%;
+  background: var(--color-cobre-oscuro);
+  border: 3px solid var(--color-hueso);
+  box-shadow: 0 0 0 1px var(--color-cobre-oscuro);
+}
+.slider-editorial::-moz-range-track {
+  height: 2px;
+  background: var(--color-gris-calido-200);
+}
+.slider-editorial::-moz-range-progress {
+  height: 2px;
+  background: var(--color-cobre-oscuro);
+}
+.slider-editorial::-moz-range-thumb {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--color-cobre-oscuro);
+  border: 3px solid var(--color-hueso);
 }
