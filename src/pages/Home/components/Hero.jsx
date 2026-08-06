@@ -16,8 +16,8 @@ export function Hero() {
 
       <div className="relative mx-auto grid max-w-5xl items-center gap-10 md:grid-cols-2 md:gap-12">
         <motion.div
-          initial={{ opacity: 0, scale: 0.82, y: 20 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 1.1, ease: EASE_ENTRADA, delay: 0.15 }}
           className="order-2 flex justify-center md:order-1"
         >

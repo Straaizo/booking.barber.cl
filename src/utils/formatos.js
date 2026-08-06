@@ -15,6 +15,15 @@ export function ofertaVigente(servicio) {
   return new Date(servicio.oferta_vence) > new Date()
 }
 
+// Arma un enlace wa.me a partir de un teléfono chileno guardado en cualquier
+// formato (con/sin +56, con espacios) — normaliza a solo dígitos con 56 al inicio.
+export function linkWhatsApp(telefono, mensaje = '') {
+  const soloDigitos = telefono.replace(/\D/g, '')
+  const conCodigoPais = soloDigitos.startsWith('56') ? soloDigitos : `56${soloDigitos.replace(/^0/, '')}`
+  const query = mensaje ? `?text=${encodeURIComponent(mensaje)}` : ''
+  return `https://wa.me/${conCodigoPais}${query}`
+}
+
 export function formatoFechaCorta(fecha) {
   return fecha.toLocaleDateString('es-CL', {
     weekday: 'short',
