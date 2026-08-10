@@ -470,6 +470,67 @@ Batería completa en 8 combinaciones de viewport/DPR, desde 1920×1080 (sin esca
 
 ---
 
+## 2026-08-06 - El modelo 3D del hero ahora se muestra en mobile por defecto, con degradación adaptativa por fps real
+
+**Qué se hizo:**
+Hasta ahora, mobile mostraba siempre `StaticBarberPoleIllustration` (la ilustración SVG) — una decisión tomada cuando todavía no existía el modelo 3D real y se optaba por seguridad de rendimiento. Enzo preguntó si se podía mostrar el modelo 3D real en mobile también. La respuesta corta es sí, y el prompt original de la Parte 3 ya lo contemplaba: *"en móvil, degrada: el 3D puede pasar a una versión de menor polycount, menos luces, o a un render estático de alta calidad si el frame rate baja de 50fps"* — es decir, la versión estática debía ser el **último recurso**, no la respuesta por defecto para todo mobile.
+
+Se implementó exactamente eso, de forma adaptativa en vez de una regla fija por ancho de pantalla:
+
+- **`MonitorRendimiento.jsx`** (nuevo): vive dentro del `<Canvas>` y usa `useFrame` para medir el fps real durante los primeros ~2 segundos (con 0.2s de calentamiento descartados, para no contar la compilación de shaders como "lento"). Si el promedio queda bajo 50fps, avisa una sola vez hacia afuera vía callback.
+- **`Scene3DCanvas.jsx`**: acepta `liviano` (booleano) y `onRendimientoBajo`. En modo `liviano` (mobile): `dpr` tope 1 en vez de 1.5 (el costo dominante en GPUs móviles es el fill-rate, no la geometría — bajar el dpr es lo que más ahorra), se quitan la luz de relleno y el rim trasero de cobre (quedan ambiente + key cálida, con el ambiente compensado un poco más arriba para que no se vea plano), sin sombra dinámica ni antialiasing.
+- **`HeroScene3D.jsx`**: ya no decide "mobile = estática" de entrada. Ahora `mostrarEstatica = prefersReducedMotion || rendimientoBajo` — `prefers-reduced-motion` sigue siendo una preferencia de accesibilidad que se respeta siempre (nunca monta el Canvas, ahorra la descarga completa de Three.js/el `.glb` en ese caso); `rendimientoBajo` es una decisión que se toma recién con una medición real del equipo del visitante, sea el que sea. Se unificó el tamaño del contenedor entre el estado 3D y el estático (antes eran de alto distinto) para que, si el monitor baja a estática después de un par de segundos, no haya un salto de layout — solo cambia lo que hay adentro de la misma caja.
+
+**Cómo se probó:**
+- `npm run build` limpio.
+- Se reprodujo el modelo real en mobile con user agent de iPhone (414×896 @ DPR 2): confirmado visualmente que el poste 3D (versión `liviano`) se ve bien — brillo cálido en la bombilla, rayas nítidas, sin verse "degradado" a simple vista pese a tener menos luces.
+- **Limitación real del entorno de prueba, importante de dejar registrada:** Chromium en modo headless en este entorno no tiene GPU real (usa un renderer por software) — el `MonitorRendimiento` mide correctamente ~40-43fps *tanto en mobile como en escritorio*, y baja a la ilustración estática en ambos casos. Esto no es un bug: es el monitor midiendo con precisión un hardware gráfico genuinamente lento. Como el escritorio venía mostrando el 3D fluido en todas las capturas de sesiones anteriores (con GPU real), esto confirma que la medición es correcta — simplemente no se puede demostrar "se ve fluido en un iPhone real" sin un dispositivo físico, que no está disponible en este entorno. Se verificó el camino "rinde bien" desactivando temporalmente el chequeo de fps solo para la captura visual, y revirtiendo el código real inmediatamente después.
+- Se repitió la batería de 7 escenarios (375/390/768/1024/1440/1920 + iPhone XR a DPR2) con la lógica real (sin bypasear nada): sin scroll horizontal, sin errores de consola en ninguno.
+- Se confirmó que con `prefers-reduced-motion: reduce` el `<canvas>` nunca llega a montarse (0 canvas encontrados tras esperar), es decir, ese camino sigue sin descargar Three.js en absoluto.
+
+**Por qué:**
+- Medir fps real en vez de asumir "mobile = débil": un iPhone reciente tiene una GPU más potente que muchos notebooks con integrada — negarle el 3D solo por el ancho de viewport habría sido una regla más simple pero peor, exactamente lo que Enzo notó y preguntó si se podía mejorar.
+- `dpr` tope 1 como principal ahorro en mobile (en vez de simplificar la geometría, que ya es low-poly): en GPUs móviles el cuello de botella típico es cuántos píxeles hay que sombrear (fill-rate), no cuántos vértices procesar — es la palanca que más rinde por el menor costo visual.
+- Mismo tamaño de contenedor en ambos estados: evitar un salto de layout que se notaría justo cuando el usuario ya está leyendo el hero, en el peor momento posible para un cambio brusco.
+
+**Archivos afectados:**
+- Nuevo: `src/components/animations/MonitorRendimiento.jsx`.
+- Modificados: `src/components/animations/Scene3DCanvas.jsx` (prop `liviano` + `onRendimientoBajo`), `src/components/animations/HeroScene3D.jsx` (ya no usa `isMobile` para decidir mostrar la ilustración; contenedor unificado).
+
+**Pendiente / próximos pasos:**
+- Validar en un dispositivo móvil físico real cuando Enzo tenga oportunidad — todo lo verificado acá es emulación de viewport/DPR/user-agent, no hardware real. Si en la práctica el umbral de 50fps resulta muy estricto o muy laxo para el catálogo real de equipos de sus clientes, es el número a ajustar (`umbralFps` en `MonitorRendimiento`).
+
+---
+
+## 2026-08-06 - Diagnóstico de errores de consola en el DevTools real de Enzo: uno era ruido de una extensión, el otro sí era corregible
+
+**Qué se hizo:**
+Enzo compartió una captura de su DevTools mostrando un error "Uncaught (in promise) Error: A listener indicated an asynchronous response by returning true, but the message channel closed before a response was received" y una advertencia de React Router. Se investigó cada uno por separado, sin asumir la causa:
+
+1. **El error de "asynchronous response"**: se cargó el sitio en un Chromium recién instalado por Playwright — **sin ninguna extensión** — y se navegó igual que un usuario real (scroll, esperas, sin forzar nada). El error **no apareció en absoluto**. Ese mensaje específico es una firma muy conocida de extensiones de Chrome que usan `chrome.runtime.sendMessage` con un listener que devuelve `true` (avisando que va a responder async) pero nunca llega a responder — típico de gestores de contraseñas, bloqueadores de ads, Grammarly, etc. Confirmado con evidencia: no es un bug del sitio, es una extensión instalada en el navegador real de Enzo. No hay nada que el código de la página pueda hacer para evitar que una extensión de un tercero se comporte así.
+2. **La advertencia de React Router** (`v7_startTransition`) — esta sí era corregible y se corrigió. Primer intento: pasar `future: { v7_startTransition: true }` como segundo argumento de `createBrowserRouter` — no funcionó (la advertencia seguía apareciendo incluso reiniciando el dev server desde cero, se verificó explícitamente en vez de asumir que "ya quedó"). Causa: esa bandera específica no es una opción de `createBrowserRouter`, es una prop de `<RouterProvider>`. Corregido pasándola ahí: `<RouterProvider router={router} future={{ v7_startTransition: true }} />`. Verificado de nuevo con el dev server reiniciado: la advertencia ya no aparece.
+
+De paso, revisando la consola en un navegador limpio, aparecieron otros dos mensajes (`GL Driver Message: GPU stall due to ReadPixels` y `THREE.WebGLRenderer: Context Lost`) — se investigaron también: ocurren igual con y sin capturas de pantalla de por medio (se descartó que fueran un artefacto de mi propio método de prueba), pero son específicos de este entorno de sandbox headless sin GPU real (renderiza por software) — el mismo modelo 3D ya se ha visto fluido y correcto en decenas de capturas de sesiones anteriores con GPU real disponible. No se tocó nada del 3D por esto (Enzo ya había pedido explícitamente no tocarlo).
+
+**Cómo se probó:**
+- Consola completa en Chromium limpio (sin extensiones): confirmado que el error de "asynchronous response" no es reproducible desde el código del sitio.
+- Tras el fix del future flag: reinicio completo del dev server (no solo HMR) + relectura de consola, confirmando la ausencia de la advertencia.
+- Navegación real entre rutas (`/`, click a `#planes`, `/demo`, `/login`) sin errores de página.
+- Batería completa de 7 viewports (375/390/768/1024/1440/1920 + iPhone XR): sin scroll horizontal, sin errores de página en ninguno.
+- `npm run build` limpio en cada punto de control.
+
+**Por qué:**
+- Se verificó la hipótesis del "ruido de extensión" con un navegador realmente limpio en vez de solo argumentarlo — la diferencia entre "creo que es una extensión" y "lo probé sin extensiones y no aparece" es la diferencia entre una opinión y un diagnóstico.
+- Se corrigió el primer intento fallido del future flag en vez de dejarlo por hecho tras escribir el código — el build pasa igual aunque la bandera esté en el lugar equivocado (no es un error de sintaxis, solo no tiene efecto), así que solo se puede confirmar probando.
+
+**Archivos afectados:**
+- `src/routes/AppRouter.jsx` (`future` movido de `createBrowserRouter` a `<RouterProvider>`).
+
+**Pendiente / próximos pasos:**
+- El error de "asynchronous response" que vio Enzo es de una extensión de su Chrome — no requiere ni admite un fix desde el código. Si quiere confirmarlo él mismo: abrir el sitio en una ventana de incógnito con las extensiones desactivadas (Chrome permite elegir cuáles corren en incógnito) y ver si el error deja de aparecer.
+
+---
+
 ## 2026-08-06 - El contenido de la demo quedaba pegado arriba del teléfono — centrado vertical real
 
 **Qué se hizo:**
@@ -517,6 +578,67 @@ Batería completa en 8 combinaciones de viewport/DPR, desde 1920×1080 (sin esca
 
 **Pendiente / próximos pasos:**
 - Sin cambios respecto a la entrada anterior.
+
+---
+
+## 2026-08-06 - El modelo 3D del hero ahora se muestra en mobile por defecto, con degradación adaptativa por fps real
+
+**Qué se hizo:**
+Hasta ahora, mobile mostraba siempre `StaticBarberPoleIllustration` (la ilustración SVG) — una decisión tomada cuando todavía no existía el modelo 3D real y se optaba por seguridad de rendimiento. Enzo preguntó si se podía mostrar el modelo 3D real en mobile también. La respuesta corta es sí, y el prompt original de la Parte 3 ya lo contemplaba: *"en móvil, degrada: el 3D puede pasar a una versión de menor polycount, menos luces, o a un render estático de alta calidad si el frame rate baja de 50fps"* — es decir, la versión estática debía ser el **último recurso**, no la respuesta por defecto para todo mobile.
+
+Se implementó exactamente eso, de forma adaptativa en vez de una regla fija por ancho de pantalla:
+
+- **`MonitorRendimiento.jsx`** (nuevo): vive dentro del `<Canvas>` y usa `useFrame` para medir el fps real durante los primeros ~2 segundos (con 0.2s de calentamiento descartados, para no contar la compilación de shaders como "lento"). Si el promedio queda bajo 50fps, avisa una sola vez hacia afuera vía callback.
+- **`Scene3DCanvas.jsx`**: acepta `liviano` (booleano) y `onRendimientoBajo`. En modo `liviano` (mobile): `dpr` tope 1 en vez de 1.5 (el costo dominante en GPUs móviles es el fill-rate, no la geometría — bajar el dpr es lo que más ahorra), se quitan la luz de relleno y el rim trasero de cobre (quedan ambiente + key cálida, con el ambiente compensado un poco más arriba para que no se vea plano), sin sombra dinámica ni antialiasing.
+- **`HeroScene3D.jsx`**: ya no decide "mobile = estática" de entrada. Ahora `mostrarEstatica = prefersReducedMotion || rendimientoBajo` — `prefers-reduced-motion` sigue siendo una preferencia de accesibilidad que se respeta siempre (nunca monta el Canvas, ahorra la descarga completa de Three.js/el `.glb` en ese caso); `rendimientoBajo` es una decisión que se toma recién con una medición real del equipo del visitante, sea el que sea. Se unificó el tamaño del contenedor entre el estado 3D y el estático (antes eran de alto distinto) para que, si el monitor baja a estática después de un par de segundos, no haya un salto de layout — solo cambia lo que hay adentro de la misma caja.
+
+**Cómo se probó:**
+- `npm run build` limpio.
+- Se reprodujo el modelo real en mobile con user agent de iPhone (414×896 @ DPR 2): confirmado visualmente que el poste 3D (versión `liviano`) se ve bien — brillo cálido en la bombilla, rayas nítidas, sin verse "degradado" a simple vista pese a tener menos luces.
+- **Limitación real del entorno de prueba, importante de dejar registrada:** Chromium en modo headless en este entorno no tiene GPU real (usa un renderer por software) — el `MonitorRendimiento` mide correctamente ~40-43fps *tanto en mobile como en escritorio*, y baja a la ilustración estática en ambos casos. Esto no es un bug: es el monitor midiendo con precisión un hardware gráfico genuinamente lento. Como el escritorio venía mostrando el 3D fluido en todas las capturas de sesiones anteriores (con GPU real), esto confirma que la medición es correcta — simplemente no se puede demostrar "se ve fluido en un iPhone real" sin un dispositivo físico, que no está disponible en este entorno. Se verificó el camino "rinde bien" desactivando temporalmente el chequeo de fps solo para la captura visual, y revirtiendo el código real inmediatamente después.
+- Se repitió la batería de 7 escenarios (375/390/768/1024/1440/1920 + iPhone XR a DPR2) con la lógica real (sin bypasear nada): sin scroll horizontal, sin errores de consola en ninguno.
+- Se confirmó que con `prefers-reduced-motion: reduce` el `<canvas>` nunca llega a montarse (0 canvas encontrados tras esperar), es decir, ese camino sigue sin descargar Three.js en absoluto.
+
+**Por qué:**
+- Medir fps real en vez de asumir "mobile = débil": un iPhone reciente tiene una GPU más potente que muchos notebooks con integrada — negarle el 3D solo por el ancho de viewport habría sido una regla más simple pero peor, exactamente lo que Enzo notó y preguntó si se podía mejorar.
+- `dpr` tope 1 como principal ahorro en mobile (en vez de simplificar la geometría, que ya es low-poly): en GPUs móviles el cuello de botella típico es cuántos píxeles hay que sombrear (fill-rate), no cuántos vértices procesar — es la palanca que más rinde por el menor costo visual.
+- Mismo tamaño de contenedor en ambos estados: evitar un salto de layout que se notaría justo cuando el usuario ya está leyendo el hero, en el peor momento posible para un cambio brusco.
+
+**Archivos afectados:**
+- Nuevo: `src/components/animations/MonitorRendimiento.jsx`.
+- Modificados: `src/components/animations/Scene3DCanvas.jsx` (prop `liviano` + `onRendimientoBajo`), `src/components/animations/HeroScene3D.jsx` (ya no usa `isMobile` para decidir mostrar la ilustración; contenedor unificado).
+
+**Pendiente / próximos pasos:**
+- Validar en un dispositivo móvil físico real cuando Enzo tenga oportunidad — todo lo verificado acá es emulación de viewport/DPR/user-agent, no hardware real. Si en la práctica el umbral de 50fps resulta muy estricto o muy laxo para el catálogo real de equipos de sus clientes, es el número a ajustar (`umbralFps` en `MonitorRendimiento`).
+
+---
+
+## 2026-08-06 - Diagnóstico de errores de consola en el DevTools real de Enzo: uno era ruido de una extensión, el otro sí era corregible
+
+**Qué se hizo:**
+Enzo compartió una captura de su DevTools mostrando un error "Uncaught (in promise) Error: A listener indicated an asynchronous response by returning true, but the message channel closed before a response was received" y una advertencia de React Router. Se investigó cada uno por separado, sin asumir la causa:
+
+1. **El error de "asynchronous response"**: se cargó el sitio en un Chromium recién instalado por Playwright — **sin ninguna extensión** — y se navegó igual que un usuario real (scroll, esperas, sin forzar nada). El error **no apareció en absoluto**. Ese mensaje específico es una firma muy conocida de extensiones de Chrome que usan `chrome.runtime.sendMessage` con un listener que devuelve `true` (avisando que va a responder async) pero nunca llega a responder — típico de gestores de contraseñas, bloqueadores de ads, Grammarly, etc. Confirmado con evidencia: no es un bug del sitio, es una extensión instalada en el navegador real de Enzo. No hay nada que el código de la página pueda hacer para evitar que una extensión de un tercero se comporte así.
+2. **La advertencia de React Router** (`v7_startTransition`) — esta sí era corregible y se corrigió. Primer intento: pasar `future: { v7_startTransition: true }` como segundo argumento de `createBrowserRouter` — no funcionó (la advertencia seguía apareciendo incluso reiniciando el dev server desde cero, se verificó explícitamente en vez de asumir que "ya quedó"). Causa: esa bandera específica no es una opción de `createBrowserRouter`, es una prop de `<RouterProvider>`. Corregido pasándola ahí: `<RouterProvider router={router} future={{ v7_startTransition: true }} />`. Verificado de nuevo con el dev server reiniciado: la advertencia ya no aparece.
+
+De paso, revisando la consola en un navegador limpio, aparecieron otros dos mensajes (`GL Driver Message: GPU stall due to ReadPixels` y `THREE.WebGLRenderer: Context Lost`) — se investigaron también: ocurren igual con y sin capturas de pantalla de por medio (se descartó que fueran un artefacto de mi propio método de prueba), pero son específicos de este entorno de sandbox headless sin GPU real (renderiza por software) — el mismo modelo 3D ya se ha visto fluido y correcto en decenas de capturas de sesiones anteriores con GPU real disponible. No se tocó nada del 3D por esto (Enzo ya había pedido explícitamente no tocarlo).
+
+**Cómo se probó:**
+- Consola completa en Chromium limpio (sin extensiones): confirmado que el error de "asynchronous response" no es reproducible desde el código del sitio.
+- Tras el fix del future flag: reinicio completo del dev server (no solo HMR) + relectura de consola, confirmando la ausencia de la advertencia.
+- Navegación real entre rutas (`/`, click a `#planes`, `/demo`, `/login`) sin errores de página.
+- Batería completa de 7 viewports (375/390/768/1024/1440/1920 + iPhone XR): sin scroll horizontal, sin errores de página en ninguno.
+- `npm run build` limpio en cada punto de control.
+
+**Por qué:**
+- Se verificó la hipótesis del "ruido de extensión" con un navegador realmente limpio en vez de solo argumentarlo — la diferencia entre "creo que es una extensión" y "lo probé sin extensiones y no aparece" es la diferencia entre una opinión y un diagnóstico.
+- Se corrigió el primer intento fallido del future flag en vez de dejarlo por hecho tras escribir el código — el build pasa igual aunque la bandera esté en el lugar equivocado (no es un error de sintaxis, solo no tiene efecto), así que solo se puede confirmar probando.
+
+**Archivos afectados:**
+- `src/routes/AppRouter.jsx` (`future` movido de `createBrowserRouter` a `<RouterProvider>`).
+
+**Pendiente / próximos pasos:**
+- El error de "asynchronous response" que vio Enzo es de una extensión de su Chrome — no requiere ni admite un fix desde el código. Si quiere confirmarlo él mismo: abrir el sitio en una ventana de incógnito con las extensiones desactivadas (Chrome permite elegir cuáles corren en incógnito) y ver si el error deja de aparecer.
 
 ---
 
@@ -634,6 +756,67 @@ Batería completa en 8 combinaciones de viewport/DPR, desde 1920×1080 (sin esca
 
 ---
 
+## 2026-08-06 - El modelo 3D del hero ahora se muestra en mobile por defecto, con degradación adaptativa por fps real
+
+**Qué se hizo:**
+Hasta ahora, mobile mostraba siempre `StaticBarberPoleIllustration` (la ilustración SVG) — una decisión tomada cuando todavía no existía el modelo 3D real y se optaba por seguridad de rendimiento. Enzo preguntó si se podía mostrar el modelo 3D real en mobile también. La respuesta corta es sí, y el prompt original de la Parte 3 ya lo contemplaba: *"en móvil, degrada: el 3D puede pasar a una versión de menor polycount, menos luces, o a un render estático de alta calidad si el frame rate baja de 50fps"* — es decir, la versión estática debía ser el **último recurso**, no la respuesta por defecto para todo mobile.
+
+Se implementó exactamente eso, de forma adaptativa en vez de una regla fija por ancho de pantalla:
+
+- **`MonitorRendimiento.jsx`** (nuevo): vive dentro del `<Canvas>` y usa `useFrame` para medir el fps real durante los primeros ~2 segundos (con 0.2s de calentamiento descartados, para no contar la compilación de shaders como "lento"). Si el promedio queda bajo 50fps, avisa una sola vez hacia afuera vía callback.
+- **`Scene3DCanvas.jsx`**: acepta `liviano` (booleano) y `onRendimientoBajo`. En modo `liviano` (mobile): `dpr` tope 1 en vez de 1.5 (el costo dominante en GPUs móviles es el fill-rate, no la geometría — bajar el dpr es lo que más ahorra), se quitan la luz de relleno y el rim trasero de cobre (quedan ambiente + key cálida, con el ambiente compensado un poco más arriba para que no se vea plano), sin sombra dinámica ni antialiasing.
+- **`HeroScene3D.jsx`**: ya no decide "mobile = estática" de entrada. Ahora `mostrarEstatica = prefersReducedMotion || rendimientoBajo` — `prefers-reduced-motion` sigue siendo una preferencia de accesibilidad que se respeta siempre (nunca monta el Canvas, ahorra la descarga completa de Three.js/el `.glb` en ese caso); `rendimientoBajo` es una decisión que se toma recién con una medición real del equipo del visitante, sea el que sea. Se unificó el tamaño del contenedor entre el estado 3D y el estático (antes eran de alto distinto) para que, si el monitor baja a estática después de un par de segundos, no haya un salto de layout — solo cambia lo que hay adentro de la misma caja.
+
+**Cómo se probó:**
+- `npm run build` limpio.
+- Se reprodujo el modelo real en mobile con user agent de iPhone (414×896 @ DPR 2): confirmado visualmente que el poste 3D (versión `liviano`) se ve bien — brillo cálido en la bombilla, rayas nítidas, sin verse "degradado" a simple vista pese a tener menos luces.
+- **Limitación real del entorno de prueba, importante de dejar registrada:** Chromium en modo headless en este entorno no tiene GPU real (usa un renderer por software) — el `MonitorRendimiento` mide correctamente ~40-43fps *tanto en mobile como en escritorio*, y baja a la ilustración estática en ambos casos. Esto no es un bug: es el monitor midiendo con precisión un hardware gráfico genuinamente lento. Como el escritorio venía mostrando el 3D fluido en todas las capturas de sesiones anteriores (con GPU real), esto confirma que la medición es correcta — simplemente no se puede demostrar "se ve fluido en un iPhone real" sin un dispositivo físico, que no está disponible en este entorno. Se verificó el camino "rinde bien" desactivando temporalmente el chequeo de fps solo para la captura visual, y revirtiendo el código real inmediatamente después.
+- Se repitió la batería de 7 escenarios (375/390/768/1024/1440/1920 + iPhone XR a DPR2) con la lógica real (sin bypasear nada): sin scroll horizontal, sin errores de consola en ninguno.
+- Se confirmó que con `prefers-reduced-motion: reduce` el `<canvas>` nunca llega a montarse (0 canvas encontrados tras esperar), es decir, ese camino sigue sin descargar Three.js en absoluto.
+
+**Por qué:**
+- Medir fps real en vez de asumir "mobile = débil": un iPhone reciente tiene una GPU más potente que muchos notebooks con integrada — negarle el 3D solo por el ancho de viewport habría sido una regla más simple pero peor, exactamente lo que Enzo notó y preguntó si se podía mejorar.
+- `dpr` tope 1 como principal ahorro en mobile (en vez de simplificar la geometría, que ya es low-poly): en GPUs móviles el cuello de botella típico es cuántos píxeles hay que sombrear (fill-rate), no cuántos vértices procesar — es la palanca que más rinde por el menor costo visual.
+- Mismo tamaño de contenedor en ambos estados: evitar un salto de layout que se notaría justo cuando el usuario ya está leyendo el hero, en el peor momento posible para un cambio brusco.
+
+**Archivos afectados:**
+- Nuevo: `src/components/animations/MonitorRendimiento.jsx`.
+- Modificados: `src/components/animations/Scene3DCanvas.jsx` (prop `liviano` + `onRendimientoBajo`), `src/components/animations/HeroScene3D.jsx` (ya no usa `isMobile` para decidir mostrar la ilustración; contenedor unificado).
+
+**Pendiente / próximos pasos:**
+- Validar en un dispositivo móvil físico real cuando Enzo tenga oportunidad — todo lo verificado acá es emulación de viewport/DPR/user-agent, no hardware real. Si en la práctica el umbral de 50fps resulta muy estricto o muy laxo para el catálogo real de equipos de sus clientes, es el número a ajustar (`umbralFps` en `MonitorRendimiento`).
+
+---
+
+## 2026-08-06 - Diagnóstico de errores de consola en el DevTools real de Enzo: uno era ruido de una extensión, el otro sí era corregible
+
+**Qué se hizo:**
+Enzo compartió una captura de su DevTools mostrando un error "Uncaught (in promise) Error: A listener indicated an asynchronous response by returning true, but the message channel closed before a response was received" y una advertencia de React Router. Se investigó cada uno por separado, sin asumir la causa:
+
+1. **El error de "asynchronous response"**: se cargó el sitio en un Chromium recién instalado por Playwright — **sin ninguna extensión** — y se navegó igual que un usuario real (scroll, esperas, sin forzar nada). El error **no apareció en absoluto**. Ese mensaje específico es una firma muy conocida de extensiones de Chrome que usan `chrome.runtime.sendMessage` con un listener que devuelve `true` (avisando que va a responder async) pero nunca llega a responder — típico de gestores de contraseñas, bloqueadores de ads, Grammarly, etc. Confirmado con evidencia: no es un bug del sitio, es una extensión instalada en el navegador real de Enzo. No hay nada que el código de la página pueda hacer para evitar que una extensión de un tercero se comporte así.
+2. **La advertencia de React Router** (`v7_startTransition`) — esta sí era corregible y se corrigió. Primer intento: pasar `future: { v7_startTransition: true }` como segundo argumento de `createBrowserRouter` — no funcionó (la advertencia seguía apareciendo incluso reiniciando el dev server desde cero, se verificó explícitamente en vez de asumir que "ya quedó"). Causa: esa bandera específica no es una opción de `createBrowserRouter`, es una prop de `<RouterProvider>`. Corregido pasándola ahí: `<RouterProvider router={router} future={{ v7_startTransition: true }} />`. Verificado de nuevo con el dev server reiniciado: la advertencia ya no aparece.
+
+De paso, revisando la consola en un navegador limpio, aparecieron otros dos mensajes (`GL Driver Message: GPU stall due to ReadPixels` y `THREE.WebGLRenderer: Context Lost`) — se investigaron también: ocurren igual con y sin capturas de pantalla de por medio (se descartó que fueran un artefacto de mi propio método de prueba), pero son específicos de este entorno de sandbox headless sin GPU real (renderiza por software) — el mismo modelo 3D ya se ha visto fluido y correcto en decenas de capturas de sesiones anteriores con GPU real disponible. No se tocó nada del 3D por esto (Enzo ya había pedido explícitamente no tocarlo).
+
+**Cómo se probó:**
+- Consola completa en Chromium limpio (sin extensiones): confirmado que el error de "asynchronous response" no es reproducible desde el código del sitio.
+- Tras el fix del future flag: reinicio completo del dev server (no solo HMR) + relectura de consola, confirmando la ausencia de la advertencia.
+- Navegación real entre rutas (`/`, click a `#planes`, `/demo`, `/login`) sin errores de página.
+- Batería completa de 7 viewports (375/390/768/1024/1440/1920 + iPhone XR): sin scroll horizontal, sin errores de página en ninguno.
+- `npm run build` limpio en cada punto de control.
+
+**Por qué:**
+- Se verificó la hipótesis del "ruido de extensión" con un navegador realmente limpio en vez de solo argumentarlo — la diferencia entre "creo que es una extensión" y "lo probé sin extensiones y no aparece" es la diferencia entre una opinión y un diagnóstico.
+- Se corrigió el primer intento fallido del future flag en vez de dejarlo por hecho tras escribir el código — el build pasa igual aunque la bandera esté en el lugar equivocado (no es un error de sintaxis, solo no tiene efecto), así que solo se puede confirmar probando.
+
+**Archivos afectados:**
+- `src/routes/AppRouter.jsx` (`future` movido de `createBrowserRouter` a `<RouterProvider>`).
+
+**Pendiente / próximos pasos:**
+- El error de "asynchronous response" que vio Enzo es de una extensión de su Chrome — no requiere ni admite un fix desde el código. Si quiere confirmarlo él mismo: abrir el sitio en una ventana de incógnito con las extensiones desactivadas (Chrome permite elegir cuáles corren en incógnito) y ver si el error deja de aparecer.
+
+---
+
 ## 2026-08-06 - El contenido de la demo quedaba pegado arriba del teléfono — centrado vertical real
 
 **Qué se hizo:**
@@ -681,6 +864,67 @@ Batería completa en 8 combinaciones de viewport/DPR, desde 1920×1080 (sin esca
 
 **Pendiente / próximos pasos:**
 - Sin cambios respecto a la entrada anterior.
+
+---
+
+## 2026-08-06 - El modelo 3D del hero ahora se muestra en mobile por defecto, con degradación adaptativa por fps real
+
+**Qué se hizo:**
+Hasta ahora, mobile mostraba siempre `StaticBarberPoleIllustration` (la ilustración SVG) — una decisión tomada cuando todavía no existía el modelo 3D real y se optaba por seguridad de rendimiento. Enzo preguntó si se podía mostrar el modelo 3D real en mobile también. La respuesta corta es sí, y el prompt original de la Parte 3 ya lo contemplaba: *"en móvil, degrada: el 3D puede pasar a una versión de menor polycount, menos luces, o a un render estático de alta calidad si el frame rate baja de 50fps"* — es decir, la versión estática debía ser el **último recurso**, no la respuesta por defecto para todo mobile.
+
+Se implementó exactamente eso, de forma adaptativa en vez de una regla fija por ancho de pantalla:
+
+- **`MonitorRendimiento.jsx`** (nuevo): vive dentro del `<Canvas>` y usa `useFrame` para medir el fps real durante los primeros ~2 segundos (con 0.2s de calentamiento descartados, para no contar la compilación de shaders como "lento"). Si el promedio queda bajo 50fps, avisa una sola vez hacia afuera vía callback.
+- **`Scene3DCanvas.jsx`**: acepta `liviano` (booleano) y `onRendimientoBajo`. En modo `liviano` (mobile): `dpr` tope 1 en vez de 1.5 (el costo dominante en GPUs móviles es el fill-rate, no la geometría — bajar el dpr es lo que más ahorra), se quitan la luz de relleno y el rim trasero de cobre (quedan ambiente + key cálida, con el ambiente compensado un poco más arriba para que no se vea plano), sin sombra dinámica ni antialiasing.
+- **`HeroScene3D.jsx`**: ya no decide "mobile = estática" de entrada. Ahora `mostrarEstatica = prefersReducedMotion || rendimientoBajo` — `prefers-reduced-motion` sigue siendo una preferencia de accesibilidad que se respeta siempre (nunca monta el Canvas, ahorra la descarga completa de Three.js/el `.glb` en ese caso); `rendimientoBajo` es una decisión que se toma recién con una medición real del equipo del visitante, sea el que sea. Se unificó el tamaño del contenedor entre el estado 3D y el estático (antes eran de alto distinto) para que, si el monitor baja a estática después de un par de segundos, no haya un salto de layout — solo cambia lo que hay adentro de la misma caja.
+
+**Cómo se probó:**
+- `npm run build` limpio.
+- Se reprodujo el modelo real en mobile con user agent de iPhone (414×896 @ DPR 2): confirmado visualmente que el poste 3D (versión `liviano`) se ve bien — brillo cálido en la bombilla, rayas nítidas, sin verse "degradado" a simple vista pese a tener menos luces.
+- **Limitación real del entorno de prueba, importante de dejar registrada:** Chromium en modo headless en este entorno no tiene GPU real (usa un renderer por software) — el `MonitorRendimiento` mide correctamente ~40-43fps *tanto en mobile como en escritorio*, y baja a la ilustración estática en ambos casos. Esto no es un bug: es el monitor midiendo con precisión un hardware gráfico genuinamente lento. Como el escritorio venía mostrando el 3D fluido en todas las capturas de sesiones anteriores (con GPU real), esto confirma que la medición es correcta — simplemente no se puede demostrar "se ve fluido en un iPhone real" sin un dispositivo físico, que no está disponible en este entorno. Se verificó el camino "rinde bien" desactivando temporalmente el chequeo de fps solo para la captura visual, y revirtiendo el código real inmediatamente después.
+- Se repitió la batería de 7 escenarios (375/390/768/1024/1440/1920 + iPhone XR a DPR2) con la lógica real (sin bypasear nada): sin scroll horizontal, sin errores de consola en ninguno.
+- Se confirmó que con `prefers-reduced-motion: reduce` el `<canvas>` nunca llega a montarse (0 canvas encontrados tras esperar), es decir, ese camino sigue sin descargar Three.js en absoluto.
+
+**Por qué:**
+- Medir fps real en vez de asumir "mobile = débil": un iPhone reciente tiene una GPU más potente que muchos notebooks con integrada — negarle el 3D solo por el ancho de viewport habría sido una regla más simple pero peor, exactamente lo que Enzo notó y preguntó si se podía mejorar.
+- `dpr` tope 1 como principal ahorro en mobile (en vez de simplificar la geometría, que ya es low-poly): en GPUs móviles el cuello de botella típico es cuántos píxeles hay que sombrear (fill-rate), no cuántos vértices procesar — es la palanca que más rinde por el menor costo visual.
+- Mismo tamaño de contenedor en ambos estados: evitar un salto de layout que se notaría justo cuando el usuario ya está leyendo el hero, en el peor momento posible para un cambio brusco.
+
+**Archivos afectados:**
+- Nuevo: `src/components/animations/MonitorRendimiento.jsx`.
+- Modificados: `src/components/animations/Scene3DCanvas.jsx` (prop `liviano` + `onRendimientoBajo`), `src/components/animations/HeroScene3D.jsx` (ya no usa `isMobile` para decidir mostrar la ilustración; contenedor unificado).
+
+**Pendiente / próximos pasos:**
+- Validar en un dispositivo móvil físico real cuando Enzo tenga oportunidad — todo lo verificado acá es emulación de viewport/DPR/user-agent, no hardware real. Si en la práctica el umbral de 50fps resulta muy estricto o muy laxo para el catálogo real de equipos de sus clientes, es el número a ajustar (`umbralFps` en `MonitorRendimiento`).
+
+---
+
+## 2026-08-06 - Diagnóstico de errores de consola en el DevTools real de Enzo: uno era ruido de una extensión, el otro sí era corregible
+
+**Qué se hizo:**
+Enzo compartió una captura de su DevTools mostrando un error "Uncaught (in promise) Error: A listener indicated an asynchronous response by returning true, but the message channel closed before a response was received" y una advertencia de React Router. Se investigó cada uno por separado, sin asumir la causa:
+
+1. **El error de "asynchronous response"**: se cargó el sitio en un Chromium recién instalado por Playwright — **sin ninguna extensión** — y se navegó igual que un usuario real (scroll, esperas, sin forzar nada). El error **no apareció en absoluto**. Ese mensaje específico es una firma muy conocida de extensiones de Chrome que usan `chrome.runtime.sendMessage` con un listener que devuelve `true` (avisando que va a responder async) pero nunca llega a responder — típico de gestores de contraseñas, bloqueadores de ads, Grammarly, etc. Confirmado con evidencia: no es un bug del sitio, es una extensión instalada en el navegador real de Enzo. No hay nada que el código de la página pueda hacer para evitar que una extensión de un tercero se comporte así.
+2. **La advertencia de React Router** (`v7_startTransition`) — esta sí era corregible y se corrigió. Primer intento: pasar `future: { v7_startTransition: true }` como segundo argumento de `createBrowserRouter` — no funcionó (la advertencia seguía apareciendo incluso reiniciando el dev server desde cero, se verificó explícitamente en vez de asumir que "ya quedó"). Causa: esa bandera específica no es una opción de `createBrowserRouter`, es una prop de `<RouterProvider>`. Corregido pasándola ahí: `<RouterProvider router={router} future={{ v7_startTransition: true }} />`. Verificado de nuevo con el dev server reiniciado: la advertencia ya no aparece.
+
+De paso, revisando la consola en un navegador limpio, aparecieron otros dos mensajes (`GL Driver Message: GPU stall due to ReadPixels` y `THREE.WebGLRenderer: Context Lost`) — se investigaron también: ocurren igual con y sin capturas de pantalla de por medio (se descartó que fueran un artefacto de mi propio método de prueba), pero son específicos de este entorno de sandbox headless sin GPU real (renderiza por software) — el mismo modelo 3D ya se ha visto fluido y correcto en decenas de capturas de sesiones anteriores con GPU real disponible. No se tocó nada del 3D por esto (Enzo ya había pedido explícitamente no tocarlo).
+
+**Cómo se probó:**
+- Consola completa en Chromium limpio (sin extensiones): confirmado que el error de "asynchronous response" no es reproducible desde el código del sitio.
+- Tras el fix del future flag: reinicio completo del dev server (no solo HMR) + relectura de consola, confirmando la ausencia de la advertencia.
+- Navegación real entre rutas (`/`, click a `#planes`, `/demo`, `/login`) sin errores de página.
+- Batería completa de 7 viewports (375/390/768/1024/1440/1920 + iPhone XR): sin scroll horizontal, sin errores de página en ninguno.
+- `npm run build` limpio en cada punto de control.
+
+**Por qué:**
+- Se verificó la hipótesis del "ruido de extensión" con un navegador realmente limpio en vez de solo argumentarlo — la diferencia entre "creo que es una extensión" y "lo probé sin extensiones y no aparece" es la diferencia entre una opinión y un diagnóstico.
+- Se corrigió el primer intento fallido del future flag en vez de dejarlo por hecho tras escribir el código — el build pasa igual aunque la bandera esté en el lugar equivocado (no es un error de sintaxis, solo no tiene efecto), así que solo se puede confirmar probando.
+
+**Archivos afectados:**
+- `src/routes/AppRouter.jsx` (`future` movido de `createBrowserRouter` a `<RouterProvider>`).
+
+**Pendiente / próximos pasos:**
+- El error de "asynchronous response" que vio Enzo es de una extensión de su Chrome — no requiere ni admite un fix desde el código. Si quiere confirmarlo él mismo: abrir el sitio en una ventana de incógnito con las extensiones desactivadas (Chrome permite elegir cuáles corren en incógnito) y ver si el error deja de aparecer.
 
 ---
 
@@ -731,6 +975,67 @@ Batería completa en 8 combinaciones de viewport/DPR, desde 1920×1080 (sin esca
 
 ---
 
+## 2026-08-06 - El modelo 3D del hero ahora se muestra en mobile por defecto, con degradación adaptativa por fps real
+
+**Qué se hizo:**
+Hasta ahora, mobile mostraba siempre `StaticBarberPoleIllustration` (la ilustración SVG) — una decisión tomada cuando todavía no existía el modelo 3D real y se optaba por seguridad de rendimiento. Enzo preguntó si se podía mostrar el modelo 3D real en mobile también. La respuesta corta es sí, y el prompt original de la Parte 3 ya lo contemplaba: *"en móvil, degrada: el 3D puede pasar a una versión de menor polycount, menos luces, o a un render estático de alta calidad si el frame rate baja de 50fps"* — es decir, la versión estática debía ser el **último recurso**, no la respuesta por defecto para todo mobile.
+
+Se implementó exactamente eso, de forma adaptativa en vez de una regla fija por ancho de pantalla:
+
+- **`MonitorRendimiento.jsx`** (nuevo): vive dentro del `<Canvas>` y usa `useFrame` para medir el fps real durante los primeros ~2 segundos (con 0.2s de calentamiento descartados, para no contar la compilación de shaders como "lento"). Si el promedio queda bajo 50fps, avisa una sola vez hacia afuera vía callback.
+- **`Scene3DCanvas.jsx`**: acepta `liviano` (booleano) y `onRendimientoBajo`. En modo `liviano` (mobile): `dpr` tope 1 en vez de 1.5 (el costo dominante en GPUs móviles es el fill-rate, no la geometría — bajar el dpr es lo que más ahorra), se quitan la luz de relleno y el rim trasero de cobre (quedan ambiente + key cálida, con el ambiente compensado un poco más arriba para que no se vea plano), sin sombra dinámica ni antialiasing.
+- **`HeroScene3D.jsx`**: ya no decide "mobile = estática" de entrada. Ahora `mostrarEstatica = prefersReducedMotion || rendimientoBajo` — `prefers-reduced-motion` sigue siendo una preferencia de accesibilidad que se respeta siempre (nunca monta el Canvas, ahorra la descarga completa de Three.js/el `.glb` en ese caso); `rendimientoBajo` es una decisión que se toma recién con una medición real del equipo del visitante, sea el que sea. Se unificó el tamaño del contenedor entre el estado 3D y el estático (antes eran de alto distinto) para que, si el monitor baja a estática después de un par de segundos, no haya un salto de layout — solo cambia lo que hay adentro de la misma caja.
+
+**Cómo se probó:**
+- `npm run build` limpio.
+- Se reprodujo el modelo real en mobile con user agent de iPhone (414×896 @ DPR 2): confirmado visualmente que el poste 3D (versión `liviano`) se ve bien — brillo cálido en la bombilla, rayas nítidas, sin verse "degradado" a simple vista pese a tener menos luces.
+- **Limitación real del entorno de prueba, importante de dejar registrada:** Chromium en modo headless en este entorno no tiene GPU real (usa un renderer por software) — el `MonitorRendimiento` mide correctamente ~40-43fps *tanto en mobile como en escritorio*, y baja a la ilustración estática en ambos casos. Esto no es un bug: es el monitor midiendo con precisión un hardware gráfico genuinamente lento. Como el escritorio venía mostrando el 3D fluido en todas las capturas de sesiones anteriores (con GPU real), esto confirma que la medición es correcta — simplemente no se puede demostrar "se ve fluido en un iPhone real" sin un dispositivo físico, que no está disponible en este entorno. Se verificó el camino "rinde bien" desactivando temporalmente el chequeo de fps solo para la captura visual, y revirtiendo el código real inmediatamente después.
+- Se repitió la batería de 7 escenarios (375/390/768/1024/1440/1920 + iPhone XR a DPR2) con la lógica real (sin bypasear nada): sin scroll horizontal, sin errores de consola en ninguno.
+- Se confirmó que con `prefers-reduced-motion: reduce` el `<canvas>` nunca llega a montarse (0 canvas encontrados tras esperar), es decir, ese camino sigue sin descargar Three.js en absoluto.
+
+**Por qué:**
+- Medir fps real en vez de asumir "mobile = débil": un iPhone reciente tiene una GPU más potente que muchos notebooks con integrada — negarle el 3D solo por el ancho de viewport habría sido una regla más simple pero peor, exactamente lo que Enzo notó y preguntó si se podía mejorar.
+- `dpr` tope 1 como principal ahorro en mobile (en vez de simplificar la geometría, que ya es low-poly): en GPUs móviles el cuello de botella típico es cuántos píxeles hay que sombrear (fill-rate), no cuántos vértices procesar — es la palanca que más rinde por el menor costo visual.
+- Mismo tamaño de contenedor en ambos estados: evitar un salto de layout que se notaría justo cuando el usuario ya está leyendo el hero, en el peor momento posible para un cambio brusco.
+
+**Archivos afectados:**
+- Nuevo: `src/components/animations/MonitorRendimiento.jsx`.
+- Modificados: `src/components/animations/Scene3DCanvas.jsx` (prop `liviano` + `onRendimientoBajo`), `src/components/animations/HeroScene3D.jsx` (ya no usa `isMobile` para decidir mostrar la ilustración; contenedor unificado).
+
+**Pendiente / próximos pasos:**
+- Validar en un dispositivo móvil físico real cuando Enzo tenga oportunidad — todo lo verificado acá es emulación de viewport/DPR/user-agent, no hardware real. Si en la práctica el umbral de 50fps resulta muy estricto o muy laxo para el catálogo real de equipos de sus clientes, es el número a ajustar (`umbralFps` en `MonitorRendimiento`).
+
+---
+
+## 2026-08-06 - Diagnóstico de errores de consola en el DevTools real de Enzo: uno era ruido de una extensión, el otro sí era corregible
+
+**Qué se hizo:**
+Enzo compartió una captura de su DevTools mostrando un error "Uncaught (in promise) Error: A listener indicated an asynchronous response by returning true, but the message channel closed before a response was received" y una advertencia de React Router. Se investigó cada uno por separado, sin asumir la causa:
+
+1. **El error de "asynchronous response"**: se cargó el sitio en un Chromium recién instalado por Playwright — **sin ninguna extensión** — y se navegó igual que un usuario real (scroll, esperas, sin forzar nada). El error **no apareció en absoluto**. Ese mensaje específico es una firma muy conocida de extensiones de Chrome que usan `chrome.runtime.sendMessage` con un listener que devuelve `true` (avisando que va a responder async) pero nunca llega a responder — típico de gestores de contraseñas, bloqueadores de ads, Grammarly, etc. Confirmado con evidencia: no es un bug del sitio, es una extensión instalada en el navegador real de Enzo. No hay nada que el código de la página pueda hacer para evitar que una extensión de un tercero se comporte así.
+2. **La advertencia de React Router** (`v7_startTransition`) — esta sí era corregible y se corrigió. Primer intento: pasar `future: { v7_startTransition: true }` como segundo argumento de `createBrowserRouter` — no funcionó (la advertencia seguía apareciendo incluso reiniciando el dev server desde cero, se verificó explícitamente en vez de asumir que "ya quedó"). Causa: esa bandera específica no es una opción de `createBrowserRouter`, es una prop de `<RouterProvider>`. Corregido pasándola ahí: `<RouterProvider router={router} future={{ v7_startTransition: true }} />`. Verificado de nuevo con el dev server reiniciado: la advertencia ya no aparece.
+
+De paso, revisando la consola en un navegador limpio, aparecieron otros dos mensajes (`GL Driver Message: GPU stall due to ReadPixels` y `THREE.WebGLRenderer: Context Lost`) — se investigaron también: ocurren igual con y sin capturas de pantalla de por medio (se descartó que fueran un artefacto de mi propio método de prueba), pero son específicos de este entorno de sandbox headless sin GPU real (renderiza por software) — el mismo modelo 3D ya se ha visto fluido y correcto en decenas de capturas de sesiones anteriores con GPU real disponible. No se tocó nada del 3D por esto (Enzo ya había pedido explícitamente no tocarlo).
+
+**Cómo se probó:**
+- Consola completa en Chromium limpio (sin extensiones): confirmado que el error de "asynchronous response" no es reproducible desde el código del sitio.
+- Tras el fix del future flag: reinicio completo del dev server (no solo HMR) + relectura de consola, confirmando la ausencia de la advertencia.
+- Navegación real entre rutas (`/`, click a `#planes`, `/demo`, `/login`) sin errores de página.
+- Batería completa de 7 viewports (375/390/768/1024/1440/1920 + iPhone XR): sin scroll horizontal, sin errores de página en ninguno.
+- `npm run build` limpio en cada punto de control.
+
+**Por qué:**
+- Se verificó la hipótesis del "ruido de extensión" con un navegador realmente limpio en vez de solo argumentarlo — la diferencia entre "creo que es una extensión" y "lo probé sin extensiones y no aparece" es la diferencia entre una opinión y un diagnóstico.
+- Se corrigió el primer intento fallido del future flag en vez de dejarlo por hecho tras escribir el código — el build pasa igual aunque la bandera esté en el lugar equivocado (no es un error de sintaxis, solo no tiene efecto), así que solo se puede confirmar probando.
+
+**Archivos afectados:**
+- `src/routes/AppRouter.jsx` (`future` movido de `createBrowserRouter` a `<RouterProvider>`).
+
+**Pendiente / próximos pasos:**
+- El error de "asynchronous response" que vio Enzo es de una extensión de su Chrome — no requiere ni admite un fix desde el código. Si quiere confirmarlo él mismo: abrir el sitio en una ventana de incógnito con las extensiones desactivadas (Chrome permite elegir cuáles corren en incógnito) y ver si el error deja de aparecer.
+
+---
+
 ## 2026-08-06 - El contenido de la demo quedaba pegado arriba del teléfono — centrado vertical real
 
 **Qué se hizo:**
@@ -778,5 +1083,419 @@ Batería completa en 8 combinaciones de viewport/DPR, desde 1920×1080 (sin esca
 
 **Pendiente / próximos pasos:**
 - Sin cambios respecto a la entrada anterior.
+
+---
+
+## 2026-08-06 - El modelo 3D del hero ahora se muestra en mobile por defecto, con degradación adaptativa por fps real
+
+**Qué se hizo:**
+Hasta ahora, mobile mostraba siempre `StaticBarberPoleIllustration` (la ilustración SVG) — una decisión tomada cuando todavía no existía el modelo 3D real y se optaba por seguridad de rendimiento. Enzo preguntó si se podía mostrar el modelo 3D real en mobile también. La respuesta corta es sí, y el prompt original de la Parte 3 ya lo contemplaba: *"en móvil, degrada: el 3D puede pasar a una versión de menor polycount, menos luces, o a un render estático de alta calidad si el frame rate baja de 50fps"* — es decir, la versión estática debía ser el **último recurso**, no la respuesta por defecto para todo mobile.
+
+Se implementó exactamente eso, de forma adaptativa en vez de una regla fija por ancho de pantalla:
+
+- **`MonitorRendimiento.jsx`** (nuevo): vive dentro del `<Canvas>` y usa `useFrame` para medir el fps real durante los primeros ~2 segundos (con 0.2s de calentamiento descartados, para no contar la compilación de shaders como "lento"). Si el promedio queda bajo 50fps, avisa una sola vez hacia afuera vía callback.
+- **`Scene3DCanvas.jsx`**: acepta `liviano` (booleano) y `onRendimientoBajo`. En modo `liviano` (mobile): `dpr` tope 1 en vez de 1.5 (el costo dominante en GPUs móviles es el fill-rate, no la geometría — bajar el dpr es lo que más ahorra), se quitan la luz de relleno y el rim trasero de cobre (quedan ambiente + key cálida, con el ambiente compensado un poco más arriba para que no se vea plano), sin sombra dinámica ni antialiasing.
+- **`HeroScene3D.jsx`**: ya no decide "mobile = estática" de entrada. Ahora `mostrarEstatica = prefersReducedMotion || rendimientoBajo` — `prefers-reduced-motion` sigue siendo una preferencia de accesibilidad que se respeta siempre (nunca monta el Canvas, ahorra la descarga completa de Three.js/el `.glb` en ese caso); `rendimientoBajo` es una decisión que se toma recién con una medición real del equipo del visitante, sea el que sea. Se unificó el tamaño del contenedor entre el estado 3D y el estático (antes eran de alto distinto) para que, si el monitor baja a estática después de un par de segundos, no haya un salto de layout — solo cambia lo que hay adentro de la misma caja.
+
+**Cómo se probó:**
+- `npm run build` limpio.
+- Se reprodujo el modelo real en mobile con user agent de iPhone (414×896 @ DPR 2): confirmado visualmente que el poste 3D (versión `liviano`) se ve bien — brillo cálido en la bombilla, rayas nítidas, sin verse "degradado" a simple vista pese a tener menos luces.
+- **Limitación real del entorno de prueba, importante de dejar registrada:** Chromium en modo headless en este entorno no tiene GPU real (usa un renderer por software) — el `MonitorRendimiento` mide correctamente ~40-43fps *tanto en mobile como en escritorio*, y baja a la ilustración estática en ambos casos. Esto no es un bug: es el monitor midiendo con precisión un hardware gráfico genuinamente lento. Como el escritorio venía mostrando el 3D fluido en todas las capturas de sesiones anteriores (con GPU real), esto confirma que la medición es correcta — simplemente no se puede demostrar "se ve fluido en un iPhone real" sin un dispositivo físico, que no está disponible en este entorno. Se verificó el camino "rinde bien" desactivando temporalmente el chequeo de fps solo para la captura visual, y revirtiendo el código real inmediatamente después.
+- Se repitió la batería de 7 escenarios (375/390/768/1024/1440/1920 + iPhone XR a DPR2) con la lógica real (sin bypasear nada): sin scroll horizontal, sin errores de consola en ninguno.
+- Se confirmó que con `prefers-reduced-motion: reduce` el `<canvas>` nunca llega a montarse (0 canvas encontrados tras esperar), es decir, ese camino sigue sin descargar Three.js en absoluto.
+
+**Por qué:**
+- Medir fps real en vez de asumir "mobile = débil": un iPhone reciente tiene una GPU más potente que muchos notebooks con integrada — negarle el 3D solo por el ancho de viewport habría sido una regla más simple pero peor, exactamente lo que Enzo notó y preguntó si se podía mejorar.
+- `dpr` tope 1 como principal ahorro en mobile (en vez de simplificar la geometría, que ya es low-poly): en GPUs móviles el cuello de botella típico es cuántos píxeles hay que sombrear (fill-rate), no cuántos vértices procesar — es la palanca que más rinde por el menor costo visual.
+- Mismo tamaño de contenedor en ambos estados: evitar un salto de layout que se notaría justo cuando el usuario ya está leyendo el hero, en el peor momento posible para un cambio brusco.
+
+**Archivos afectados:**
+- Nuevo: `src/components/animations/MonitorRendimiento.jsx`.
+- Modificados: `src/components/animations/Scene3DCanvas.jsx` (prop `liviano` + `onRendimientoBajo`), `src/components/animations/HeroScene3D.jsx` (ya no usa `isMobile` para decidir mostrar la ilustración; contenedor unificado).
+
+**Pendiente / próximos pasos:**
+- Validar en un dispositivo móvil físico real cuando Enzo tenga oportunidad — todo lo verificado acá es emulación de viewport/DPR/user-agent, no hardware real. Si en la práctica el umbral de 50fps resulta muy estricto o muy laxo para el catálogo real de equipos de sus clientes, es el número a ajustar (`umbralFps` en `MonitorRendimiento`).
+
+---
+
+## 2026-08-06 - Diagnóstico de errores de consola en el DevTools real de Enzo: uno era ruido de una extensión, el otro sí era corregible
+
+**Qué se hizo:**
+Enzo compartió una captura de su DevTools mostrando un error "Uncaught (in promise) Error: A listener indicated an asynchronous response by returning true, but the message channel closed before a response was received" y una advertencia de React Router. Se investigó cada uno por separado, sin asumir la causa:
+
+1. **El error de "asynchronous response"**: se cargó el sitio en un Chromium recién instalado por Playwright — **sin ninguna extensión** — y se navegó igual que un usuario real (scroll, esperas, sin forzar nada). El error **no apareció en absoluto**. Ese mensaje específico es una firma muy conocida de extensiones de Chrome que usan `chrome.runtime.sendMessage` con un listener que devuelve `true` (avisando que va a responder async) pero nunca llega a responder — típico de gestores de contraseñas, bloqueadores de ads, Grammarly, etc. Confirmado con evidencia: no es un bug del sitio, es una extensión instalada en el navegador real de Enzo. No hay nada que el código de la página pueda hacer para evitar que una extensión de un tercero se comporte así.
+2. **La advertencia de React Router** (`v7_startTransition`) — esta sí era corregible y se corrigió. Primer intento: pasar `future: { v7_startTransition: true }` como segundo argumento de `createBrowserRouter` — no funcionó (la advertencia seguía apareciendo incluso reiniciando el dev server desde cero, se verificó explícitamente en vez de asumir que "ya quedó"). Causa: esa bandera específica no es una opción de `createBrowserRouter`, es una prop de `<RouterProvider>`. Corregido pasándola ahí: `<RouterProvider router={router} future={{ v7_startTransition: true }} />`. Verificado de nuevo con el dev server reiniciado: la advertencia ya no aparece.
+
+De paso, revisando la consola en un navegador limpio, aparecieron otros dos mensajes (`GL Driver Message: GPU stall due to ReadPixels` y `THREE.WebGLRenderer: Context Lost`) — se investigaron también: ocurren igual con y sin capturas de pantalla de por medio (se descartó que fueran un artefacto de mi propio método de prueba), pero son específicos de este entorno de sandbox headless sin GPU real (renderiza por software) — el mismo modelo 3D ya se ha visto fluido y correcto en decenas de capturas de sesiones anteriores con GPU real disponible. No se tocó nada del 3D por esto (Enzo ya había pedido explícitamente no tocarlo).
+
+**Cómo se probó:**
+- Consola completa en Chromium limpio (sin extensiones): confirmado que el error de "asynchronous response" no es reproducible desde el código del sitio.
+- Tras el fix del future flag: reinicio completo del dev server (no solo HMR) + relectura de consola, confirmando la ausencia de la advertencia.
+- Navegación real entre rutas (`/`, click a `#planes`, `/demo`, `/login`) sin errores de página.
+- Batería completa de 7 viewports (375/390/768/1024/1440/1920 + iPhone XR): sin scroll horizontal, sin errores de página en ninguno.
+- `npm run build` limpio en cada punto de control.
+
+**Por qué:**
+- Se verificó la hipótesis del "ruido de extensión" con un navegador realmente limpio en vez de solo argumentarlo — la diferencia entre "creo que es una extensión" y "lo probé sin extensiones y no aparece" es la diferencia entre una opinión y un diagnóstico.
+- Se corrigió el primer intento fallido del future flag en vez de dejarlo por hecho tras escribir el código — el build pasa igual aunque la bandera esté en el lugar equivocado (no es un error de sintaxis, solo no tiene efecto), así que solo se puede confirmar probando.
+
+**Archivos afectados:**
+- `src/routes/AppRouter.jsx` (`future` movido de `createBrowserRouter` a `<RouterProvider>`).
+
+**Pendiente / próximos pasos:**
+- El error de "asynchronous response" que vio Enzo es de una extensión de su Chrome — no requiere ni admite un fix desde el código. Si quiere confirmarlo él mismo: abrir el sitio en una ventana de incógnito con las extensiones desactivadas (Chrome permite elegir cuáles corren en incógnito) y ver si el error deja de aparecer.
+
+---
+
+## 2026-08-07 - Rediseño completo del login: carrusel a sangrado en vez del 3D, formulario con todos sus estados, y separación desktop/mobile/shared adoptada como estándar del proyecto
+
+**Qué se hizo:**
+
+**1. Por qué se sacó el 3D de esta pantalla.** El poste de barbería 3D es la pieza de identidad del *hero* del home — tiene sentido ahí porque el visitante llega sin contexto y el 3D vende oficio/artesanía en el primer segundo. En el login el usuario ya es un cliente de la plataforma que solo quiere entrar a trabajar; un modelo 3D girando de fondo compite con el formulario en vez de acompañarlo, y además carga Three.js/el `.glb` en una pantalla que se visita muchas veces al día. Se reemplazó por un carrusel de imágenes a sangrado (crossfade, nunca slide lateral) con un slogan por imagen — mismo mood cobre/negro-barbero de la marca, mucho más liviano.
+
+**2. Los pares imagen/slogan y dónde editarlos.** Viven en `src/pages/Login/data/slides.js`, nunca hardcodeados en el JSX — es el único archivo que hay que tocar para cambiar contenido. Los 4 pares actuales (con placeholders abstractos, ver Pendiente):
+  - Silla de barbero vacía, luz lateral → *"Tu sillón te espera."*
+  - Tijera/manos, plano cercano → *"Tú al oficio. Nosotros a la agenda."*
+  - Herramientas ordenadas en el mesón → *"Todo en su lugar."*
+  - Cuaderno de horas cerrado, luz baja → *"El cuaderno quedó atrás."*
+  El archivo también expone `DURACION_SLIDE_MS` (7000), `DURACION_TRANSICION_MS` (1200) y `DESFASE_TEXTO_MS` (500, la imagen empieza a desvanecer antes de que el texto salga/entre, a propósito).
+
+**3. Carga progresiva.** Solo la primera imagen carga de inmediato (`fetchPriority="high"`); las otras 3 ni siquiera se montan en el DOM hasta que `useCarruselLogin` marca `secundariasListas` (vía `requestIdleCallback`, con `setTimeout` de respaldo para Safari) — se probó que el formulario es interactivo (`fill()` responde) en ~60-75ms sin esperar ninguna imagen. `ImagenCarrusel.jsx` está listo para pasar de `placeholder` (string, el SVG actual) a `fuentes: { webp, jpg, webpMovil, jpgMovil }` sin tocar ningún componente — ver Pendiente para el formato exacto de las fotos reales.
+
+**4. Estados funcionales del formulario** (`shared/FormularioAcceso.jsx` + `shared/useLogin.js`, toda la lógica de auth en el hook, nunca en la UI):
+  - Auto-focus en usuario al cargar; Enter en cualquier campo envía.
+  - Botón deshabilitado + loader propio (navaja, no un spinner genérico) mientras envía; guardia sincrónica por `useRef` contra doble-submit (probado: doble click real dispara una sola request de auth, no dos).
+  - Error de credenciales: mensaje genérico ("Usuario o contraseña incorrectos") — nunca revela si el usuario existe.
+  - Error de conexión, diferenciado: "No pudimos conectar. Revisa tu conexión e inténtalo de nuevo."
+  - Cuenta inactiva: si `barberias.estado_id` no es el activo, se cierra la sesión recién abierta y se muestra un mensaje específico en vez de dejar pasar al panel.
+  - Validación cliente (zod) antes de enviar, sin recargar ni perder lo tipeado.
+  - Detección de Bloq Mayús en el campo de contraseña (advertencia visible bajo el campo).
+  - Mostrar/ocultar contraseña con ícono propio (no el nativo del navegador).
+  - "¿Olvidaste tu contraseña?" abre una explicación inline — **placeholder**: por ahora dirige a pedirle la actualización a quien administra la barbería (+ WhatsApp si `VITE_WHATSAPP_CONTACTO` está seteado). No hay flujo de recuperación real todavía.
+  - `autocomplete="username"` / `"current-password"` correctos para que el gestor de contraseñas del navegador funcione.
+  - Sesión activa visitando `/login` → redirige al panel según rol sin mostrar el formulario.
+  - Bug real encontrado y corregido durante las pruebas: `esErrorDeRed()` en `authService.js` solo reconocía fallas de red con la forma que usa el cliente de Auth (`TypeError` / `AuthRetryableFetchError`). La RPC `obtener_email_por_usuario` usa postgrest-js, que en una falla de red devuelve un objeto plano con el fetch original serializado en `.message` (nunca `instanceof TypeError`) — una caída de conexión en ese paso específico se mostraba como "Usuario o contraseña incorrectos" en vez del mensaje de conexión. Se agregó un chequeo por texto (`/failed to fetch|networkerror|load failed/i` sobre `error.message`) como respaldo.
+
+**5. Separación desktop/mobile/shared — adoptada como estándar del proyecto de acá en adelante.**
+```
+src/pages/Login/
+├── Login.jsx              # orquestador: decide desktop o mobile, estados de sesión
+├── desktop/LoginDesktop.jsx   # composición DESKTOP (cabecera "=== LOGIN — VERSIÓN DESKTOP ===")
+├── mobile/LoginMobile.jsx     # composición MÓVIL (cabecera "=== LOGIN — VERSIÓN MÓVIL ===")
+├── shared/                # lógica y piezas de UI que usan ambas composiciones — una sola vez
+│   ├── useLogin.js, esquemaLogin.js       (auth + validación)
+│   ├── useCarruselLogin.js, ImagenCarrusel.jsx, TextoSlogan.jsx   (carrusel)
+│   └── FormularioAcceso.jsx, IconoOjo.jsx (formulario)
+└── data/slides.js         # contenido del carrusel
+```
+La razón de fondo: si mobile y desktop copiaran su propia lógica de auth/validación/carrusel, con el tiempo terminan desincronizados (un fix en uno no llega al otro). Todo lo que es *comportamiento* (qué pasa al enviar, qué dice cada error, cuándo rota el carrusel) vive una sola vez en `shared/`; lo que es *composición visual* (cómo se ve, qué tamaño, qué anima) vive por separado en `desktop/` y `mobile/`, porque ahí sí deben poder diferir a propósito. **Esta convención queda adoptada para el resto de los módulos del proyecto** (home, página de barbería, paneles) de acá en adelante — no implica rehacer lo que ya está en producción, pero todo módulo nuevo con composiciones desktop/mobile suficientemente distintas debería seguir esta misma estructura.
+
+La decisión de cuál composición renderizar usa `useIsMobile()` (ya existente, basado en `matchMedia` con `addEventListener('change', ...)`), que reacciona en vivo tanto a resize como a rotación de pantalla — no fue necesario un hook nuevo.
+
+**6. Composición mobile y el problema del teclado virtual.** Mobile no es el desktop achicado: la imagen es una franja superior (no medio split-screen), con su propia escala tipográfica para 375-428px (no un `clamp()` reutilizado), menos elementos animados a la vez, y sin nada dependiente de `hover`. El problema típico de mobile — que el teclado tape el botón de enviar — se resolvió en dos frentes: (a) la franja de imagen se achica de `~30vh` a `64px` en cuanto cualquier campo recibe foco (vía el mismo callback `onCambioFoco` que ya pausa el carrusel en desktop), liberando espacio vertical; (b) al probar con un viewport muy bajo (375×320, aproximando el teclado abierto en un equipo chico) el botón todavía quedaba fuera de la pantalla — se agregó un modo `compacto` a `FormularioAcceso` (gaps más chicos, sin perder el mínimo de 44px de los campos/botón) que además oculta el título "Ingresar" mientras hay un campo con foco, dejando más aire para el formulario mismo.
+
+**7. Resultado de las 16 pruebas** (Playwright con mocks de red sobre Supabase — no hay backend real conectado en este entorno; instalado como dependencia temporal y desinstalado al terminar), separado por lo que es específico de cada dispositivo:
+
+*Aplican igual en desktop y mobile (verificadas una sola vez, la lógica es compartida):* login correcto por los 3 roles con redirección correcta (1), credenciales incorrectas con mensaje genérico (2), campos vacíos con validación sin perder lo tipeado (3), error de conexión diferenciado — corregido durante la prueba, ver punto 4 (4), doble click sin doble request (5), navegación por teclado Tab/Enter (7), atributos `autocomplete` correctos (8), `prefers-reduced-motion` sin rotación (11), cursor cambia de forma por tipo de elemento y desaparece en contexto táctil (12), formulario interactivo antes de que termine de cargar el carrusel (13), sesión activa en `/login` redirige sin mostrar el formulario (14).
+
+*Específicas de mobile:* sin scroll horizontal en 375/390/768/1024/1440/1920px (9), botón "Ingresar" visible con viewport muy reducido simulando teclado abierto — requirió el ajuste del punto 6 (9b), landscape 667×375 sin scroll y con el botón visible (9c), inputs con `font-size` ≥16px para no disparar zoom automático en iOS (16).
+
+*No automatizables en este entorno — requieren verificación manual, documentado explícitamente en vez de darlas por buenas:*
+- **(6) Bloq Mayús:** el protocolo de automatización de Chromium (CDP) no puede alternar el estado real de bloqueo que `getModifierState('CapsLock')` consulta — no hay tecla física que reportar en un navegador headless. El código de detección es el mecanismo estándar del navegador y está implementado; falta que Enzo (u otra persona) lo confirme con un teclado real.
+- **(8, autofill) y (9b/virtual keyboard real):** el autocompletado real del gestor de contraseñas del navegador y el comportamiento exacto del teclado virtual de iOS/Android no son reproducibles en Playwright headless — se verificó lo que sí es automatizable (atributos correctos, botón visible con el viewport reducido) pero la confirmación final necesita un dispositivo real.
+- **(10) Contraste en cada frame de transición:** verificado estructuralmente (overlay pareja + texto siempre en tono claro), pero el veredicto visual final en el frame medio de cada crossfade es un juicio humano, no solo un cálculo de contraste aislado.
+- **(13, 3G real):** se simuló latencia agregada a los assets de imagen en vez de usar el perfil de throttling nativo de Playwright (requiere CDP expuesto de forma distinta según el canal de instalación).
+- **(15) Encuadre del sujeto en cada imagen mobile:** no evaluable todavía — las 4 imágenes actuales son placeholders abstractos (gradiente + grano SVG), no fotografías reales con un sujeto que pueda salirse del encuadre.
+
+**Por qué:**
+- El 3D es una decisión de *hero*, no de utilidad diaria — en una pantalla que se visita muchas veces al día, la velocidad y la falta de distracción pesan más que el impacto inicial.
+- La taxonomía de errores (`ErrorLogin` con `.tipo`) vive solo en `authService.js` para que la UI nunca tenga que inspeccionar texto de Supabase ni decidir qué mensaje mostrar — un solo lugar donde se define qué es "error de red" evita que ese criterio se desincronice entre pantallas futuras que reutilicen el mismo servicio.
+- La separación desktop/mobile/shared se adopta como estándar (y no solo para este login) porque el problema que resuelve — lógica duplicada que se desincroniza con el tiempo — no es específico de esta pantalla; es más barato fijar la convención ahora, con un ejemplo concreto ya funcionando, que descubrirla de nuevo en el próximo módulo.
+- Reportar las pruebas no automatizables como tales (en vez de omitirlas o darlas por buenas) es más útil que un reporte que diga "16/16" sin que eso sea cierto.
+
+**Archivos afectados:**
+- Nuevo: `src/pages/Login/{data,shared,desktop,mobile}/*` (estructura completa descrita en el punto 5), `src/assets/login/*.svg` (4 placeholders).
+- Modificado: `src/services/authService.js` (taxonomía de errores + chequeo de barbería activa + fix del bug de detección de red en la RPC), `src/components/common/Cursor.jsx` (reacciona distinto por tipo de elemento: se agranda y rellena sobre botones, se angosta a una barra vertical sobre campos de texto, anillo intermedio sobre links), `src/components/common/Button.jsx` (`data-cursor="boton"` para que el cursor lo detecte sin importar si el botón renderiza como `<a>` o `<button>`).
+- Eliminado: `src/pages/Login/esquemaLogin.js` (movido a `shared/esquemaLogin.js`, mismo contenido).
+
+**Pendiente / próximos pasos:**
+- **Las 4 imágenes del carrusel son placeholders abstractos** (gradientes + grano SVG, sin rostros ni gente posada a propósito) — están listas para reemplazarse por fotografía real sin tocar componentes: en `data/slides.js`, cambiar `placeholder: 'ruta.svg'` por `fuentes: { webp, jpg, webpMovil, jpgMovil }` en cada slide. Especificación para las fotos reales: orientación vertical o crop vertical bien encuadrado, mínimo ~1400×2000px de origen, formato WebP con fallback JPG (nunca PNG para fotografía), una versión reducida para mobile (`webpMovil`/`jpgMovil`), y contenido de detalle de oficio (herramientas, texturas, manos, luz sobre superficies) — sin rostros identificables ni fotos de stock de gente posada.
+- **Recuperación de contraseña real:** el flujo actual es un placeholder que dirige a contactar al administrador de la barbería. Falta decidir e implementar un flujo real (ej. reset por email técnico) cuando se priorice.
+- **Verificación manual pendiente** (no automatizable en este entorno, ver punto 7): Bloq Mayús con teclado físico, autofill real del gestor de contraseñas, teclado virtual real en un dispositivo iOS/Android físico, y el juicio visual final de contraste en cada transición del carrusel con las fotos reales puestas.
+- **Nota aparte, no relacionada con el login:** al revisar este archivo se encontraron varias entradas anteriores (2026-08-06) duplicadas varias veces de forma consecutiva — parece un artefacto de un guardado anterior, no contenido nuevo. No se tocó nada (esta convención es de solo-agregar), pero vale la pena que Enzo lo revise y decida si quiere deduplicarlas a mano.
+
+---
+
+## 2026-08-10 - Login: fotografía real conectada (4/4), bug del carrusel "pegado" corregido, ajuste fino de encuadre móvil y rediseño del cursor sobre botones
+
+**Qué se hizo:**
+
+**1. Ritmo del carrusel y slogans.** A pedido de Enzo, `DURACION_SLIDE_MS` bajó de 7000 a 2500 y luego se afinó a **4000ms** (todo lo demás — crossfade, desfase de texto, barra de progreso — lee esa misma constante en `data/slides.js`, así que el ritmo se ajustó sin tocar nada más). Los 4 slogans se reescribieron con foco en bienestar del barbero + tono de marketing profesional: *"Tu día, ordenado antes de empezar."*, *"Tú al oficio. Nosotros a la agenda."*, *"Tu mesón en orden. Tu agenda también."*, y más tarde *"Todo listo para el próximo turno."* (ver punto 3).
+
+**2. Fotografía real: 3 de 4 imágenes.** Enzo subió 4 fotos a `public/images/login/` (`login1-4.jpg`, 3-8.7MB cada una, directo de cámara). Se revisó cada una contra el criterio ya definido (sin rostros identificables, orientación vertical, mood cálido/desaturado consistente):
+  - `login1.jpg` (manos + máquina en la nuca, cliente de espalda) → slide `tijera`.
+  - `login3.jpg` (interior con fila de sillones, lámparas colgantes) → slide `silla`.
+  - `login2.jpg` (mesón con máquinas/peines, **horizontal**) → slide `herramientas`, recorte vertical necesario.
+  - `login4.jpg` se dejó afuera en la primera pasada: mostraba un barbero y un cliente reales, desenfocados, en el fondo — justo lo que la regla del carrusel pide evitar.
+
+  Instalada `sharp` como dependencia temporal (mismo criterio que Playwright: se usa y se desinstala) para generar los derivados: cada foto se redimensionó a 1400×2000 (desktop) y 750×1072 (móvil), en WebP + JPG. Tamaños finales entre 34KB y 355KB — muy lejos de los 3-8.7MB originales. Los 4 archivos de cámara sin procesar se movieron a `src/assets/login/originales-sin-procesar/` (fuera de `public/`, no se sirven).
+
+**3. La 4ta imagen, recuperada.** Enzo pidió específicamente completar la que faltaba. Revisando `login4.jpg` de nuevo: las personas del fondo ocupan solo el 38% superior del cuadro: se recortó ese margen y quedó una composición de detalle — toalla a rayas sobre el sillón, textura de cuero — sin nadie visible (una pierna borrosa en el extremo del encuadre, sin rostro, se consideró aceptable bajo el mismo criterio que ya se usaba para "manos sin cara"). Reemplazó al placeholder abstracto que hacía de `cuaderno` — con un slogan nuevo acorde a lo que la foto realmente muestra (ya no tenía sentido forzar "el cuaderno quedó atrás" sobre una foto de toalla y sillón): **"Todo listo para el próximo turno."** Con esto, las 4 imágenes del carrusel son fotografía real — no queda ningún placeholder abstracto en el login. Los 3 SVG que quedaron sin uso (`silla.svg`, `tijera.svg`, `herramientas.svg`, `cuaderno.svg`) se eliminaron de `src/assets/login/`.
+
+**4. Bug real: el carrusel no rotaba.** Enzo reportó que las imágenes no cambiaban, se quedaban pegadas. Diagnóstico con Playwright: la barra de progreso del carrusel no existía en el DOM ni 300ms después de cargar la página, sin que nadie tocara nada. Causa: el campo de usuario tiene `autoFocus`, que dispara el evento `focus` del formulario apenas monta — y ese evento estaba conectado directo a la pausa del carrusel (`onCambioFoco` → `pausado`). El carrusel nacía pausado en el segundo cero y solo se liberaba si el usuario abandonaba *todo* el formulario, algo que casi nunca pasa en un login real. La causa de fondo: la pausa estaba atada a "¿hay foco en algún campo?" cuando debía estar atada a "¿el usuario está escribiendo activamente?" — son señales distintas. Se separaron en `FormularioAcceso.jsx`: `onCambioFoco` (por foco, sigue usándola mobile para achicar la franja de imagen cuando se abre el teclado) y una nueva `onEscribiendo` (por tecleo real vía `onInput`, con 1.2s de margen de inactividad antes de avisar que se dejó de escribir) — el carrusel ahora se pausa con esta segunda señal. Verificado con Playwright: rota solo sin interacción, se pausa mientras se escribe, y retoma sola ~1.2s después de la última tecla.
+
+**5. Encuadre en móvil, afinado con pruebas.** Enzo pidió ver cómo quedaba mejor el encuadre de cada foto en la franja móvil (que es una banda corta y ancha — object-fit:cover recorta casi todo el ancho de la foto, así que lo único que importa ajustar es la posición vertical). Se probaron 6 posiciones por imagen (10/25/40/55/70/85%), recortando exactamente la franja tal como se ve en pantalla, y se eligió la más legible/profesional de cada una: `silla` 70% (muestra la fila de sillones, no solo las lámparas del techo), `tijera` 25% (la máquina en la mano queda nítida, no solo piel/tinta abstracta), `herramientas` 40% (el conjunto de peines en diagonal, con variedad de color), `listo` 55% (la textura de la toalla con un borde cálido de piso). Verificado el resultado final (con overlay y logo encima) en 375×667 y 390×844 — consistente en ambos anchos.
+
+**6. Dos correcciones puntuales de pulido:**
+  - **Letra cortada en los slogans** (ej. la "g" de "agenda"): el contenedor `overflow-hidden` del revelado por máscara (`TextoSlogan.jsx`) no dejaba margen abajo para las descendentes (g/j/p/q/y) con el `leading` ajustado del texto. Se agregó `pb-[0.2em]` al contenedor — no afecta la animación de entrada/salida (esa se mueve relativa a la altura del propio texto, no a la del contenedor), solo le da aire abajo.
+  - **Cursor sobre botones, demasiado opaco**: el anillo al pasar por un botón crecía a 64px con 92% de opacidad — tapaba el texto del botón. Enzo pidió repensarlo, no solo bajarle el número. Se le dio identidad propia usando **laton** (bronce, `#b08d57` — tono de la paleta hasta ahora sin uso en el cursor) en vez de reusar cobre: un anillo de 56px, casi sin relleno (14% de opacidad), que crece sobre botones sin tapar nada — distinto del anillo cobre (más chico, 46px) que sigue usándose sobre links. Es un cambio en `Cursor.jsx`, que es global (se monta una vez en `main.jsx`), así que mejora en todo el sitio, no solo en el login.
+
+**Cómo se probó:**
+Playwright instalado y desinstalado como dependencia temporal en cada ronda (mismo patrón ya establecido: nunca queda en `package.json`). Cada punto de este resumen se verificó con capturas o medición directa (ancho de la barra de progreso, `src` real en pantalla con timestamps, bounding box del botón con el cursor encima) antes de darlo por resuelto — en particular el diagnóstico del carrusel pegado y el ajuste de encuadre móvil pasaron por una ronda de prueba fallida (deriva de tiempo en el script de prueba, no del producto) que se corrigió antes de confiar en el resultado. `npm run build` limpio después de cada cambio.
+
+**Por qué:**
+- Separar "foco" de "escribiendo" en vez de solo desactivar la pausa: la pausa mientras se escribe sigue siendo la intención correcta (no distraer), el bug era usar la señal equivocada para detectarla.
+- Recortar y salvar la 4ta foto en vez de descartarla: ya había una razón de contenido válida (no había ninguna foto de cuaderno), y la imagen sí tenía un recorte limpio disponible una vez fuera las personas del fondo — más barato que pedir una foto nueva.
+- Laton en vez de solo bajar la opacidad del cobre: un botón y un link son cosas distintas para el usuario: dar cada uno su propio color, no solo su propio tamaño, es lo que hace que el cursor lea como diseño y no como decoración repetida — el criterio que ya se había definido para esta feature.
+
+**Archivos afectados:**
+- `src/pages/Login/data/slides.js` (timing, slogans, las 4 imágenes ahora con `fuentes` reales, sin ningún `placeholder` abstracto).
+- `public/images/login/*.{webp,jpg}` (12 archivos: 4 imágenes × desktop/móvil × webp/jpg).
+- `src/assets/login/originales-sin-procesar/login{1-4}.jpg` (nuevo, fuera de `public/`).
+- Eliminados: `src/assets/login/{silla,tijera,herramientas,cuaderno}.svg` (ya sin uso).
+- `src/pages/Login/shared/FormularioAcceso.jsx` (nueva señal `onEscribiendo`, separada de `onCambioFoco`).
+- `src/pages/Login/desktop/LoginDesktop.jsx`, `src/pages/Login/mobile/LoginMobile.jsx` (wiring de la nueva señal; mobile mantiene ambas).
+- `src/pages/Login/shared/TextoSlogan.jsx` (`pb-[0.2em]` para las descendentes).
+- `src/components/common/Cursor.jsx` (anillo de botón rediseñado en laton, sin relleno pesado; el punto central ahora también visible sobre botones).
+
+**Pendiente / próximos pasos:**
+- Las 4 imágenes ya son fotografía real — no queda ningún placeholder pendiente de reemplazo en el login.
+- El recorte de `herramientas` (desde una foto horizontal) es aceptable pero no ideal — perdió la fila inferior de máquinas doradas del original. Si en algún momento se quiere mejorar, hay que reprocesar desde `src/assets/login/originales-sin-procesar/login2.jpg` con otro punto de recorte, no alcanza con tocar `slides.js`.
+- La leve cercanía visual entre cobre y laton (son dos tonos cálidos de la misma familia) hace que la diferencia botón/link del cursor sea sutil más que evidente a primera vista — se optó así a propósito (evitar que el cursor "grite"), pero vale la pena que Enzo lo revise en su pantalla real y avise si prefiere una diferencia más marcada.
+- Sigue pendiente todo lo ya anotado como no-automatizable en la entrada anterior (Bloq Mayús con teclado físico, autofill real, teclado virtual en dispositivo real, flujo de recuperación de contraseña real).
+
+---
+
+## 2026-08-10 - Cursor: el anillo sobre botones y links se reemplazó por una mano con el índice extendido
+
+**Qué se hizo:**
+Enzo pidió repensar de nuevo el estado del cursor sobre elementos clicables: en vez de un anillo (aunque ya fuera translúcido, ver entrada anterior), quería algo tipo "mano con el dedo índice" — el mismo lenguaje del cursor `pointer` nativo del sistema, pero dibujado a mano con la paleta del sitio en vez de depender del cursor del navegador.
+
+Se creó `src/components/common/CursorManoIndice.jsx`: un ícono SVG propio (tres rectángulos con bordes redondeados — dedo índice, palma, pulgar — con un trazo hueso de contorno para que se lea bien tanto sobre fondos claros como oscuros). No es un ícono de librería ni un emoji: mismo criterio que el resto del sitio ("cero iconografía de stock").
+
+En `Cursor.jsx`: sobre botones y links, el anillo desaparece por completo y aparece este ícono en su lugar, siguiendo el mismo movimiento con inercia (spring) que ya tenía el anillo. Mantiene la diferenciación de color ya establecida — botón en laton (bronce), link en cobre — ahora expresada en el color de la mano en vez de en el color de un anillo. Los estados `default` (anillo simple) y `texto` (barra vertical, sobre campos de formulario) no cambiaron.
+
+Hubo dos rondas de ajuste antes del resultado final:
+1. La primera versión del ícono, con una rotación general de -14° sobre todo el grupo, se veía como un blob/paleta en vez de una mano — el pulgar y la palma se fundían visualmente. Se rehizo sin la rotación general (cada pieza dibujada recta, con el pulgar rotado solo él) y ahora se lee con claridad como una mano señalando.
+2. El punto de anclaje del ícono (dónde "toca" la posición real del cursor) estaba centrado en el medio del dibujo, no en la punta del dedo — se notaba un desfase entre dónde estaba el mouse real y dónde parecía apuntar la mano. Se recalculó el offset (`translateX: -50%, translateY: -8%`) para que la punta del índice sea el punto exacto que sigue al cursor real, igual que un cursor de sistema tiene su "hotspot" en la punta de la flecha.
+
+**Cómo se probó:**
+Playwright instalado y desinstalado como dependencia temporal (mismo patrón de siempre). Se verificó con capturas: la mano se lee con claridad sobre el botón "Ingresar" del login (laton) y sobre "¿Olvidaste tu contraseña?" (cobre); el punto de anclaje coincide con la punta del dedo tras el ajuste; los estados que no debían cambiar siguen iguales (`default`: punto + anillo sobre espacio vacío; `texto`: barra vertical sobre un campo de input); en contexto táctil (`hasTouch` + `isMobile`) el cursor propio no se activa; y se confirmó el mismo comportamiento en un botón real de la Home (`Button.jsx`), ya que `Cursor.jsx` es global.
+
+**Por qué:**
+- Ícono propio en vez de un cursor CSS nativo (`cursor: pointer`) o un emoji: mantiene la coherencia de que todo el cursor personalizado (punto, anillo, barra, y ahora la mano) es dibujo propio con la paleta del sitio, no un recurso genérico.
+- Ajustar el hotspot a la punta del dedo en vez de dejarlo centrado: un cursor cuyo punto de referencia visual no coincide con dónde realmente se hace click se percibe como impreciso, aunque funcionalmente el click siga funcionando bien (el `pointer-events-none` del ícono no interfiere con la interacción real).
+
+**Archivos afectados:**
+- Nuevo: `src/components/common/CursorManoIndice.jsx`.
+- Modificado: `src/components/common/Cursor.jsx` (la mano reemplaza al anillo en los estados `boton`/`enlace`; el punto central también queda visible en estos dos estados, ya que la mano no lo tapa).
+
+**Pendiente / próximos pasos:**
+- Ninguno nuevo — con este cambio se considera cerrado el pedido de "cursor que reacciona por tipo de elemento" de la Parte 3 original del rediseño de login.
+
+---
+
+## 2026-08-10 - Cursor: la mano se rehizo con la silueta clásica de 4 dedos (la de un dedo solo no se entendía)
+
+**Qué se hizo:**
+Enzo compartió una referencia visual: el ícono clásico de cursor "mano" (los 4 dedos juntos apuntando hacia arriba, escalonados en altura, con el pulgar aparte) — el que usan Windows/la mayoría de sistemas para el cursor de link/botón. La versión anterior (un solo dedo índice sobre una palma) no se leía con claridad a tamaño real. Se rehizo `CursorManoIndice.jsx` con esa silueta exacta: 4 rectángulos con puntas redondeadas de distinto largo (índice el más alto, meñique el más corto, como una mano real con el índice extendido y el resto ligeramente escalonado) apoyados sobre la palma, más el pulgar rotado a un costado — recoloreado con la paleta del sitio (laton/cobre) en vez del blanco/negro del ícono de referencia. Se recalculó el punto de anclaje (la punta del índice, ahora el dedo más alto y más a la izquierda) para que siga siendo el punto exacto que sigue al cursor real.
+
+**Cómo se probó:**
+Playwright + una utilidad de zoom (`sharp`, redimensionado sin suavizado para ver el trazo tal cual) sobre capturas del botón "Ingresar" y el link "¿Olvidaste tu contraseña?" en el login, ambas a tamaño real y ampliadas 4x. Se confirmó que los 4 dedos se distinguen con claridad (separación visible entre cada uno, largos escalonados) y que los estados que no debían cambiar (`default`, `texto`) siguen intactos.
+
+**Por qué:**
+- La silueta de 4 dedos es la que el usuario reconoce instantáneamente como "esto es clicable" (es el cursor pointer de toda la vida) — un solo dedo, aunque la intención fuera la misma, no llegaba a leerse como mano a los ~30px de tamaño real.
+
+**Archivos afectados:**
+- `src/components/common/CursorManoIndice.jsx` (silueta rehecha, ahora con 4 dedos).
+- `src/components/common/Cursor.jsx` (nuevo punto de anclaje: `translateX: -31%, translateY: -4%`, correspondiente a la punta del dedo índice en el nuevo dibujo).
+
+**Pendiente / próximos pasos:**
+- Ninguno — Enzo debería revisarlo en su pantalla real y confirmar que el tamaño/velocidad de seguimiento le acomodan.
+
+---
+
+## 2026-08-10 - Cursor: la mano se rehizo desde la geometría real del ícono clásico de Windows (no más formas propias aproximadas)
+
+**Qué se hizo:**
+Enzo rechazó las dos versiones anteriores de la mano (un dedo sobre una palma, luego cuatro rectángulos escalonados): "no parece una mano", y pidió buscar una fuente real y replicar el cursor de mano de Windows exactamente, no una aproximación. Se buscó y encontró **"Hand Cursor.svg"** en Wikimedia Commons — el path SVG real del clásico cursor de mano/pointer, con licencia **CC0 (dominio público)**, sin restricciones de uso: https://commons.wikimedia.org/wiki/File:Hand_Cursor.svg
+
+Se tomó ese path exacto (índice extendido, los otros tres dedos curvados, pulgar, contorno curvo real en vez de rectángulos) y se recoloreó a la paleta del sitio: relleno crema (`#ffe6ca`, muy cercano al hueso), contorno oscuro (`#1c1b19`, el negro-barbero del sitio en vez de negro puro) y una sombra propia (una copia del mismo path, en negro al 22% de opacidad, desplazada) — replicando el mismo lenguaje visual de la referencia que mostró Enzo (relleno claro + contorno oscuro + sombra). Se dejó de diferenciar botón/link por color (la idea de "botón en laton, link en cobre" de la iteración anterior se abandona: cambiarle el color rompía la lectura del dibujo) — ahora se diferencian solo por tamaño (el botón escala 1.15x).
+
+Se recalculó el punto de anclaje del ícono (dónde su punta de índice coincide con la posición real del cursor) para esta nueva geometría: `translateX: -31%, translateY: 0%`.
+
+**Cómo se probó:**
+Playwright + captura ampliada 8x sin suavizado (para ver el trazo con nitidez, no una imagen borrosa por escalado) sobre el botón "Ingresar" y el link "¿Olvidaste tu contraseña?" del login. Se ajustó el punto de anclaje con una prueba dirigida (mover el cursor a una esquina conocida del botón y verificar dónde cae la punta del dedo en la captura) hasta que coincidiera. Se reconfirmaron los estados que no debían cambiar: `default` (punto + anillo), `texto` (barra vertical sobre un input, verificada con zoom) y la desactivación completa en contexto táctil.
+
+**Por qué:**
+- Partir de una geometría real (curvas de un dibujo hecho por alguien que sabe dibujar una mano) en vez de aproximarla a mano con rectángulos: dos intentos propios ya habían fallado en leerse como mano — el problema no era el color ni el tamaño, era que las curvas de una mano real no se pueden aproximar bien con formas rectangulares simples.
+- CC0 (dominio público): se puede usar, modificar y recolorear libremente sin atribución obligatoria — no es un ícono de una librería con licencia restrictiva ni un asset de otro producto.
+- Se abandonó la diferenciación de color botón/link: mantener la fidelidad visual al pedido explícito de Enzo pesó más que la diferenciación sutil que se había agregado antes — se puede reintroducir más adelante si hace falta, pero no a costa de que la mano se vea "distinta" del dibujo pedido.
+
+**Archivos afectados:**
+- `src/components/common/CursorManoIndice.jsx` (reescrito con el path real de Wikimedia Commons + sombra propia).
+- `src/components/common/Cursor.jsx` (color único `#ffe6ca` en vez de laton/cobre; nuevo punto de anclaje).
+
+**Pendiente / próximos pasos:**
+- Ninguno — este es el resultado que Enzo pidió explícitamente replicar. Falta su confirmación final en pantalla real.
+
+---
+
+## 2026-08-10 - Cursor: la flecha por defecto también se rehizo desde la geometría real de Windows
+
+**Qué se hizo:**
+Mismo criterio que con la mano (ver entrada anterior): Enzo pidió que el cursor por defecto (el que se ve sobre el resto de la página, sin hover de nada) también fuera "igualito al de Windows pero con la paleta de la página" — en vez del punto+anillo abstracto que había desde el inicio de esta feature.
+
+Se buscó y encontró **"Windows 10 Aero arrow 32x32-32.svg"** en Wikimedia Commons — la geometría real de la flecha de cursor de Windows 10, en **dominio público** (una forma geométrica tan simple que no alcanza el umbral de originalidad para tener derechos de autor): https://commons.wikimedia.org/wiki/File:Windows_10_Aero_arrow_32x32-32.svg
+
+Se creó `CursorFlecha.jsx` con ese polígono exacto, recoloreado igual que la mano: relleno hueso (`#f3eee3`), contorno negro-barbero, sombra propia desplazada. Reemplaza por completo al punto+anillo que existía para el estado `default` — ya no queda ningún resto de ese diseño original en `Cursor.jsx` (se simplificó el componente: ya no hay un "punto" separado, cada estado — flecha, mano, barra de texto — es una sola pieza que sigue el cursor con la misma inercia).
+
+**Cómo se probó:**
+Playwright + captura ampliada 8x. Se verificó legibilidad sobre fondo claro (hueso) y sobre el panel oscuro del carrusel — el contorno oscuro se sigue viendo bien en ambos porque el relleno claro es lo que aporta el contraste, no el contorno. Se verificó la precisión del punto de anclaje (la punta de la flecha, el "hotspot" tradicional de cualquier cursor de sistema) con una medición directa de `getBoundingClientRect()` contra la posición real del mouse — coincide con menos de 1px de diferencia. Se reconfirmó que los otros dos estados (mano sobre botón/link, barra sobre campo de texto) y la desactivación en táctil sigan funcionando igual que antes.
+
+**Por qué:**
+- Misma razón que con la mano: partir de una geometría real en vez de aproximarla — acá el riesgo era menor (una flecha es una forma mucho más simple que una mano), pero la consistencia de criterio importa: si la mano se sacó de una fuente real, la flecha debía seguir el mismo camino.
+- Ya no hay un "punto" instantáneo separado del resto: con los tres estados representados por una forma completa (flecha/mano/barra) que sigue el spring, mantener un punto adicional solo para el estado default ya no cumplía ningún propósito y sumaba una capa más a coordinar sin beneficio visual.
+
+**Archivos afectados:**
+- Nuevo: `src/components/common/CursorFlecha.jsx`.
+- Modificado: `src/components/common/Cursor.jsx` (se quitó el punto+anillo original; la flecha reemplaza al estado `default`).
+
+**Pendiente / próximos pasos:**
+- Con esto, los tres estados del cursor (`default`, `boton`/`enlace`, `texto`) están resueltos con geometría real recoloreada. Falta la confirmación final de Enzo en su pantalla.
+
+---
+
+## 2026-08-10 - Cursor: se eliminó el resorte de posición (cero delay) y se unificaron tamaño/color entre la flecha y la mano
+
+**Qué se hizo:**
+Enzo reportó que el cursor se sentía con mucho delay, y pidió que la flecha y la mano fueran del mismo tamaño, forma (de dibujo) y color — dos pedidos relacionados, resueltos juntos:
+
+1. **Cero delay posicional.** El cursor usaba un resorte (`useSpring`, con `damping`/`stiffness`/`mass`) para que el anillo/mano/flecha siguiera al mouse con una inercia suave — una decisión explícita de una fase anterior del proyecto ("retraso elástico, nunca 1:1 rígido"). Con las formas ya calcadas de los cursores reales de Windows, ese retraso deja de sentirse como una decisión de diseño y empieza a sentirse como lag. Se sacó el resorte por completo: ahora los tres estados (flecha, mano, barra de texto) siguen la posición real del mouse (`x`/`y`, los motion values que ya traía) sin ningún suavizado — igual de instantáneo que el cursor nativo del sistema, porque literalmente se están replicando esos cursores.
+2. **Mismo tamaño y color en flecha y mano.** La mano (`CursorManoIndice.jsx`) tenía un `viewBox` heredado del archivo original de Wikimedia con mucho margen vacío alrededor del dibujo (la mano ocupaba solo ~55% del ancho del cuadro) — a igual tamaño de contenedor que la flecha (que sí ocupa casi el 100% de su propio `viewBox`), la mano se veía notoriamente más chica. Se recortó el `viewBox` de la mano a su contenido real (medido con `getBBox()` sobre el path, no a ojo) para que ambas formas rindan al mismo tamaño visual dentro del mismo contenedor (`w-7` para las dos). Los colores también se unificaron: antes la mano usaba un crema tomado literalmente del archivo de referencia (`#ffe6ca`) y la flecha ya usaba hueso (`#f3eee3`) — ahora ambas usan exactamente `#f3eee3` (hueso) de relleno y `#1c1b19` (negro-barbero) de contorno, los tokens reales de la paleta del sitio, no un color de otro lado.
+
+**Cómo se probó:**
+- **Medición de lag real, no solo percepción**: un loop de `requestAnimationFrame` leyó en cada frame la posición renderizada del cursor (parseando su `transform: translate()`) contra la última posición real del mouse, durante un movimiento rápido y continuo (40 puntos en zigzag). Resultado: diferencia máxima de **0.0005px** — ruido de punto flotante, no lag real.
+- **Precisión del punto de anclaje de la mano** tras recortar su `viewBox`: se repitió la medición directa contra `getBoundingClientRect()` — la punta del índice quedó a menos de 2px de la posición real del cursor.
+- **Comparación visual lado a lado** (capturas ampliadas 6x sin suavizado) de la flecha sobre fondo vacío y la mano sobre el botón "Ingresar": mismo tamaño aparente, mismo relleno, mismo contorno.
+- Se reconfirmó que la barra de texto sobre un input y la desactivación completa en contexto táctil sigan funcionando.
+- Playwright instalado y desinstalado como dependencia temporal, de nuevo.
+
+**Por qué:**
+- El resorte suave fue una decisión correcta cuando el cursor era un punto y un anillo abstractos — ahí un poco de inercia se sentía "diseñado". Con formas que imitan cursores reales del sistema, la comparación mental del usuario cambia: espera que se comporten como cursores reales, y un cursor real no tiene delay. Mantener el resorte ahí ya no aportaba sensación de cuidado, aportaba sensación de lag.
+- Medir el recorte del `viewBox` con `getBBox()` en vez de ajustarlo a ojo: la diferencia de tamaño percibida no era un problema de la clase CSS (`w-8` vs `w-7`), era que un dibujo tenía mucho margen interno invisible y el otro no — ajustar solo el contenedor sin corregir eso nunca iba a emparejarlos bien.
+
+**Archivos afectados:**
+- `src/components/common/Cursor.jsx` (se quitó `useSpring`; los tres estados ahora comparten `x`/`y` directos; mismo ancho de contenedor `w-7` para flecha y mano; color único `#f3eee3`).
+- `src/components/common/CursorManoIndice.jsx` (`viewBox` recortado a `91.37 36.74 279.79 393.05`, el bounding box real del dibujo con margen para el trazo y la sombra).
+
+**Pendiente / próximos pasos:**
+- Con esto se consideran resueltos los tres pedidos encadenados sobre el cursor (formas reales, tamaño/color unificado, cero delay). Falta la confirmación de Enzo en su equipo real — la medición de lag se hizo en este entorno, que no tiene el mismo hardware que el suyo, aunque al ser cero-resorte (sin ningún cálculo adicional por frame más allá de aplicar el transform) no debería depender del equipo.
+
+---
+
+## 2026-08-10 - Cursor: corrección de dirección — la flecha se ajustó a la mano, no al revés
+
+**Qué se hizo:**
+La entrada anterior había igualado el tamaño/color recortando y recoloreando la **mano** para que se pareciera a la flecha — Enzo aclaró que era al revés: la mano ya estaba bien (era el diseño ya validado), y lo que había que ajustar era la flecha para que tomara sus atributos. Se revirtió por completo el recorte del `viewBox` de la mano (vuelve a `0 0 453.54331 453.54331`, el original de Wikimedia) y su color vuelve a `#ffe6ca`, su contenedor a `w-8`, su punto de anclaje a `translateX: -31%, translateY: 0%`, su escala de hover a 1.15 — exactamente como estaba antes de esa entrada.
+
+Con la mano fija como referencia, se ajustó la flecha: mismo color (`#ffe6ca`, ya no `#f3eee3`), trazo más fino (2.6 → 1.4, para acercarse al peso visual del contorno de la mano) y sombra más discreta (offset de `(2.2,3)` a `(1.3,1.8)`), contenedor reducido de `w-7` a `w-5` — la flecha necesita un contenedor más chico que la mano porque su `viewBox` casi no tiene margen interno (ocupa ~95% del cuadro), mientras que el de la mano sí tiene bastante margen (ocupa ~55-80%) — a igual contenedor, la flecha se veía más grande. Ambos componentes (`CursorFlecha`, `CursorManoIndice`) ahora reciben el color por prop desde la misma constante (`COLOR_CURSOR` en `Cursor.jsx`), para que no puedan volver a desalinearse por accidente.
+
+**Cómo se probó:**
+Playwright + capturas ampliadas 6x, incluida una comparación lado a lado (mismo zoom, mismo tamaño de recorte) entre la flecha sobre fondo vacío y la mano sobre el botón "Ingresar" — mismo color, mismo grosor de trazo relativo, tamaño visual comparable. Se remidió la precisión del punto de anclaje de ambas formas contra la posición real del mouse (menos de 3px de diferencia en los dos casos) y se reconfirmó que la barra de texto y la desactivación en táctil sigan funcionando.
+
+**Por qué:**
+- La mano era el diseño ya validado por Enzo en una entrada anterior — no había ningún motivo para tocarla; el error fue asumir que había que encontrar un punto medio entre las dos formas en vez de fijar una como referencia y ajustar la otra.
+
+**Archivos afectados:**
+- `src/components/common/CursorManoIndice.jsx` (revertido el `viewBox` al original completo).
+- `src/components/common/CursorFlecha.jsx` (acepta `color` por prop; trazo y sombra más finos).
+- `src/components/common/Cursor.jsx` (color único `#ffe6ca` compartido por ambos; contenedor de la mano de vuelta a `w-8`/`-31%`/`0%`/escala 1.15; contenedor de la flecha a `w-5`).
+
+**Pendiente / próximos pasos:**
+- Falta la confirmación de Enzo en pantalla real — esta vez con la mano como punto de partida fijo, no como resultado de un promedio entre ambas formas.
+
+---
+
+## 2026-08-10 - Cursor: ajuste fino de tamaño — flecha y mano midiendo el dibujo real, no el contenedor
+
+**Qué se hizo:**
+Enzo notó que la flecha seguía viéndose más grande que la mano tras el ajuste anterior. El cálculo de la entrada previa (basado en estimar a ojo qué porcentaje de cada `viewBox` ocupa el dibujo) resultó impreciso. Se remidió directamente en el navegador con Playwright: `getBoundingClientRect()` sobre el `<polygon>`/`<path>` real ya renderizado (no sobre el contenedor, que incluye margen invisible) — la mano dibujada medía 20.4×29.3px con su contenedor en `w-8` (32px), la flecha medía solo 15.8×24.7px con el suyo en 17px. Se ajustó el contenedor de la flecha a `w-[21px]` (un valor exacto en píxeles, no un paso de Tailwind) hasta que el dibujo real midiera 19.5×30.5px — a menos de un 4% de diferencia con la mano en ambas dimensiones, lo más cerca que se puede llegar sin deformar ninguna de las dos formas (tienen proporciones de alto/ancho ligeramente distintas, así que un tamaño idéntico exacto en las dos dimensiones a la vez no es posible con un escalado uniforme).
+
+**Cómo se probó:**
+Medición directa del tamaño dibujado (no del contenedor) de ambas formas, iterando el ancho del contenedor de la flecha hasta minimizar la diferencia. Captura lado a lado al mismo zoom para confirmar visualmente. Se remidió la precisión del punto de anclaje de la flecha tras el cambio de tamaño (los porcentajes de `translateX`/`translateY` son relativos al tamaño del propio elemento, así que en teoría no debían desajustarse — confirmado: menos de 0.1px de diferencia). Se reconfirmó la barra de texto y la desactivación en táctil.
+
+**Por qué:**
+- Medir el `viewBox` a ojo (qué porcentaje del cuadro ocupa el dibujo) no es lo mismo que medir el dibujo ya renderizado en pantalla — la única forma confiable de igualar dos íconos con proporciones internas distintas es medir el resultado final, no las proporciones de origen.
+
+**Archivos afectados:**
+- `src/components/common/Cursor.jsx` (contenedor de la flecha: `w-[17px]` → `w-[21px]`).
+
+**Pendiente / próximos pasos:**
+- Falta la confirmación de Enzo en pantalla real.
+
+---
+
+## 2026-08-10 - Cursor: tamaño ajustado al estándar real de Windows (32x32 de lienzo, ~16px de dibujo visible)
+
+**Qué se hizo:**
+Enzo notó que ambos cursores seguían viéndose grandes comparados con el cursor real de Windows, y pidió específicamente usar el estándar de tamaño de Windows para que el salto entre el cursor nativo y el de la página se note solo en el diseño, no en la escala. Se investigó el estándar real: Windows usa un lienzo de 32×32px para sus cursores desde Windows 3.11 (de ahí que "32x32" sea la referencia que todo el mundo cita), pero el dibujo visible de la flecha dentro de ese lienzo — la tinta real, no el cuadro invisible que la contiene — mide aproximadamente 16px. Es el mismo tipo de diferencia que ya se había encontrado antes entre el `viewBox` de cada ícono y su contenido real.
+
+Se redujeron los contenedores hasta que el dibujo real (medido de nuevo con `getBoundingClientRect()` sobre el trazo, no sobre el contenedor) diera ~16-17px de alto en ambos: flecha de `w-[21px]` a `w-[12px]` (dibujo real: 11.2×17.4px), mano de `w-8` a `w-[19px]` (dibujo real: 12.1×17.4px) — mismo alto casi exacto, ancho a menos de 1px de diferencia.
+
+**Cómo se probó:**
+Fuente verificada sobre el estándar de Windows (Microsoft Q&A). Medición directa del tamaño dibujado en pantalla (no del contenedor) con Playwright, iterando hasta acercarse al ~16px real. Captura lado a lado a mayor zoom para confirmar visualmente. Se remidió la precisión del punto de anclaje de ambas formas tras la reducción de tamaño (los porcentajes de `translateX`/`translateY` son relativos al propio elemento, así que no debían desajustarse — confirmado, menos de 2px de diferencia en ambos casos). Se reconfirmó la barra de texto y la desactivación en táctil.
+
+**Por qué:**
+- El objetivo explícito era que el cambio entre el cursor nativo y el de la página se note "solo en el diseño", no en el tamaño — eso exige igualar el tamaño de la tinta visible, no el tamaño nominal que todo el mundo asocia a "cursor de Windows" (32px), que en realidad es el lienzo, no el dibujo.
+
+**Archivos afectados:**
+- `src/components/common/Cursor.jsx` (contenedor de la flecha: `w-[21px]` → `w-[12px]`; contenedor de la mano: `w-8` → `w-[19px]`).
+
+**Pendiente / próximos pasos:**
+- Falta la confirmación de Enzo en pantalla real — la comparación contra el cursor nativo de Windows solo se puede juzgar del todo en su propio equipo, no en este entorno.
+
+---
+
+## 2026-08-10 - Panel superadmin sin login + una barbería de prueba con datos provisorios (localStorage), para trabajar sin Supabase real
+
+**Qué se hizo:**
+Enzo quería entrar al panel superadmin (`/admin`) para trabajar ahí, pero dos cosas lo bloqueaban: no hay login funcional contra un backend real todavía, y aunque lo hubiera, no hay ninguna barbería cargada para ver cómo se ve la lista/el detalle/la página pública.
+
+**1. Bypass del login solo en `/admin`.** Se sacó el `<RutaProtegida rolesPermitidos={[ROL_SUPERADMIN]}>` que envolvía las rutas de `/admin` en `AppRouter.jsx`, dejando un comentario explícito de que es temporal y cómo revertirlo. `/panel` y `/panel/precios` no se tocaron — siguen protegidos igual que antes.
+
+**2. Una barbería de prueba, con datos provisorios respaldados en `localStorage`.** Se creó `src/mocks/datosProvisoriosSuperadmin.js`: un pequeño "backend falso" en memoria/localStorage con la misma forma exacta que espera cada hook real (columnas, relaciones embebidas `planes`/`personalizacion`/`servicios`/`barberos`, hasta el RPC de cambio de estado con su historial). Trae una barbería semilla ("Barbería Don Manuel", slug `don-manuel`, estado Activo, plan Equipo, con 3 servicios y 2 barberos) y 3 planes (Solo/Equipo/Estudio, los mismos precios que ya se muestran en la landing).
+
+Se conectó en los 4 hooks que hoy dependen de Supabase para esta parte — `useBarberiasSuperadmin.js` (lista, detalle, crear, cambiar plan, cambiar estado, chequeo de slug), `useHistorialEstados.js`, `usePlanesSuperadmin.js` (solo lectura) y `useBarberiaPorSlug.js` (la página pública) — con una sola bandera compartida, `HAY_BACKEND_REAL`, que revisa si `VITE_SUPABASE_URL` sigue siendo el placeholder de `.env`. Ninguna query real se tocó ni se borró: cada hook simplemente elige entre la función real y la provisoria según esa bandera. **Se autodesactiva sola** apenas `.env` tenga una URL de Supabase real — no hay nada que revertir a mano en el código cuando llegue ese momento.
+
+Los cambios que se hagan desde el panel (cambiar plan, cambiar estado, crear una barbería nueva con el formulario que ya existía) quedan guardados en `localStorage` y sobreviven a recargar la página — no es solo una demo que se resetea sola.
+
+**3. Referencia en CSV (el "Excel" pedido).** `datos-provisorios/{barberias,servicios,barberos}.csv` — abre normal en Excel/Sheets, refleja los mismos datos de la barbería semilla, para que Enzo tenga un respaldo legible fuera del navegador. Incluye un `README.md` explicando con claridad que esto **no se lee automáticamente** — es solo referencia/registro manual; la fuente real que ve la app es el archivo de mocks + `localStorage`, y agregar barberías de verdad se hace desde el propio formulario del panel, no editando el CSV.
+
+**Cómo se probó:**
+Playwright (instalado y desinstalado como siempre): la barbería semilla aparece en la lista de `/admin`, su detalle carga con el plan y el historial vacío correctos, cambiar el plan a "Estudio" y recargar la página mantiene el cambio (confirma que `localStorage` persiste), y `/barberias/don-manuel` carga la página pública completa — color de marca, eslogan, dirección, link de WhatsApp, los 3 servicios con su oferta activa/inactiva, y el asistente de reserva mostrando "Elige un servicio" — sin ningún error de consola. `npm run build` y `npm run lint` limpios.
+
+**Por qué:**
+- Bandera única (`HAY_BACKEND_REAL`) en vez de un flag manual que alguien tiene que acordarse de apagar: el criterio de activación es un hecho verificable (¿la URL sigue siendo la de ejemplo?), no una decisión que dependa de la memoria de nadie.
+- No tocar ninguna query real: si se llega a necesitar ajustar algo del comportamiento real más adelante, el código real sigue ahí intacto, no escondido detrás de la lógica provisoria.
+- CSV en vez de intentar que la app lea un Excel de verdad: agregar un parser de `.xlsx` y una capa de importación para algo que se describió como "de momento" habría sido mucho más trabajo del que el pedido necesitaba — la necesidad real era tener un respaldo legible, no una fuente de datos autoritativa alternativa.
+
+**Archivos afectados:**
+- Nuevo: `src/mocks/datosProvisoriosSuperadmin.js`, `datos-provisorios/{barberias,servicios,barberos}.csv`, `datos-provisorios/README.md`.
+- Modificado: `src/routes/AppRouter.jsx` (bypass de `/admin`), `src/pages/panel/hooks/{useBarberiasSuperadmin,useHistorialEstados,usePlanesSuperadmin}.js`, `src/pages/barberias/hooks/useBarberiaPorSlug.js` (todos con la rama provisoria, sin tocar la real).
+
+**Pendiente / próximos pasos:**
+- Esto es explícitamente provisorio — en cuanto haya credenciales reales de Supabase, todo se apaga solo (no hace falta revertir código), pero sigue pendiente ejecutar el SQL real (`supabase/sql/*.sql`) contra ese proyecto y crear ahí las tablas/columnas que hoy solo existen en el código y en este mock.
+- El bypass de `/admin` sigue siendo temporal — falta re-envolverlo en `<RutaProtegida rolesPermitidos={[ROL_SUPERADMIN]}>` cuando se retome el login (ver comentario en `AppRouter.jsx`).
 
 ---

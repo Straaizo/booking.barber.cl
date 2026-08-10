@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../../../services/supabaseClient'
+import { HAY_BACKEND_REAL, listarHistorialProvisorio } from '../../../mocks/datosProvisoriosSuperadmin'
 
 async function obtenerHistorial(barberiaId) {
   const { data, error } = await supabase
@@ -15,7 +16,7 @@ async function obtenerHistorial(barberiaId) {
 export function useHistorialEstados(barberiaId) {
   return useQuery({
     queryKey: ['historial_estados', barberiaId],
-    queryFn: () => obtenerHistorial(barberiaId),
+    queryFn: () => (HAY_BACKEND_REAL ? obtenerHistorial(barberiaId) : listarHistorialProvisorio(barberiaId)),
     enabled: Boolean(barberiaId),
   })
 }

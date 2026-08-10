@@ -30,6 +30,7 @@ export function Button({ as = 'a', className = '', ...props }) {
   return (
     <MotionElement
       ref={referencia}
+      data-cursor="boton"
       onMouseMove={manejarMovimiento}
       onMouseLeave={resetear}
       style={{ x: springX, y: springY }}

@@ -1,0 +1,4 @@
+id,barberia_id,nombre,duracion_minutos,precio_clp,precio_oferta,oferta_activa,activo
+prov-servicio-1,prov-barberia-1,Corte clásico,30,8000,,FALSE,TRUE
+prov-servicio-2,prov-barberia-1,Corte + Barba,45,13000,11000,TRUE,TRUE
+prov-servicio-3,prov-barberia-1,Afeitado a la antigua,25,7500,,FALSE,TRUE

@@ -15,7 +15,7 @@ import { PanelSuperadminLayout } from '../pages/panel/PanelSuperadminLayout'
 import { PanelSuperadminBarberias } from '../pages/panel/PanelSuperadminBarberias'
 import { PanelSuperadminBarberiaDetalle } from '../pages/panel/PanelSuperadminBarberiaDetalle'
 import { PanelSuperadminPlanes } from '../pages/panel/PanelSuperadminPlanes'
-import { ROL_BARBERO, ROL_ADMIN, ROL_SUPERADMIN } from '../utils/roles'
+import { ROL_BARBERO, ROL_ADMIN } from '../utils/roles'
 
 const router = createBrowserRouter([
   { path: '/', element: <Home /> },
@@ -50,22 +50,26 @@ const router = createBrowserRouter([
       },
     ],
   },
+  // TEMPORAL: se saca el <RutaProtegida> de /admin para trabajar en el panel
+  // superadmin sin pasar por el login (todavía no hay Supabase real conectado
+  // — ver .env). Revertir envolviendo de nuevo en
+  // <RutaProtegida rolesPermitidos={[ROL_SUPERADMIN]}> (importar ROL_SUPERADMIN
+  // desde '../utils/roles') apenas se retome el login o se conecte el backend real.
   {
-    element: <RutaProtegida rolesPermitidos={[ROL_SUPERADMIN]} />,
+    path: '/admin',
+    element: <PanelSuperadminLayout />,
     children: [
-      {
-        path: '/admin',
-        element: <PanelSuperadminLayout />,
-        children: [
-          { index: true, element: <PanelSuperadminBarberias /> },
-          { path: 'barberias/:id', element: <PanelSuperadminBarberiaDetalle /> },
-          { path: 'planes', element: <PanelSuperadminPlanes /> },
-        ],
-      },
+      { index: true, element: <PanelSuperadminBarberias /> },
+      { path: 'barberias/:id', element: <PanelSuperadminBarberiaDetalle /> },
+      { path: 'planes', element: <PanelSuperadminPlanes /> },
     ],
   },
 ])
 
 export function AppRouter() {
-  return <RouterProvider router={router} />
+  // v7_startTransition es una bandera de <RouterProvider>, no de
+  // createBrowserRouter — evita el warning en consola, no cambia nada visible
+  // (React Router ya recomienda activarla desde ahora, antes de que sea
+  // obligatoria en v7).
+  return <RouterProvider router={router} future={{ v7_startTransition: true }} />
 }

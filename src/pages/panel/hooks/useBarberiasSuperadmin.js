@@ -1,6 +1,15 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../../services/supabaseClient'
 import { ESTADO_PENDIENTE_ACTIVACION } from '../../../utils/estados'
+import {
+  HAY_BACKEND_REAL,
+  listarBarberiasProvisorias,
+  obtenerBarberiaProvisoria,
+  slugProvisorioDisponible,
+  crearBarberiaProvisoria,
+  cambiarPlanProvisorio,
+  cambiarEstadoProvisorio,
+} from '../../../mocks/datosProvisoriosSuperadmin'
 
 const CLAVE = ['barberias_superadmin']
 
@@ -15,7 +24,7 @@ async function obtenerBarberias() {
 }
 
 export function useBarberiasSuperadmin() {
-  return useQuery({ queryKey: CLAVE, queryFn: obtenerBarberias })
+  return useQuery({ queryKey: CLAVE, queryFn: HAY_BACKEND_REAL ? obtenerBarberias : listarBarberiasProvisorias })
 }
 
 async function obtenerBarberiaDetalle(id) {
@@ -34,12 +43,13 @@ async function obtenerBarberiaDetalle(id) {
 export function useBarberiaDetalle(id) {
   return useQuery({
     queryKey: ['barberia_detalle', id],
-    queryFn: () => obtenerBarberiaDetalle(id),
+    queryFn: () => (HAY_BACKEND_REAL ? obtenerBarberiaDetalle(id) : obtenerBarberiaProvisoria(id)),
     enabled: Boolean(id),
   })
 }
 
 export async function slugDisponible(slug) {
+  if (!HAY_BACKEND_REAL) return slugProvisorioDisponible(slug)
   const { data, error } = await supabase.from('barberias').select('id').eq('slug', slug).maybeSingle()
   if (error) throw error
   return !data
@@ -49,6 +59,7 @@ export function useCrearBarberia() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: async (barberia) => {
+      if (!HAY_BACKEND_REAL) return crearBarberiaProvisoria(barberia)
       const { data, error } = await supabase
         .from('barberias')
         .insert({ ...barberia, estado_id: ESTADO_PENDIENTE_ACTIVACION })
@@ -65,6 +76,7 @@ export function useCambiarPlanBarberia() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: async ({ id, planId }) => {
+      if (!HAY_BACKEND_REAL) return cambiarPlanProvisorio(id, planId)
       const { error } = await supabase.from('barberias').update({ plan_id: planId }).eq('id', id)
       if (error) throw error
     },
@@ -83,6 +95,7 @@ export function useCambiarEstadoBarberia() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: async ({ barberiaId, estadoNuevoId, motivo }) => {
+      if (!HAY_BACKEND_REAL) return cambiarEstadoProvisorio(barberiaId, estadoNuevoId, motivo)
       const { error } = await supabase.rpc('cambiar_estado_barberia', {
         p_barberia_id: barberiaId,
         p_estado_nuevo_id: estadoNuevoId,

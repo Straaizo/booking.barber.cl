@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../../services/supabaseClient'
+import { HAY_BACKEND_REAL, listarPlanesProvisorios } from '../../../mocks/datosProvisoriosSuperadmin'
 
 const COLUMNAS = 'id, nombre, precio_clp, max_barberos, orden'
 const CLAVE = ['planes_superadmin']
@@ -11,7 +12,7 @@ async function obtenerPlanes() {
 }
 
 export function usePlanesSuperadmin() {
-  return useQuery({ queryKey: CLAVE, queryFn: obtenerPlanes })
+  return useQuery({ queryKey: CLAVE, queryFn: HAY_BACKEND_REAL ? obtenerPlanes : listarPlanesProvisorios })
 }
 
 export function useCrearPlan() {

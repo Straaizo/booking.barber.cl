@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../../../services/supabaseClient'
+import { HAY_BACKEND_REAL, obtenerBarberiaProvisoriaPorSlug } from '../../../mocks/datosProvisoriosSuperadmin'
 
 async function obtenerBarberiaPorSlug(slug) {
   const { data, error } = await supabase
@@ -22,7 +23,7 @@ async function obtenerBarberiaPorSlug(slug) {
 export function useBarberiaPorSlug(slug) {
   return useQuery({
     queryKey: ['barberia', slug],
-    queryFn: () => obtenerBarberiaPorSlug(slug),
+    queryFn: () => (HAY_BACKEND_REAL ? obtenerBarberiaPorSlug(slug) : obtenerBarberiaProvisoriaPorSlug(slug)),
     enabled: Boolean(slug),
   })
 }
