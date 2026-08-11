@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { motion, useMotionValue } from 'framer-motion'
 import { useTienePunteroFino } from '../../hooks/useTienePunteroFino'
 import { usePrefersReducedMotion } from '../../hooks/usePrefersReducedMotion'
@@ -46,6 +46,16 @@ export function Cursor() {
   const prefiereReducido = usePrefersReducedMotion()
   const [tipo, setTipo] = useState('default')
   const [visible, setVisible] = useState(false)
+  // Un iframe (como la vista previa de Personalización) es un documento
+  // aparte: el mouse dentro de él no dispara `pointermove` en esta ventana,
+  // así que este cursor se congelaría en el borde por donde entró. La
+  // entrada/salida de un `<iframe>` sí dispara `pointerover`/`pointerout`
+  // normales en el padre (son eventos de borde del elemento, no de
+  // movimiento continuo) — con eso alcanza para ocultar este cursor mientras
+  // el mouse esté ahí adentro, sin necesitar saber nada de esa ruta. Un
+  // `ref` (no un estado) porque es un flag que solo lee el propio handler de
+  // `pointermove`, sin que nada necesite volver a renderizar por su cambio.
+  const sobreIframe = useRef(false)
 
   const x = useMotionValue(-100)
   const y = useMotionValue(-100)
@@ -58,10 +68,22 @@ export function Cursor() {
     document.body.classList.add('tiene-cursor-propio')
 
     function moverPuntero(evento) {
+      if (sobreIframe.current) return
       x.set(evento.clientX)
       y.set(evento.clientY)
       if (!visible) setVisible(true)
       setTipo(detectarTipo(evento.target))
+    }
+
+    function alEntrarAUnElemento(evento) {
+      if (evento.target.tagName === 'IFRAME') {
+        sobreIframe.current = true
+        setVisible(false)
+      }
+    }
+
+    function alSalirDeUnElemento(evento) {
+      if (evento.target.tagName === 'IFRAME') sobreIframe.current = false
     }
 
     function ocultar() {
@@ -70,10 +92,14 @@ export function Cursor() {
 
     window.addEventListener('pointermove', moverPuntero)
     window.addEventListener('pointerleave', ocultar)
+    window.addEventListener('pointerover', alEntrarAUnElemento)
+    window.addEventListener('pointerout', alSalirDeUnElemento)
     return () => {
       document.body.classList.remove('tiene-cursor-propio')
       window.removeEventListener('pointermove', moverPuntero)
       window.removeEventListener('pointerleave', ocultar)
+      window.removeEventListener('pointerover', alEntrarAUnElemento)
+      window.removeEventListener('pointerout', alSalirDeUnElemento)
     }
   }, [activo, x, y, visible])
 

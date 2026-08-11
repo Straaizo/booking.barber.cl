@@ -1,0 +1,698 @@
+import { useEffect, useRef, useState } from 'react'
+import { useAuth } from '../../hooks/useAuth'
+import { useIsMobile } from '../../hooks/useIsMobile'
+import { Loader } from '../../components/common/Loader'
+import { Button } from '../../components/common/Button'
+import { HoverLink } from '../../components/common/HoverLink'
+import { ToastGuardado } from '../../components/common/ToastGuardado'
+import { usePersonalizacionAdmin, useGuardarPersonalizacion } from './hooks/usePersonalizacionAdmin'
+import { archivoAImagenComprimida } from '../../utils/imagenes'
+import { FUENTES_DISPONIBLES, asegurarFuenteCargada } from '../../utils/fuentes'
+
+// La vista previa usa exactamente el mismo componente que la página pública
+// real (`VistaBarberia`, renderizado dentro de un <iframe> — ver
+// PreviewBarberia.jsx), con los cambios todavía sin guardar — nunca una
+// aproximación aparte que se puede desincronizar de cómo se ve de verdad.
+function construirVistaPrevia(barberia, form) {
+  return {
+    ...barberia,
+    logo_url: form.logo_url,
+    personalizacion: {
+      color_primario: form.color_primario || null,
+      color_header: form.color_header || null,
+      fuente_display: form.fuente_display,
+      eslogan: form.eslogan,
+      descripcion: form.descripcion,
+      secciones: form.secciones,
+    },
+  }
+}
+
+function formularioDesdeBarberia(barberia) {
+  const p = barberia.personalizacion ?? {}
+  return {
+    logo_url: barberia.logo_url ?? null,
+    color_primario: p.color_primario ?? '',
+    color_header: p.color_header ?? '',
+    fuente_display: p.fuente_display || 'fraunces',
+    eslogan: p.eslogan ?? '',
+    descripcion: p.descripcion ?? '',
+    secciones: p.secciones ?? [],
+  }
+}
+
+function nuevaSeccion(tipo) {
+  const id = 'sec-' + Date.now() + '-' + Math.floor(Math.random() * 1000)
+  return tipo === 'galeria'
+    ? { id, tipo: 'galeria', titulo: '', imagenes: [] }
+    : { id, tipo: 'imagen_texto', imagen: null, titulo: '', texto: '' }
+}
+
+function resumenSeccion(seccion) {
+  if (seccion.tipo === 'galeria') {
+    const n = seccion.imagenes?.length ?? 0
+    return `${seccion.titulo || 'Sin título'} — ${n} foto${n === 1 ? '' : 's'}`
+  }
+  return seccion.titulo || 'Sin título'
+}
+
+// Un encabezado numerado por grupo — mismo lenguaje que ya usa el resto del
+// sitio ("— 01 / Cómo funciona") — para que cada zona del formulario se lea
+// como un bloque separado, no como un solo formulario largo sin quiebres.
+function TituloGrupo({ numero, children }) {
+  return (
+    <div className="flex items-center gap-3 border-b border-cobre/25 pb-2">
+      <span className="numeros-tabulares text-xs text-cobre">{numero}</span>
+      <h2 className="versalitas text-xs text-gris-calido-700">{children}</h2>
+    </div>
+  )
+}
+
+export function PanelPersonalizacion() {
+  const { perfil } = useAuth()
+  const esMobile = useIsMobile()
+  const { data: barberia, isLoading, isError } = usePersonalizacionAdmin(perfil.barberia_id)
+  const guardar = useGuardarPersonalizacion(perfil.barberia_id)
+
+  const [form, setForm] = useState(null)
+  const [formGuardado, setFormGuardado] = useState(null)
+  const [estadoToast, setEstadoToast] = useState(null)
+  const [subiendo, setSubiendo] = useState(false)
+  const [seccionAbiertaId, setSeccionAbiertaId] = useState(null)
+  // Arranca en "movil" si ya se sabe desde el primer render que el viewport
+  // es angosto — evita un parpadeo a "pc" (que fuerza min-width: 768px en el
+  // iframe, rompiendo el ancho de la página en un celular real) antes de que
+  // el efecto de abajo llegue a corregirlo.
+  const [modoVista, setModoVista] = useState(() =>
+    typeof window !== 'undefined' && window.innerWidth < 768 ? 'movil' : 'pc'
+  )
+  const [alertaMovilCerrada, setAlertaMovilCerrada] = useState(false)
+  const iframeRef = useRef(null)
+
+  // En un celular real no tiene sentido ofrecer el modo "PC": el iframe en
+  // ese modo fuerza un ancho mínimo de 768px para seguir siendo un layout de
+  // escritorio genuino, y eso desborda la pantalla angosta del teléfono,
+  // rompiendo el diseño de toda la pantalla de Personalización (no solo el
+  // de la vista previa). Por eso en mobile solo existe el modo "Móvil".
+  useEffect(() => {
+    if (esMobile) setModoVista('movil')
+  }, [esMobile])
+
+  useEffect(() => {
+    if (barberia) {
+      const inicial = formularioDesdeBarberia(barberia)
+      setForm(inicial)
+      setFormGuardado(JSON.stringify(inicial))
+    }
+  }, [barberia])
+
+  // Cada cambio en el formulario se manda al iframe de la vista previa por
+  // postMessage — el iframe vive en su propia página (PreviewBarberia.jsx),
+  // así que no puede leer el estado de este componente directo.
+  useEffect(() => {
+    if (!form || !barberia) return
+    iframeRef.current?.contentWindow?.postMessage(
+      { tipo: 'preview-barberia', barberia: construirVistaPrevia(barberia, form) },
+      '*'
+    )
+  }, [form, barberia])
+
+  // El toast se borra solo tras un momento — "guardando" en cambio queda
+  // fijo hasta que la mutación de verdad termine, para no cerrarse antes de
+  // tiempo si el guardado tarda más de la cuenta.
+  useEffect(() => {
+    if (estadoToast !== 'ok' && estadoToast !== 'error') return
+    const temporizador = setTimeout(() => setEstadoToast(null), 2600)
+    return () => clearTimeout(temporizador)
+  }, [estadoToast])
+
+  function alCargarIframe() {
+    if (form && barberia) {
+      iframeRef.current?.contentWindow?.postMessage(
+        { tipo: 'preview-barberia', barberia: construirVistaPrevia(barberia, form) },
+        '*'
+      )
+    }
+  }
+
+  // Compara contra la última versión guardada — así queda inequívoco cuándo
+  // lo que se ve en la vista previa todavía no es lo que ve un cliente real
+  // en la página pública (recién se publica al guardar).
+  const hayCambiosSinGuardar = form && formGuardado !== null && JSON.stringify(form) !== formGuardado
+
+  async function subirLogo(evento) {
+    const archivo = evento.target.files?.[0]
+    if (!archivo) return
+    setSubiendo(true)
+    try {
+      const dataUrl = await archivoAImagenComprimida(archivo, { maxAncho: 400, maxAlto: 400 })
+      setForm((f) => ({ ...f, logo_url: dataUrl }))
+    } finally {
+      setSubiendo(false)
+      evento.target.value = ''
+    }
+  }
+
+  function actualizarSeccion(id, cambios) {
+    setForm((f) => ({ ...f, secciones: f.secciones.map((s) => (s.id === id ? { ...s, ...cambios } : s)) }))
+  }
+
+  function agregarSeccion(tipo) {
+    const seccion = nuevaSeccion(tipo)
+    setForm((f) => ({ ...f, secciones: [...f.secciones, seccion] }))
+    setSeccionAbiertaId(seccion.id)
+  }
+
+  function quitarSeccion(id) {
+    setForm((f) => ({ ...f, secciones: f.secciones.filter((s) => s.id !== id) }))
+  }
+
+  function moverSeccion(indice, direccion) {
+    setForm((f) => {
+      const destino = indice + direccion
+      if (destino < 0 || destino >= f.secciones.length) return f
+      const secciones = [...f.secciones]
+      ;[secciones[indice], secciones[destino]] = [secciones[destino], secciones[indice]]
+      return { ...f, secciones }
+    })
+  }
+
+  async function agregarImagenesAGaleria(id, evento) {
+    const archivos = Array.from(evento.target.files ?? [])
+    if (archivos.length === 0) return
+    setSubiendo(true)
+    try {
+      const nuevas = await Promise.all(
+        archivos.map(async (archivo) => ({
+          url: await archivoAImagenComprimida(archivo, { maxAncho: 1200, maxAlto: 1600 }),
+          tamano: 'normal',
+          leyenda: '',
+        }))
+      )
+      setForm((f) => ({
+        ...f,
+        secciones: f.secciones.map((s) =>
+          s.id === id ? { ...s, imagenes: [...(s.imagenes ?? []), ...nuevas] } : s
+        ),
+      }))
+    } finally {
+      setSubiendo(false)
+      evento.target.value = ''
+    }
+  }
+
+  function moverImagenEnGaleria(idSeccion, indice, direccion) {
+    setForm((f) => ({
+      ...f,
+      secciones: f.secciones.map((s) => {
+        if (s.id !== idSeccion) return s
+        const destino = indice + direccion
+        if (destino < 0 || destino >= s.imagenes.length) return s
+        const imagenes = [...s.imagenes]
+        ;[imagenes[indice], imagenes[destino]] = [imagenes[destino], imagenes[indice]]
+        return { ...s, imagenes }
+      }),
+    }))
+  }
+
+  function quitarImagenDeGaleria(idSeccion, indice) {
+    setForm((f) => ({
+      ...f,
+      secciones: f.secciones.map((s) =>
+        s.id === idSeccion ? { ...s, imagenes: s.imagenes.filter((_, i) => i !== indice) } : s
+      ),
+    }))
+  }
+
+  function actualizarFotoEnGaleria(idSeccion, indice, cambios) {
+    setForm((f) => ({
+      ...f,
+      secciones: f.secciones.map((s) =>
+        s.id === idSeccion
+          ? { ...s, imagenes: s.imagenes.map((foto, i) => (i === indice ? { ...foto, ...cambios } : foto)) }
+          : s
+      ),
+    }))
+  }
+
+  async function subirImagenDeSeccion(id, evento) {
+    const archivo = evento.target.files?.[0]
+    if (!archivo) return
+    setSubiendo(true)
+    try {
+      const dataUrl = await archivoAImagenComprimida(archivo, { maxAncho: 1200, maxAlto: 1200 })
+      actualizarSeccion(id, { imagen: dataUrl })
+    } finally {
+      setSubiendo(false)
+      evento.target.value = ''
+    }
+  }
+
+  async function guardarCambios(evento) {
+    evento.preventDefault()
+    setEstadoToast('cargando')
+    try {
+      await guardar.mutateAsync({
+        logo_url: form.logo_url,
+        color_primario: form.color_primario || null,
+        color_header: form.color_header || null,
+        fuente_display: form.fuente_display,
+        eslogan: form.eslogan,
+        descripcion: form.descripcion,
+        secciones: form.secciones,
+      })
+      setFormGuardado(JSON.stringify(form))
+      setEstadoToast('ok')
+    } catch {
+      setEstadoToast('error')
+    }
+  }
+
+  if (isLoading || !form) {
+    return (
+      <div className="py-12">
+        <Loader label="Cargando personalización" />
+      </div>
+    )
+  }
+
+  if (isError) {
+    return (
+      <p role="alert" className="py-8 text-sm text-red-700">
+        No pudimos cargar la personalización.
+      </p>
+    )
+  }
+
+  return (
+    <div>
+      {/* Sangrado completo a propósito, desde el título hasta el formulario:
+          todo este bloque necesita más ancho del que deja el contenedor
+          angosto del panel (heredado de PanelShell, compartido con el resto
+          de las pestañas) — y todo tiene que alinearse al mismo borde
+          izquierdo real de la página, título incluido, en vez de que el
+          título quede más metido hacia el centro que el formulario de abajo. */}
+      <div className="relative left-1/2 right-1/2 -mx-[50vw] w-screen px-6 md:px-10">
+        <h1 className="font-display text-2xl font-light tracking-tight text-negro-barbero md:text-3xl">
+          Personalización
+        </h1>
+        <p className="mt-2 max-w-lg text-sm text-gris-calido-700">
+          Así se ve tu página pública. Cambia lo que quieras a la izquierda — la vista previa de al
+          lado se actualiza al instante, con el mismo botón para ver cómo queda en PC o en el
+          celular de un cliente, y recién queda pública cuando guardas.{' '}
+          <HoverLink href={`/barberias/${barberia.slug}`} target="_blank" rel="noreferrer">
+            Ver página pública →
+          </HoverLink>
+        </p>
+
+        {esMobile && !alertaMovilCerrada && (
+          <div className="mt-4 flex items-start justify-between gap-3 rounded-md border border-cobre/40 bg-cobre/10 px-3 py-3 text-xs text-cobre-texto">
+            <p>
+              Estás viendo esto desde un dispositivo móvil. Te recomendamos usar un computador para
+              tener una vista más clara al armar tu página — hay bastante para editar y comparar con
+              la vista previa.
+            </p>
+            <button
+              type="button"
+              onClick={() => setAlertaMovilCerrada(true)}
+              aria-label="Cerrar aviso"
+              className="shrink-0 text-cobre-texto/70 hover:text-cobre-texto"
+            >
+              ✕
+            </button>
+          </div>
+        )}
+
+        {hayCambiosSinGuardar && (
+          <p className="mt-4 flex items-center gap-2 rounded-md border border-cobre/40 bg-cobre/10 px-3 py-2 text-xs text-cobre-texto">
+            <span aria-hidden="true">●</span> Tenés cambios sin guardar — la página pública todavía
+            muestra la versión anterior.
+          </p>
+        )}
+
+        {/* En pantallas chicas (debajo de `lg`) el grid cae a una sola
+            columna — formulario y luego vista previa, como antes. */}
+        <form onSubmit={guardarCambios} className="mt-8">
+        <div className="grid gap-x-12 gap-y-10 lg:grid-cols-[480px_minmax(0,1fr)] lg:items-start">
+          {/* Columna izquierda: formulario */}
+          <div className="flex max-w-lg flex-col gap-12 lg:max-w-none">
+          <section className="flex flex-col gap-6">
+            <TituloGrupo numero="01">Identidad</TituloGrupo>
+
+            <label className="flex flex-col gap-2">
+              <span className="versalitas text-xs text-gris-calido-500">Logo</span>
+              <div className="flex items-center gap-4">
+                {form.logo_url ? (
+                  <img src={form.logo_url} alt="Logo" className="h-14 w-14 rounded-full object-cover" />
+                ) : (
+                  <span className="flex h-14 w-14 items-center justify-center rounded-full border border-gris-calido-200 text-xs text-gris-calido-400">
+                    Sin logo
+                  </span>
+                )}
+                <input type="file" accept="image/*" onChange={subirLogo} className="text-sm" />
+                {form.logo_url && (
+                  <button
+                    type="button"
+                    onClick={() => setForm((f) => ({ ...f, logo_url: null }))}
+                    className="text-xs text-gris-calido-500 underline-offset-2 hover:text-red-700 hover:underline"
+                  >
+                    Quitar
+                  </button>
+                )}
+              </div>
+            </label>
+
+            <div className="grid grid-cols-2 gap-6">
+              <label className="flex flex-col gap-2">
+                <span className="versalitas text-xs text-gris-calido-500">Color de marca</span>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="color"
+                    value={form.color_primario || '#a85c32'}
+                    onChange={(e) => setForm((f) => ({ ...f, color_primario: e.target.value }))}
+                    className="h-11 w-14 cursor-pointer border border-gris-calido-200 bg-transparent"
+                  />
+                  {form.color_primario && (
+                    <button
+                      type="button"
+                      onClick={() => setForm((f) => ({ ...f, color_primario: '' }))}
+                      className="text-xs text-gris-calido-500 hover:text-red-700"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+              </label>
+
+              <label className="flex flex-col gap-2">
+                <span className="versalitas text-xs text-gris-calido-500">Color del header</span>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="color"
+                    value={form.color_header || '#1c1b19'}
+                    onChange={(e) => setForm((f) => ({ ...f, color_header: e.target.value }))}
+                    className="h-11 w-14 cursor-pointer border border-gris-calido-200 bg-transparent"
+                  />
+                  {form.color_header && (
+                    <button
+                      type="button"
+                      onClick={() => setForm((f) => ({ ...f, color_header: '' }))}
+                      className="text-xs text-gris-calido-500 hover:text-red-700"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+                <span className="text-xs text-gris-calido-500">El texto se ajusta solo para seguir siendo legible.</span>
+              </label>
+            </div>
+
+            <label className="flex flex-col gap-2">
+              <span className="versalitas text-xs text-gris-calido-500">Tipografía de títulos</span>
+              <select
+                value={form.fuente_display}
+                onChange={(e) => {
+                  const clave = e.target.value
+                  asegurarFuenteCargada(clave)
+                  setForm((f) => ({ ...f, fuente_display: clave }))
+                }}
+                className="min-h-11 border-b border-gris-calido-200 bg-transparent py-2 text-negro-barbero outline-none transition-colors focus:border-cobre"
+              >
+                {FUENTES_DISPONIBLES.map((f) => (
+                  <option key={f.clave} value={f.clave}>
+                    {f.etiqueta}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </section>
+
+          <section className="flex flex-col gap-6">
+            <TituloGrupo numero="02">Textos principales</TituloGrupo>
+
+            <label className="flex flex-col gap-2">
+              <span className="versalitas text-xs text-gris-calido-500">Eslogan</span>
+              <input
+                type="text"
+                value={form.eslogan}
+                onChange={(e) => setForm((f) => ({ ...f, eslogan: e.target.value }))}
+                placeholder="Corte de barrio, oficio de siempre"
+                className="min-h-11 border-b border-gris-calido-200 bg-transparent py-2 text-negro-barbero outline-none transition-colors focus:border-cobre"
+              />
+            </label>
+
+            <label className="flex flex-col gap-2">
+              <span className="versalitas text-xs text-gris-calido-500">Descripción</span>
+              <textarea
+                value={form.descripcion}
+                onChange={(e) => setForm((f) => ({ ...f, descripcion: e.target.value }))}
+                rows={3}
+                placeholder="Contale a tus clientes qué hace especial a tu barbería."
+                className="border-b border-gris-calido-200 bg-transparent py-2 text-sm text-negro-barbero outline-none transition-colors focus:border-cobre"
+              />
+            </label>
+          </section>
+
+          <section className="flex flex-col gap-4">
+            <TituloGrupo numero="03">Secciones de la página</TituloGrupo>
+            <p className="-mt-2 text-xs text-gris-calido-500">
+              Click en una sección para abrirla y editarla — el orden de la lista es el orden real en
+              tu página, entre el encabezado y el formulario de reserva.
+            </p>
+
+            {form.secciones.map((seccion, indice) => {
+              const abierta = seccionAbiertaId === seccion.id
+              return (
+                <div
+                  key={seccion.id}
+                  className={`overflow-hidden rounded-lg border transition-colors ${abierta ? 'border-cobre' : 'border-gris-calido-200'}`}
+                >
+                  <div className="flex items-center justify-between gap-2 p-3">
+                    <button
+                      type="button"
+                      onClick={() => setSeccionAbiertaId(abierta ? null : seccion.id)}
+                      className="flex flex-1 items-center gap-3 text-left"
+                    >
+                      <span className="text-xs text-gris-calido-400">{abierta ? '▾' : '▸'}</span>
+                      <span className="versalitas shrink-0 text-xs text-gris-calido-500">
+                        {seccion.tipo === 'galeria' ? 'Galería' : 'Imagen y texto'}
+                      </span>
+                      <span className="truncate text-sm text-negro-barbero">{resumenSeccion(seccion)}</span>
+                    </button>
+                    <div className="flex shrink-0 gap-2 text-xs text-gris-calido-500">
+                      <button type="button" onClick={() => moverSeccion(indice, -1)} disabled={indice === 0} className="disabled:opacity-30">
+                        ↑
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => moverSeccion(indice, 1)}
+                        disabled={indice === form.secciones.length - 1}
+                        className="disabled:opacity-30"
+                      >
+                        ↓
+                      </button>
+                      <button type="button" onClick={() => quitarSeccion(seccion.id)} className="hover:text-red-700">
+                        Eliminar
+                      </button>
+                    </div>
+                  </div>
+
+                  {abierta && (
+                    <div className="border-t border-gris-calido-200 bg-hueso/60 p-4">
+                      {seccion.tipo === 'galeria' && (
+                        <div className="flex flex-col gap-4">
+                          <input
+                            type="text"
+                            value={seccion.titulo}
+                            onChange={(e) => actualizarSeccion(seccion.id, { titulo: e.target.value })}
+                            placeholder="Título de la sección — ej: Nuestro trabajo"
+                            className="min-h-11 border-b border-gris-calido-200 bg-transparent py-2 text-sm text-negro-barbero outline-none transition-colors focus:border-cobre"
+                          />
+
+                          <div className="flex flex-wrap gap-3">
+                            {(seccion.imagenes ?? []).map((foto, i) => (
+                              <div key={i} className="flex w-40 flex-col gap-2 rounded border border-gris-calido-200 bg-white p-2">
+                                <img src={foto.url} alt={`Foto ${i + 1}`} className="h-24 w-full rounded object-cover" />
+                                <input
+                                  type="text"
+                                  value={foto.leyenda}
+                                  onChange={(e) => actualizarFotoEnGaleria(seccion.id, i, { leyenda: e.target.value })}
+                                  placeholder="Leyenda"
+                                  className="min-h-8 border-b border-gris-calido-200 bg-transparent py-1 text-xs text-negro-barbero outline-none transition-colors focus:border-cobre"
+                                />
+                                <label className="flex items-center gap-1.5 text-xs text-gris-calido-500">
+                                  <input
+                                    type="checkbox"
+                                    checked={foto.tamano === 'grande'}
+                                    onChange={(e) =>
+                                      actualizarFotoEnGaleria(seccion.id, i, { tamano: e.target.checked ? 'grande' : 'normal' })
+                                    }
+                                  />
+                                  Destacar
+                                </label>
+                                <div className="flex items-center justify-between text-xs text-gris-calido-500">
+                                  <button type="button" onClick={() => moverImagenEnGaleria(seccion.id, i, -1)} disabled={i === 0} className="disabled:opacity-30">
+                                    ↑
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => moverImagenEnGaleria(seccion.id, i, 1)}
+                                    disabled={i === seccion.imagenes.length - 1}
+                                    className="disabled:opacity-30"
+                                  >
+                                    ↓
+                                  </button>
+                                  <button type="button" onClick={() => quitarImagenDeGaleria(seccion.id, i)} className="hover:text-red-700">
+                                    Quitar
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            multiple
+                            onChange={(e) => agregarImagenesAGaleria(seccion.id, e)}
+                            className="text-sm"
+                          />
+                        </div>
+                      )}
+
+                      {seccion.tipo === 'imagen_texto' && (
+                        <div className="flex flex-col gap-3">
+                          <div className="flex items-center gap-3">
+                            {seccion.imagen ? (
+                              <img src={seccion.imagen} alt="" className="h-14 w-14 rounded object-cover" />
+                            ) : (
+                              <span className="flex h-14 w-14 items-center justify-center rounded border border-gris-calido-200 text-xs text-gris-calido-400">
+                                Sin foto
+                              </span>
+                            )}
+                            <input type="file" accept="image/*" onChange={(e) => subirImagenDeSeccion(seccion.id, e)} className="text-sm" />
+                          </div>
+                          <input
+                            type="text"
+                            value={seccion.titulo}
+                            onChange={(e) => actualizarSeccion(seccion.id, { titulo: e.target.value })}
+                            placeholder="Título — ej: Nuestro espacio"
+                            className="min-h-11 border-b border-gris-calido-200 bg-transparent py-2 text-sm text-negro-barbero outline-none transition-colors focus:border-cobre"
+                          />
+                          <textarea
+                            value={seccion.texto}
+                            onChange={(e) => actualizarSeccion(seccion.id, { texto: e.target.value })}
+                            rows={2}
+                            placeholder="Texto que acompaña a la imagen"
+                            className="border-b border-gris-calido-200 bg-transparent py-2 text-sm text-negro-barbero outline-none transition-colors focus:border-cobre"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => agregarSeccion('galeria')}
+                className="versalitas rounded-md border border-gris-calido-200 px-3 py-2 text-xs text-gris-calido-700 hover:border-cobre hover:text-cobre-texto"
+              >
+                + Galería de fotos
+              </button>
+              <button
+                type="button"
+                onClick={() => agregarSeccion('imagen_texto')}
+                className="versalitas rounded-md border border-gris-calido-200 px-3 py-2 text-xs text-gris-calido-700 hover:border-cobre hover:text-cobre-texto"
+              >
+                + Imagen y texto
+              </button>
+            </div>
+          </section>
+
+          {/* El botón queda al final del formulario a propósito — se edita,
+              se mira la vista previa (que está siempre visible al lado, sin
+              scrollear) y solo ahí tiene sentido decidir guardar. */}
+          <div className="flex flex-col gap-3">
+            <Button as="button" type="submit" disabled={guardar.isPending || subiendo} className="w-fit">
+              {guardar.isPending ? 'Guardando…' : 'Guardar cambios'}
+            </Button>
+          </div>
+          </div>
+
+          {/* Columna derecha: vista previa — "sticky" para que no haya que
+              scrollear entre editar y mirar el resultado: mientras el
+              formulario de la izquierda se desplaza, esta columna queda fija
+              en pantalla (a partir de `lg`; en pantallas más chicas cae
+              debajo del formulario, como una sección más). */}
+          <div className="lg:sticky lg:top-6">
+            <div className="mb-4 flex items-center justify-between">
+              <span className="versalitas text-xs text-gris-calido-700">— Vista previa</span>
+              {/* En un celular real solo existe el modo Móvil — no tiene
+                  sentido ofrecer "PC" (fuerza un ancho mínimo de 768px que
+                  desborda la pantalla) ni mostrar un botón para alternar
+                  a algo que va a romper el diseño de la página. */}
+              {!esMobile && (
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setModoVista('pc')}
+                    className={`versalitas rounded-md border px-3 py-1.5 text-xs transition-colors ${
+                      modoVista === 'pc' ? 'border-cobre text-cobre-texto' : 'border-gris-calido-200 text-gris-calido-500'
+                    }`}
+                  >
+                    PC
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setModoVista('movil')}
+                    className={`versalitas rounded-md border px-3 py-1.5 text-xs transition-colors ${
+                      modoVista === 'movil' ? 'border-cobre text-cobre-texto' : 'border-gris-calido-200 text-gris-calido-500'
+                    }`}
+                  >
+                    Móvil
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* En modo PC el iframe se estira con `w-full` para aprovechar
+                todo el ancho que la columna tenga disponible (ahora que la
+                columna ya no está limitada por un `max-w` central) — con un
+                piso de 768px (`min-w`) para que sigan activándose los `md:`
+                de Tailwind y sea un layout de escritorio genuino incluso si
+                la ventana es angosta; en ese caso extremo, esta caja
+                scrollea horizontalmente en vez de mentir con un layout
+                mobile dentro de "PC". El "marco de teléfono" de 390px fijo
+                en modo Móvil solo tiene sentido cuando hay espacio de sobra
+                alrededor (viendo esto desde una pantalla grande) — en un
+                celular real ese ancho fijo no entra en el espacio ya angosto
+                de la propia pantalla y desborda la página; ahí el iframe
+                simplemente ocupa el ancho disponible (`w-full`), sin marco. */}
+            <div className="max-h-[80vh] overflow-auto rounded-lg border border-gris-calido-200 bg-white">
+              <div className={modoVista === 'movil' && !esMobile ? 'mx-auto w-[390px] py-4' : ''}>
+                <iframe
+                  ref={iframeRef}
+                  src="/_preview-barberia"
+                  title="Vista previa de la página pública"
+                  onLoad={alCargarIframe}
+                  className={`border-0 bg-hueso ${
+                    modoVista === 'movil'
+                      ? esMobile
+                        ? 'h-[900px] w-full'
+                        : 'h-[900px] w-[390px] rounded-lg shadow-lg'
+                      : 'h-[1600px] w-full min-w-[768px]'
+                  }`}
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+        </form>
+      </div>
+
+      <ToastGuardado estado={estadoToast} />
+    </div>
+  )
+}

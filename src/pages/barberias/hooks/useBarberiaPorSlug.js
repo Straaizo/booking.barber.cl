@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../../../services/supabaseClient'
 import { HAY_BACKEND_REAL, obtenerBarberiaProvisoriaPorSlug } from '../../../mocks/datosProvisoriosSuperadmin'
+import { normalizarPersonalizacion } from '../../../utils/personalizacion'
 
 async function obtenerBarberiaPorSlug(slug) {
   const { data, error } = await supabase
@@ -8,16 +9,16 @@ async function obtenerBarberiaPorSlug(slug) {
     .select(
       `
       id, slug, nombre, telefono_whatsapp, email_contacto, direccion, logo_url, estado_id,
-      personalizacion (color_primario, eslogan, descripcion, banner_url),
+      personalizacion (color_primario, color_header, fuente_display, eslogan, descripcion, banner_url, secciones),
       servicios (id, nombre, duracion_minutos, precio_clp, precio_oferta, oferta_activa, oferta_vence, activo),
-      barberos (id, nombre, activo)
+      barberos (id, nombre, activo, foto_url, especialidad)
     `
     )
     .eq('slug', slug)
     .single()
 
   if (error) throw error
-  return data
+  return { ...data, personalizacion: normalizarPersonalizacion(data.personalizacion) }
 }
 
 export function useBarberiaPorSlug(slug) {

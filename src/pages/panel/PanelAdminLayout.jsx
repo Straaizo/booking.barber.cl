@@ -6,6 +6,7 @@ const SECCIONES = [
   { to: '/panel/barberos', etiqueta: 'Barberos' },
   { to: '/panel/servicios', etiqueta: 'Servicios' },
   { to: '/panel/horarios', etiqueta: 'Horarios' },
+  { to: '/panel/personalizacion', etiqueta: 'Personalización' },
 ]
 
 function PestanaNav({ to, etiqueta }) {

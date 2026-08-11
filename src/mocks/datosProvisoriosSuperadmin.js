@@ -1,4 +1,5 @@
 import { ESTADO_ACTIVO, ESTADO_PENDIENTE_ACTIVACION } from '../utils/estados'
+import { normalizarPersonalizacion } from '../utils/personalizacion'
 
 // TEMPORAL: mientras no haya un Supabase real conectado (VITE_SUPABASE_URL
 // en `.env` sigue siendo el placeholder de ejemplo), el panel superadmin y la
@@ -10,6 +11,9 @@ export const HAY_BACKEND_REAL = !String(import.meta.env.VITE_SUPABASE_URL ?? '')
 
 const CLAVE_STORAGE = 'booking_barber_datos_provisorios_v1'
 
+export const ID_BARBERIA_PROVISORIA = 'prov-barberia-1'
+export const ID_USUARIO_PROVISORIO = 'prov-usuario-1'
+
 const PLANES_SEED = [
   { id: 1, nombre: 'Solo', precio_clp: 5000, max_barberos: 1, orden: 1 },
   { id: 2, nombre: 'Equipo', precio_clp: 6000, max_barberos: 3, orden: 2 },
@@ -18,7 +22,7 @@ const PLANES_SEED = [
 
 const BARBERIAS_SEED = [
   {
-    id: 'prov-barberia-1',
+    id: ID_BARBERIA_PROVISORIA,
     nombre: 'Barbería Don Manuel',
     slug: 'don-manuel',
     estado_id: ESTADO_ACTIVO,
@@ -29,10 +33,13 @@ const BARBERIAS_SEED = [
     logo_url: null,
     personalizacion: {
       color_primario: '#7a4324',
+      color_header: null,
+      fuente_display: 'fraunces',
       eslogan: 'Corte de barrio, oficio de siempre',
       descripcion:
         'Barbería de prueba, cargada para revisar cómo se ve el panel y la página pública mientras no hay Supabase real conectado.',
       banner_url: null,
+      secciones: [],
     },
     servicios: [
       { id: 'prov-servicio-1', nombre: 'Corte clásico', duracion_minutos: 30, precio_clp: 8000, precio_oferta: null, oferta_activa: false, oferta_vence: null, activo: true },
@@ -40,8 +47,8 @@ const BARBERIAS_SEED = [
       { id: 'prov-servicio-3', nombre: 'Afeitado a la antigua', duracion_minutos: 25, precio_clp: 7500, precio_oferta: null, oferta_activa: false, oferta_vence: null, activo: true },
     ],
     barberos: [
-      { id: 'prov-barbero-1', nombre: 'Manuel Rojas', activo: true },
-      { id: 'prov-barbero-2', nombre: 'Ignacio Soto', activo: true },
+      { id: 'prov-barbero-1', nombre: 'Manuel Rojas', activo: true, foto_url: null, especialidad: 'Cortes clásicos y degradados' },
+      { id: 'prov-barbero-2', nombre: 'Ignacio Soto', activo: true, foto_url: null, especialidad: 'Barba y afeitado a la antigua' },
     ],
     historial: [],
   },
@@ -103,7 +110,19 @@ export async function obtenerBarberiaProvisoriaPorSlug(slug) {
   const b = barberias.find((x) => x.slug === slug)
   if (!b) throw new Error('Barbería provisoria no encontrada para el slug: ' + slug)
   const { id, nombre, telefono_whatsapp, email_contacto, direccion, logo_url, estado_id, personalizacion, servicios, barberos } = b
-  return { id, slug, nombre, telefono_whatsapp, email_contacto, direccion, logo_url, estado_id, personalizacion, servicios, barberos }
+  return {
+    id,
+    slug,
+    nombre,
+    telefono_whatsapp,
+    email_contacto,
+    direccion,
+    logo_url,
+    estado_id,
+    personalizacion: normalizarPersonalizacion(personalizacion),
+    servicios,
+    barberos,
+  }
 }
 
 export async function listarPlanesProvisorios() {
@@ -128,7 +147,7 @@ export async function crearBarberiaProvisoria({ nombre, slug, plan_id }) {
     email_contacto: '',
     direccion: '',
     logo_url: null,
-    personalizacion: { color_primario: null, eslogan: '', descripcion: '', banner_url: null },
+    personalizacion: normalizarPersonalizacion(null),
     servicios: [],
     barberos: [],
     historial: [],
@@ -168,4 +187,64 @@ export async function cambiarEstadoProvisorio(barberiaId, estadoNuevoId, motivo)
 export async function listarHistorialProvisorio(barberiaId) {
   const { barberias } = leerEstado()
   return barberias.find((b) => b.id === barberiaId)?.historial ?? []
+}
+
+// Lo mínimo que necesita el panel de admin (no superadmin) para mostrar la
+// pantalla de personalización: identidad de la barbería + su personalización.
+export async function obtenerBarberiaParaPersonalizacion(barberiaId) {
+  const { barberias } = leerEstado()
+  const b = barberias.find((x) => x.id === barberiaId)
+  if (!b) throw new Error('Barbería provisoria no encontrada: ' + barberiaId)
+  return {
+    id: b.id,
+    nombre: b.nombre,
+    slug: b.slug,
+    logo_url: b.logo_url,
+    direccion: b.direccion,
+    telefono_whatsapp: b.telefono_whatsapp,
+    servicios: b.servicios ?? [],
+    barberos: b.barberos ?? [],
+    personalizacion: normalizarPersonalizacion(b.personalizacion),
+  }
+}
+
+export async function guardarPersonalizacionProvisoria(barberiaId, cambios) {
+  const estado = leerEstado()
+  const barberia = estado.barberias.find((b) => b.id === barberiaId)
+  if (!barberia) throw new Error('Barbería provisoria no encontrada: ' + barberiaId)
+  barberia.personalizacion = { ...barberia.personalizacion, ...cambios }
+  if ('logo_url' in cambios) barberia.logo_url = cambios.logo_url
+  guardarEstado(estado)
+  return barberia.personalizacion
+}
+
+export async function listarBarberosProvisorios(barberiaId) {
+  const { barberias } = leerEstado()
+  const barberia = barberias.find((b) => b.id === barberiaId)
+  if (!barberia) throw new Error('Barbería provisoria no encontrada: ' + barberiaId)
+  return [...(barberia.barberos ?? [])].sort((a, b) => a.nombre.localeCompare(b.nombre))
+}
+
+export async function crearBarberoProvisorio(barberiaId, nombre) {
+  const estado = leerEstado()
+  const barberia = estado.barberias.find((b) => b.id === barberiaId)
+  if (!barberia) throw new Error('Barbería provisoria no encontrada: ' + barberiaId)
+  const nuevo = { id: 'prov-barbero-' + Date.now(), nombre, activo: true, foto_url: null, especialidad: '' }
+  barberia.barberos = [...(barberia.barberos ?? []), nuevo]
+  guardarEstado(estado)
+  return nuevo
+}
+
+export async function actualizarBarberoProvisorio(barberiaId, id, cambios) {
+  const estado = leerEstado()
+  const barberia = estado.barberias.find((b) => b.id === barberiaId)
+  if (!barberia) throw new Error('Barbería provisoria no encontrada: ' + barberiaId)
+  let actualizado = null
+  barberia.barberos = (barberia.barberos ?? []).map((b) => {
+    if (b.id !== id) return b
+    actualizado = { ...b, ...cambios }
+    return actualizado
+  })
+  guardarEstado(estado)
+  return actualizado
 }

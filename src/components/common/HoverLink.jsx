@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 
-export function HoverLink({ href, children, className = '', tono = 'laton' }) {
+export function HoverLink({ href, children, className = '', tono = 'laton', ...resto }) {
   const colorSubrayado = tono === 'laton' ? 'bg-laton' : 'bg-cobre'
   // Rutas internas (empiezan con "/") navegan por React Router sin recargar
   // la página; anclas de hash ("#planes") y URLs externas siguen siendo <a>.
@@ -10,6 +10,7 @@ export function HoverLink({ href, children, className = '', tono = 'laton' }) {
   return (
     <EsInterno
       {...propHref}
+      {...resto}
       className={`group relative inline-block rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-laton ${className}`}
     >
       {children}

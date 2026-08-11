@@ -1,5 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../../services/supabaseClient'
+import {
+  HAY_BACKEND_REAL,
+  listarBarberosProvisorios,
+  crearBarberoProvisorio,
+  actualizarBarberoProvisorio,
+} from '../../../mocks/datosProvisoriosSuperadmin'
+
+const COLUMNAS = 'id, nombre, activo, foto_url, especialidad'
 
 function clave(barberiaId) {
   return ['barberos_admin', barberiaId]
@@ -8,7 +16,7 @@ function clave(barberiaId) {
 async function obtenerBarberos(barberiaId) {
   const { data, error } = await supabase
     .from('barberos')
-    .select('id, nombre, activo')
+    .select(COLUMNAS)
     .eq('barberia_id', barberiaId)
     .order('nombre')
 
@@ -19,7 +27,8 @@ async function obtenerBarberos(barberiaId) {
 export function useBarberosAdmin(barberiaId) {
   return useQuery({
     queryKey: clave(barberiaId),
-    queryFn: () => obtenerBarberos(barberiaId),
+    queryFn: () =>
+      HAY_BACKEND_REAL ? obtenerBarberos(barberiaId) : listarBarberosProvisorios(barberiaId),
     enabled: Boolean(barberiaId),
   })
 }
@@ -28,10 +37,11 @@ export function useCrearBarbero(barberiaId) {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: async (nombre) => {
+      if (!HAY_BACKEND_REAL) return crearBarberoProvisorio(barberiaId, nombre)
       const { data, error } = await supabase
         .from('barberos')
         .insert({ barberia_id: barberiaId, nombre, activo: true })
-        .select('id, nombre, activo')
+        .select(COLUMNAS)
         .single()
       if (error) throw error
       return data
@@ -44,11 +54,12 @@ export function useActualizarBarbero(barberiaId) {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: async ({ id, cambios }) => {
+      if (!HAY_BACKEND_REAL) return actualizarBarberoProvisorio(barberiaId, id, cambios)
       const { data, error } = await supabase
         .from('barberos')
         .update(cambios)
         .eq('id', id)
-        .select('id, nombre, activo')
+        .select(COLUMNAS)
         .single()
       if (error) throw error
       return data

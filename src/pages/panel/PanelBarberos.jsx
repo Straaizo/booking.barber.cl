@@ -3,8 +3,69 @@ import { useAuth } from '../../hooks/useAuth'
 import { Loader } from '../../components/common/Loader'
 import { Button } from '../../components/common/Button'
 import { Interruptor } from '../../components/panel/Interruptor'
+import { archivoAImagenComprimida } from '../../utils/imagenes'
 import { useBarberiaAdmin } from './hooks/useBarberiaAdmin'
 import { useBarberosAdmin, useCrearBarbero, useActualizarBarbero } from './hooks/useBarberosAdmin'
+
+// Foto + especialidad de cada barbero se muestran tal cual en la página
+// pública, en la sección "Nuestro equipo" (ver VistaBarberia.jsx) — por eso
+// viven acá, junto al resto de los datos del barbero, y no en Personalización.
+function TarjetaBarbero({ barbero, onCambiar }) {
+  const [subiendo, setSubiendo] = useState(false)
+
+  async function subirFoto(evento) {
+    const archivo = evento.target.files?.[0]
+    if (!archivo) return
+    setSubiendo(true)
+    try {
+      const dataUrl = await archivoAImagenComprimida(archivo, { maxAncho: 500, maxAlto: 500 })
+      onCambiar({ foto_url: dataUrl })
+    } finally {
+      setSubiendo(false)
+      evento.target.value = ''
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-4 border-b border-gris-calido-200 py-5 sm:flex-row sm:items-start">
+      <div className="flex items-center gap-4 sm:w-56 sm:shrink-0">
+        {barbero.foto_url ? (
+          <img src={barbero.foto_url} alt={barbero.nombre} className="h-14 w-14 rounded-full object-cover" />
+        ) : (
+          <span className="flex h-14 w-14 items-center justify-center rounded-full border border-gris-calido-200 text-lg text-gris-calido-400">
+            {barbero.nombre.trim().charAt(0).toUpperCase()}
+          </span>
+        )}
+        <div className="flex flex-col gap-1">
+          <span className={`font-medium ${barbero.activo ? 'text-negro-barbero' : 'text-gris-calido-400 line-through'}`}>
+            {barbero.nombre}
+          </span>
+          <label className="cursor-pointer text-xs text-cobre-texto underline-offset-2 hover:underline">
+            {subiendo ? 'Subiendo…' : barbero.foto_url ? 'Cambiar foto' : 'Agregar foto'}
+            <input type="file" accept="image/*" onChange={subirFoto} className="hidden" />
+          </label>
+        </div>
+      </div>
+
+      <input
+        type="text"
+        value={barbero.especialidad ?? ''}
+        onChange={(e) => onCambiar({ especialidad: e.target.value })}
+        placeholder="En qué se especializa — ej: Cortes clásicos y degradados"
+        className="min-h-11 flex-1 border-b border-gris-calido-200 bg-transparent py-2 text-sm text-negro-barbero outline-none transition-colors focus:border-cobre"
+      />
+
+      <div className="flex items-center gap-3 sm:shrink-0">
+        <span className="versalitas text-xs text-gris-calido-500">{barbero.activo ? 'Activo' : 'Inactivo'}</span>
+        <Interruptor
+          activo={barbero.activo}
+          etiqueta={`Activar/desactivar a ${barbero.nombre}`}
+          onCambiar={(valor) => onCambiar({ activo: valor })}
+        />
+      </div>
+    </div>
+  )
+}
 
 export function PanelBarberos() {
   const { perfil } = useAuth()
@@ -45,6 +106,10 @@ export function PanelBarberos() {
           </span>
         )}
       </div>
+      <p className="mt-2 max-w-lg text-sm text-gris-calido-700">
+        La foto y la especialidad de cada barbero aparecen en tu página pública, en la sección
+        "Nuestro equipo".
+      </p>
 
       <div className="mt-8">
         {isLoading && (
@@ -68,26 +133,11 @@ export function PanelBarberos() {
         {barberos && barberos.length > 0 && (
           <div className="border-t border-gris-calido-200">
             {barberos.map((barbero) => (
-              <div
+              <TarjetaBarbero
                 key={barbero.id}
-                className="flex items-center justify-between gap-4 border-b border-gris-calido-200 py-4"
-              >
-                <span className={`font-medium ${barbero.activo ? 'text-negro-barbero' : 'text-gris-calido-400 line-through'}`}>
-                  {barbero.nombre}
-                </span>
-                <div className="flex items-center gap-3">
-                  <span className="versalitas text-xs text-gris-calido-500">
-                    {barbero.activo ? 'Activo' : 'Inactivo'}
-                  </span>
-                  <Interruptor
-                    activo={barbero.activo}
-                    etiqueta={`Activar/desactivar a ${barbero.nombre}`}
-                    onCambiar={(valor) =>
-                      actualizarBarbero.mutate({ id: barbero.id, cambios: { activo: valor } })
-                    }
-                  />
-                </div>
-              </div>
+                barbero={barbero}
+                onCambiar={(cambios) => actualizarBarbero.mutate({ id: barbero.id, cambios })}
+              />
             ))}
           </div>
         )}

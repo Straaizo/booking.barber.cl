@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../../../services/supabaseClient'
+import { HAY_BACKEND_REAL, obtenerBarberiaProvisoria } from '../../../mocks/datosProvisoriosSuperadmin'
 
 async function obtenerBarberiaConPlan(barberiaId) {
   const { data, error } = await supabase
@@ -17,7 +18,8 @@ async function obtenerBarberiaConPlan(barberiaId) {
 export function useBarberiaAdmin(barberiaId) {
   return useQuery({
     queryKey: ['barberia_admin', barberiaId],
-    queryFn: () => obtenerBarberiaConPlan(barberiaId),
+    queryFn: () =>
+      HAY_BACKEND_REAL ? obtenerBarberiaConPlan(barberiaId) : obtenerBarberiaProvisoria(barberiaId),
     enabled: Boolean(barberiaId),
   })
 }

@@ -11,6 +11,8 @@ import { PanelReservas } from '../pages/panel/PanelReservas'
 import { PanelBarberos } from '../pages/panel/PanelBarberos'
 import { PanelServicios } from '../pages/panel/PanelServicios'
 import { PanelHorarios } from '../pages/panel/PanelHorarios'
+import { PanelPersonalizacion } from '../pages/panel/PanelPersonalizacion'
+import { PreviewBarberia } from '../pages/panel/PreviewBarberia'
 import { PanelSuperadminLayout } from '../pages/panel/PanelSuperadminLayout'
 import { PanelSuperadminBarberias } from '../pages/panel/PanelSuperadminBarberias'
 import { PanelSuperadminBarberiaDetalle } from '../pages/panel/PanelSuperadminBarberiaDetalle'
@@ -20,6 +22,13 @@ import { ROL_BARBERO, ROL_ADMIN } from '../utils/roles'
 const router = createBrowserRouter([
   { path: '/', element: <Home /> },
   { path: '/login', element: <Login /> },
+  // Superficie de render aislada para la vista previa PC/Móvil del panel de
+  // personalización — vive en un <iframe>, recibe sus datos por postMessage,
+  // nunca se navega a mano. Al cargar ahí dentro (con su propia
+  // ventana/documento), toda esta app se vuelve a montar independiente —
+  // incluido `<Cursor />` (ver main.jsx), que ahí sigue el mouse local a ese
+  // documento sin ningún problema.
+  { path: '/_preview-barberia', element: <PreviewBarberia /> },
   {
     path: '/barberias/:slug',
     element: <RutaBarberia />,
@@ -46,6 +55,7 @@ const router = createBrowserRouter([
           { path: 'barberos', element: <PanelBarberos /> },
           { path: 'servicios', element: <PanelServicios /> },
           { path: 'horarios', element: <PanelHorarios /> },
+          { path: 'personalizacion', element: <PanelPersonalizacion /> },
         ],
       },
     ],

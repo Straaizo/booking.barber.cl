@@ -1,8 +1,24 @@
 import { createContext, useEffect, useState } from 'react'
 import { supabase } from '../services/supabaseClient'
 import { obtenerPerfil, iniciarSesion, cerrarSesion } from '../services/authService'
+import { HAY_BACKEND_REAL, ID_BARBERIA_PROVISORIA, ID_USUARIO_PROVISORIO } from '../mocks/datosProvisoriosSuperadmin'
+import { ROL_ADMIN } from '../utils/roles'
+import { ESTADO_ACTIVO } from '../utils/estados'
 
 export const AuthContext = createContext(null)
+
+// TEMPORAL: sin Supabase real conectado, se entra directo como admin de la
+// barbería provisoria — no hay login que resolver todavía. Se autodesactiva
+// sola en cuanto HAY_BACKEND_REAL sea true (ver mocks/datosProvisoriosSuperadmin.js).
+const PERFIL_PROVISORIO = {
+  id: ID_USUARIO_PROVISORIO,
+  usuario: 'demo',
+  nombre: 'Demo (modo provisorio)',
+  rol_id: ROL_ADMIN,
+  barberia_id: ID_BARBERIA_PROVISORIA,
+  barbero_id: null,
+  barberias: { estado_id: ESTADO_ACTIVO },
+}
 
 export function AuthProvider({ children }) {
   const [sesion, setSesion] = useState(null)
@@ -11,6 +27,13 @@ export function AuthProvider({ children }) {
   const [errorPerfil, setErrorPerfil] = useState(null)
 
   useEffect(() => {
+    if (!HAY_BACKEND_REAL) {
+      setSesion({ user: { id: ID_USUARIO_PROVISORIO } })
+      setPerfil(PERFIL_PROVISORIO)
+      setCargando(false)
+      return
+    }
+
     let activo = true
 
     async function cargarPerfil(sesionActual) {

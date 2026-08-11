@@ -1499,3 +1499,388 @@ Playwright (instalado y desinstalado como siempre): la barbería semilla aparece
 - El bypass de `/admin` sigue siendo temporal — falta re-envolverlo en `<RutaProtegida rolesPermitidos={[ROL_SUPERADMIN]}>` cuando se retome el login (ver comentario en `AppRouter.jsx`).
 
 ---
+
+## 2026-08-11 - Personalización de la página pública: identidad propia por barbería, con vista previa en vivo
+
+**Qué se hizo:**
+Enzo preguntó por un editor tipo WordPress (arrastrar y soltar componentes). Se conversó el trade-off: un editor de bloques libres es mucho trabajo y le abre la puerta a que cada barbería rompa el sistema de diseño editorial ya construido. Enzo aclaró que su intención de fondo es que **cada barbería tenga identidad propia** (no que todas se vean iguales) — eso es compatible con un enfoque más acotado: personalización rica (fotos, color, textos) + secciones configurables, dentro de la estructura ya diseñada. Se acordó ir por ahí.
+
+**1. `/panel` (rol admin) ya funciona sin login real.** Mismo criterio que ya se usaba para `/admin`: `AuthContext.jsx` ahora entrega una sesión y un perfil falsos (rol admin, apuntando a la barbería provisoria "Don Manuel") cuando `HAY_BACKEND_REAL` es falso — así que en vez de bypasear el `<RutaProtegida>` de `/panel` (como se hizo con `/admin`), esta vez la protección real queda intacta y funciona sola porque el contexto ya reporta una sesión autenticada válida. Se autodesactiva igual que el resto: apenas haya un Supabase real conectado, deja de entregar la sesión falsa y todo vuelve a depender del login real. De paso, `cerrarSesion()` en `authService.js` ahora es un no-op en modo provisorio (antes tiraba un error de red al intentar cerrar una sesión que no existe).
+
+**2. Datos provisorios extendidos**: `personalizacion` ahora incluye `galeria` (array de imágenes) y `secciones_visibles` (qué secciones opcionales se muestran — hoy solo existe "galeria", pensado para crecer). Nuevas funciones: `obtenerBarberiaParaPersonalizacion` / `guardarPersonalizacionProvisoria`.
+
+**3. Nueva pestaña "Personalización" en `/panel`**, junto a Reservas/Barberos/Servicios/Horarios. El admin puede:
+- Subir su logo y fotos para una galería (comprimidas del lado del cliente antes de guardarlas — `src/utils/imagenes.js`, un helper con `<canvas>` que redimensiona a un máximo razonable y exporta JPEG; importante porque en modo provisorio esto vive en `localStorage`, que tiene ~5MB de cuota total — una foto de cámara sin comprimir la agotaría con una sola imagen).
+- Elegir su color de marca (`<input type="color">`, ya existía la columna `color_primario`, nunca había UI para editarla).
+- Editar eslogan y descripción.
+- Reordenar (↑/↓) y quitar fotos de la galería, y decidir si la sección de galería se muestra o no en su página pública.
+- Ver todo esto en una **vista previa en vivo**, sin guardar todavía.
+
+**4. La vista previa es literalmente la página real, no una aproximación.** Se sacó el JSX de `PaginaBarberia.jsx` a un componente nuevo, `VistaBarberia.jsx`, que recibe el objeto `barberia` directo por prop (antes solo se leía vía `useOutletContext()`, atado a la ruta pública). Tanto la página pública real como la vista previa del panel renderizan exactamente este mismo componente — si mañana cambia el diseño de la página pública, la vista previa cambia sola con él, nunca se puede desincronizar.
+
+**5. La galería se ve en la página pública de verdad.** `VistaBarberia.jsx` agrega una sección "Galería" (con el mismo `SectionRule` que ya usa el resto del sitio) entre el header y "Reserva tu hora", visible solo si `secciones_visibles` incluye `'galeria'` y hay al menos una foto cargada.
+
+**Cómo se probó (Playwright, instalado y desinstalado como siempre):**
+- Las 5 pestañas de `/panel` cargan sin errores de página con la sesión provisoria (las que no se mockearon — Reservas/Barberos/Servicios/Horarios — muestran su estado de error ya existente contra Supabase, esperado, no es una regresión).
+- Cambiar eslogan/descripción se refleja al instante en la vista previa.
+- Subir una foto de 2000×2000 la comprimió a 1200×1200 (confirmado con `naturalWidth`/`naturalHeight` reales, no solo el tamaño del archivo).
+- Subir 2 fotos, reordenarlas (↑/↓) y quitar una — verificado que el orden cambia y la cuenta baja correctamente, tanto en el formulario como en la vista previa.
+- El logo subido aparece en la vista previa.
+- Guardar persiste en `localStorage` (confirmado recargando la página) y la página pública real (`/barberias/don-manuel`) refleja los cambios — se verificó específicamente con el eslogan.
+- La sección de galería no aparece si `secciones_visibles` no la incluye o si no hay fotos, aunque el check esté activo (probado ambos casos).
+
+**Por qué:**
+- Sesión falsa vía `AuthContext` para `/panel`, en vez de bypasear `RutaProtegida` como se hizo con `/admin`: mantiene la lógica de protección real intacta y probada, en vez de tener dos mecanismos distintos de "saltarse el login" en el código.
+- Vista previa = el componente real, no una copia aparte: es la única forma de garantizar que "lo que ves es lo que vas a publicar" sin mantenimiento doble.
+- Comprimir imágenes del lado del cliente antes de guardar: en modo provisorio (`localStorage`, sin Storage real de Supabase) es la diferencia entre que la función funcione con varias fotos o se quede sin espacio con la primera.
+
+**Archivos afectados:**
+- Nuevo: `src/pages/panel/PanelPersonalizacion.jsx`, `src/pages/panel/hooks/usePersonalizacionAdmin.js`, `src/pages/barberias/components/VistaBarberia.jsx`, `src/utils/imagenes.js`.
+- Modificado: `src/context/AuthContext.jsx` (sesión provisoria), `src/services/authService.js` (`cerrarSesion` no-op provisorio), `src/mocks/datosProvisoriosSuperadmin.js` (galería, secciones visibles, nuevas funciones), `src/pages/barberias/PaginaBarberia.jsx` (ahora un wrapper delgado sobre `VistaBarberia`), `src/pages/panel/PanelAdminLayout.jsx` (pestaña nueva), `src/routes/AppRouter.jsx` (ruta nueva), `src/components/common/HoverLink.jsx` (ahora reenvía props extra como `target`/`rel`, necesario para el link "Ver página pública →" que abre en pestaña nueva).
+
+**Pendiente / próximos pasos:**
+- Esto es la base de "personalización rica + secciones configurables" — hoy la única sección opcional es la galería. Si se quiere seguir sumando (testimonios, mapa, horarios visibles en la página pública, etc.), el patrón ya está armado: agregar la clave a `SECCIONES_DISPONIBLES`, sumar el campo a `personalizacion`, y agregar el bloque condicional correspondiente en `VistaBarberia.jsx`.
+- El reordenamiento de fotos es con flechas ↑/↓, no arrastrar-y-soltar — se decidió así a propósito para evitar sumar una librería de drag-and-drop para una lista corta; si en algún momento se quiere ese gesto, es un cambio acotado a `PanelPersonalizacion.jsx`.
+- Cuando haya Supabase real: falta crear la migración para las columnas nuevas de `personalizacion` (`galeria`, `secciones_visibles`) y el bucket de Storage real para las imágenes — hoy son data URLs en `localStorage`, que no es donde deberían vivir en producción.
+- Las pestañas Reservas/Barberos/Servicios/Horarios de `/panel` siguen sin datos provisorios (solo se mockeó lo de `/admin` y ahora Personalización) — si se quiere seguir trabajando ahí sin backend real, se puede extender el mismo patrón.
+
+---
+
+## 2026-08-11 - Personalización, ronda 2: tipografía elegible, color de header con contraste automático, y secciones tipadas (no solo galería)
+
+**Qué se hizo:**
+Sobre la base de la entrada anterior, Enzo pidió sumar tres cosas: elegir tipografía entre algunas ya evaluadas, cambiar el color del header (no solo el color de marca general), y poder agregar secciones con imágenes "o cosas así" y ordenarlas como quiera cada barbería.
+
+**1. Tipografía de títulos, curada (no cualquier Google Font).** `src/utils/fuentes.js`: 4 opciones (Fraunces —la de siempre—, Playfair Display, Libre Baskerville, Bricolage Grotesque), cada una ya evaluada por calzar con la identidad editorial del sitio. Fraunces se sigue cargando siempre (como hasta ahora); las otras tres se inyectan como un `<link>` de Google Fonts recién cuando alguien las elige — así ninguna barbería que se queda con la fuente por defecto paga el peso de fuentes que no usa. `VistaBarberia.jsx` sobreescribe `--font-display` (la variable de Tailwind que ya usa todo el sitio) en el contenedor de la página, así que todos los títulos de esa barbería cambian de fuente sin tocar ningún componente.
+
+**2. Color del header, con contraste automático.** Antes solo existía "color de marca" (afecta cobre/acentos en toda la página). Ahora también se puede elegir el color de fondo del header en sí. Como el header viene pensado para texto claro sobre fondo oscuro, elegir un color claro (ej. blanco, hueso) rompería la legibilidad — se agregó `luminanciaRelativa()`/`esColorClaro()` a `utils/color.js` (fórmula de contraste WCAG, mismo criterio que ya se había usado para auditar contraste en sesiones anteriores) y `VistaBarberia.jsx` decide solo si el texto del header va en tono claro u oscuro según el color elegido — probado explícitamente con un header casi blanco: el texto pasó a negro-barbero automáticamente, sin que la barbería tenga que pensar en esto.
+
+**3. Secciones tipadas, no solo un interruptor de galería.** Se generalizó `personalizacion.secciones_visibles` (un booleano suelto para "galería sí/no") a `personalizacion.secciones`: un array ordenado de bloques, cada uno con su tipo. Hoy hay dos tipos:
+- **Galería**: la fila de fotos horizontal que ya existía.
+- **Imagen y texto**: una foto + título + texto — sirve para "Nuestro ambiente", "Nuestro equipo", o lo que cada barbería quiera contar con una imagen.
+
+Desde el panel se puede agregar cualquier cantidad de secciones (de cualquiera de los dos tipos, repetidas las veces que se quiera), editarlas, eliminarlas, y reordenarlas con ↑/↓ — el orden en la lista del panel es el orden real en la página pública. Se migran solas las barberías que ya tenían el shape viejo (`galeria` + `secciones_visibles` sueltos): `normalizarPersonalizacion()`, movida a `src/utils/personalizacion.js` (no vive en el mock — el código real, cuando haya Supabase, también la va a necesitar) reconstruye una sección de galería a partir de esos datos viejos si no encuentra el array nuevo, así nadie pierde lo que ya había guardado.
+
+**Cómo se probó (Playwright, instalado y desinstalado como siempre):**
+- Elegir "Playfair Display" cambió el `font-family` computado del `<h1>` en la vista previa, y tras guardar, también en la página pública real — confirmado leyendo el CSS computado real, no solo mirando la captura.
+- Poner el color del header en un tono casi blanco (`#f5f0e6`) cambió el color del texto a `rgb(28, 27, 25)` (negro-barbero) automáticamente — confirmado leyendo el `color` computado del `<h1>`, no asumido.
+- Agregar una sección "Imagen y texto" con título y texto, y una sección "Galería" con una foto, aparecieron ambas en la vista previa con sus reglas de sección (`— Nuestro ambiente`, `— Galería`).
+- Reordenar con ↓ cambió el orden real de las secciones en la vista previa (confirmado leyendo el DOM antes/después, no solo la captura).
+- Guardado, recarga y visita a la página pública real: la sección nueva y la tipografía nueva aparecen ahí también — el ciclo completo panel → guardar → página pública funciona de punta a punta.
+
+**Por qué:**
+- Tipografías curadas y carga diferida: dar la opción sin pagar el costo de performance de cargar 4 familias tipográficas completas en cada visita, cuando la inmensa mayoría se va a quedar con la de siempre.
+- Contraste automático en vez de dejarlo a criterio de cada dueño de barbería: es exactamente el tipo de detalle que alguien sin ojo de diseñador puede pasar por alto y terminar con una página ilegible — resolverlo en el código es más confiable que una advertencia de texto.
+- `secciones` como array tipado en vez de más booleanos sueltos (uno por sección): escala mejor — agregar un tercer tipo de sección el día de mañana es agregar un `case` en `VistaBarberia.jsx`, no rediseñar el shape de datos otra vez.
+
+**Archivos afectados:**
+- Nuevo: `src/utils/fuentes.js`, `src/utils/personalizacion.js`.
+- Modificado: `src/utils/color.js` (`luminanciaRelativa`, `esColorClaro`), `src/mocks/datosProvisoriosSuperadmin.js` (secciones tipadas + migración), `src/pages/panel/hooks/usePersonalizacionAdmin.js` y `src/pages/barberias/hooks/useBarberiaPorSlug.js` (columnas nuevas en la query real + normalización), `src/pages/barberias/components/VistaBarberia.jsx` (fuente, contraste de header, render de secciones tipadas), `src/pages/panel/PanelPersonalizacion.jsx` (editor completo de secciones, selector de tipografía, color de header).
+
+**Pendiente / próximos pasos:**
+- El patrón para sumar un tercer tipo de sección (testimonios, mapa, horarios visibles, lo que sea) ya está armado: una clave nueva + su bloque de render en `VistaBarberia.jsx` + su editor en el panel.
+- Cuando haya Supabase real: la tabla `personalizacion` necesita las columnas `color_header`, `fuente_display` y `secciones` (jsonb) — hoy solo existen en el shape que maneja el código, no hay migración SQL todavía.
+- Reordenar sigue siendo con flechas, no arrastrar — se mantiene la misma decisión de la ronda anterior (evitar sumar una librería de drag-and-drop).
+
+---
+
+## 2026-08-11 - Galería: grilla editorial con fotos destacadas, leyendas y lightbox — no más fila plana de miniaturas
+
+**Qué se hizo:**
+Enzo probó la pantalla de personalización y reportó no poder ordenar/agrandar las fotos de la galería a gusto — junto con eso, compartió una captura que en realidad mostraba una **versión vieja cacheada** (sin los campos de Tipografía/Color de header de la entrada anterior): se le indicó hacer un refresh forzado, porque el síntoma real no era un bug sino el navegador sirviendo JS viejo tras un reinicio del servidor de desarrollo.
+
+Sobre el pedido real ("que se vea lo mejor posible para el cliente, lo más interactivo posible"), la fila horizontal de miniaturas del mismo tamaño se reemplazó por una **grilla editorial** con tres mejoras:
+
+**1. Fotos que se pueden destacar.** Cada foto de una sección de galería ahora es un objeto (`{ url, tamaño, leyenda }`, no un string suelto) — desde el panel, un checkbox "Destacar (más grande)" por foto la hace ocupar el doble de espacio en la grilla (2 columnas × 2 filas) en vez de una celda simple. Con esto una barbería puede armar una composición real (una foto grande de portada + varias chicas alrededor) en vez de que todas compitan por el mismo tamaño.
+
+**2. Leyenda opcional por foto** — aparece como un texto superpuesto al pasar el mouse (y siempre visible en el lightbox), útil para "Antes / Después", "Nuestro sillón clásico", etc.
+
+**3. Lightbox al hacer click — la pieza de interactividad.** Cualquier foto de la grilla, en el panel o en la página pública real, se puede hacer click y abre en grande sobre un fondo oscuro, con flechas para pasar a la foto siguiente/anterior, navegación por teclado (`←`/`→` cambian de foto, `Esc` cierra) y click afuera de la imagen para cerrar. Nuevo componente `LightboxGaleria.jsx`.
+
+**4. Título editable de la sección** — antes decía "Galería" fijo; ahora cada sección de galería tiene su propio título (ej. "Nuestro trabajo", "Antes y después").
+
+**Migración de datos:** las fotos que ya estaban guardadas como string plano (de antes de este cambio) se migran solas a `{url, tamaño:'normal', leyenda:''}` al leerlas — nadie pierde lo que ya había subido.
+
+**Cómo se probó (Playwright + sharp, instalados y desinstalados como siempre):**
+- Se inyectó a mano en `localStorage` una barbería con el shape **más viejo** (`galeria` de strings sueltos, de antes de la entrada anterior) y se confirmó que se migra sola y se ve en la vista previa, sin perder el eslogan ni la foto.
+- Subir 3 fotos, marcar la primera como "Destacar" y confirmar que su elemento en el DOM efectivamente tiene `col-span-2` (no solo a ojo en una captura).
+- Agregar una leyenda a una foto, y un título a la sección — ambos aparecen en la vista previa.
+- Reordenar con ↑ y confirmar que cambia el orden real en el DOM.
+- Abrir el lightbox con click, navegar con `ArrowRight` (sigue abierto, cambió de foto) y cerrar con `Escape` (confirmado que el botón de cerrar deja de existir en el DOM).
+- Guardar y repetir la apertura del lightbox directo en la página pública real (`/barberias/don-manuel`) — funciona igual ahí, porque es el mismo componente.
+
+**Por qué:**
+- Fotos como objetos (no strings) desde el principio, aunque hoy solo se use `tamaño`/`leyenda`: agregar un atributo más por foto en el futuro (por ejemplo, un recorte específico) es un campo nuevo en el objeto, no otra migración de shape.
+- Lightbox con teclado y click-afuera-para-cerrar en vez de solo un botón de cerrar: es el gesto que cualquier visitante ya conoce de otros sitios — no inventar una interacción nueva que alguien tenga que aprender.
+- Verificar la migración inyectando el shape viejo de verdad en `localStorage`, no solo confiando en la lógica: es la única forma de probar honestamente que nadie pierde datos con este cambio.
+
+**Archivos afectados:**
+- Nuevo: `src/pages/barberias/components/LightboxGaleria.jsx`.
+- Modificado: `src/utils/personalizacion.js` (migración de fotos string→objeto, título por defecto), `src/pages/barberias/components/VistaBarberia.jsx` (grilla con `col-span`/`row-span`, integración del lightbox), `src/pages/panel/PanelPersonalizacion.jsx` (editor por foto: leyenda, destacar, reordenar; título de sección).
+
+**Pendiente / próximos pasos:**
+- Mismo pendiente de siempre en modo provisorio: cuando haya Supabase real, la columna `secciones` (jsonb) necesita guardar este shape más rico por foto.
+- Se le aclaró a Enzo que la captura que mandó era una versión vieja cacheada — vale la pena que, de ahora en más, si algo se ve raro, pruebe con un refresh forzado antes de asumir que es un bug del código.
+
+---
+
+## 2026-08-11 - Personalización: pantalla reorganizada en grupos numerados + secciones colapsables (no más formulario largo sin separación)
+
+**Qué se hizo:**
+Enzo reportó "no está tomando los cambios" y que la pantalla estaba "todo muy junto" — no se entendía qué se estaba modificando.
+
+**Sobre "no toma los cambios":** se armó un diagnóstico dedicado (Playwright) reproduciendo exactamente el flujo de un usuario real — editar el eslogan, guardar, hacer un **reload duro** (no navegación de SPA) y verificar tanto el formulario como la página pública real. El ciclo completo funcionó correctamente y sin errores de consola. No se pudo reproducir el problema — todo indica que seguía siendo el mismo síntoma de la entrada anterior (una pestaña con el JS viejo cacheado, ya que el servidor de desarrollo se había reiniciado en algún momento de la sesión). Se le pidió a Enzo confirmar con un refresh forzado y, si persiste, probar en una ventana de incógnito nueva (para descartar cualquier resto de estado en esa pestaña puntual).
+
+**Sobre "todo muy junto":** esto sí era un problema real de diseño de la pantalla, independiente del punto anterior — se había ido acumulando contenido (logo, 2 colores, tipografía, eslogan, descripción, y una lista creciente de secciones con sus propios formularios anidados) en un solo formulario largo sin ninguna separación visual fuerte. Se reorganizó en tres grupos numerados, con el mismo lenguaje que ya usa el resto del sitio para marcar quiebres de sección (`— 01 / Cómo funciona`, etc.):
+- **01 Identidad** — logo, color de marca, color del header, tipografía.
+- **02 Textos principales** — eslogan, descripción.
+- **03 Secciones de la página** — la lista dinámica de secciones.
+
+Dentro del grupo 03, cada sección pasó de estar siempre expandida a ser **colapsable** (acordeón: solo una abierta a la vez) — al agregar una sección nueva se abre sola, el resto queda como una fila resumen (tipo + título + cantidad de fotos) hasta que se hace click para editarla. Esto es lo que resuelve directamente "no se entiende qué estoy modificando": con 2-3 secciones cargadas, antes se veían todos los formularios de fotos superpuestos sin separación; ahora solo se ve expandido lo que se está tocando en ese momento, con un borde cobre marcando cuál es.
+
+También se cambió el editor de fotos dentro de una sección de galería: de una lista vertical de filas completas a una **grilla de tarjetas** (imagen + leyenda + destacar + reordenar, cada una en su propia tarjeta de ~160px) — se ve más como "estoy armando una cuadrícula de fotos" que como una lista de formularios, más parecido al resultado final.
+
+**Cómo se probó (Playwright + sharp, instalados y desinstalados como siempre):**
+- Diagnóstico dedicado del guardado: editar → guardar → **reload duro** → el cambio persiste en el formulario y en la página pública real, sin errores de consola.
+- Los 3 grupos numerados están presentes y visualmente separados.
+- Agregar una sección nueva la abre automáticamente (confirmado que su campo de título es visible sin click adicional).
+- Colapsar con click oculta su contenido; volver a abrir lo muestra de nuevo.
+- Tras guardar y recargar, la sección queda colapsada mostrando su resumen correctamente.
+
+**Por qué:**
+- Diagnosticar con una prueba real del ciclo completo en vez de asumir dónde estaba el bug: permite decir con confianza "esto funciona" en vez de aplicar un arreglo a ciegas sobre un síntoma que resultó ser de otra causa (caché del navegador) las dos veces anteriores.
+- Acordeón (una sección abierta a la vez) en vez de dejar todas expandidas: con 1 sección no hace diferencia, pero con 3+ secciones — el caso real que Enzo va a tener — es la diferencia entre desplazarse por una pantalla larga confusa y ver solo lo que se está editando.
+
+**Archivos afectados:**
+- Modificado: `src/pages/panel/PanelPersonalizacion.jsx` (grupos numerados, secciones colapsables tipo acordeón, editor de fotos en grilla de tarjetas). Sin cambios de datos ni de la página pública — es puramente una reorganización de la pantalla de edición.
+
+**Pendiente / próximos pasos:**
+- Si "no toma los cambios" sigue pasando después del refresh forzado, lo más probable es que sea algo específico del navegador/pestaña de Enzo (extensión, service worker viejo, etc.) — pedirle que lo confirme en una ventana de incógnito ayuda a aislar si es eso.
+
+---
+
+## 2026-08-11 - Personalización: vista previa real PC/Móvil (con iframe), aviso de cambios sin guardar, y layout separado del contenedor angosto del panel
+
+**Qué se hizo:**
+Enzo volvió a reportar "no está tomando los cambios" con capturas mostrando la vista previa (dentro del panel) con una galería de 3 fotos que no aparecía en la página pública real. Se armó un tercer diagnóstico, esta vez replicando el escenario exacto: color de header + 3 fotos + guardar + abrir "Ver página pública" como una **pestaña nueva de verdad** (`target="_blank"`, no navegación en la misma pestaña) — funcionó perfecto, sin errores, la galería y las 3 fotos aparecieron. Con tres diagnósticos limpios seguidos sin poder reproducir el problema, se descarta un bug de código — sigue siendo una pestaña vieja cacheada (se le sugirió a Enzo probar en una ventana de incógnito para aislarlo del todo).
+
+Sobre "está todo muy junto" y el pedido de vista previa PC/Móvil, se hicieron tres cambios:
+
+**1. Aviso explícito de cambios sin guardar.** Se guarda una copia de la última versión guardada (`formGuardado`) y se compara contra el formulario actual — si difieren, aparece un aviso destacado ("Tenés cambios sin guardar — la página pública todavía muestra la versión anterior") justo debajo del link a la página pública. Esto ataca directamente la confusión de fondo entre "lo que veo en la vista previa" y "lo que ve un cliente real" — sin importar si el reporte anterior era caché o no, este aviso hace que la distinción sea imposible de pasar por alto en el futuro.
+
+**2. La vista previa se sacó del layout de dos columnas y ahora es de sangrado completo.** Acá se encontró un problema real (no de datos, de diseño): la pantalla vive dentro de `PanelShell`, que limita el contenido a `max-w-4xl` (896px) — compartido con todas las pestañas del panel. Con el formulario y la vista previa lado a lado en ese ancho, la columna de vista previa nunca superaba ~400px de ancho real, sin importar qué tan grande fuera la pantalla de Enzo — es decir, un modo "PC" ahí nunca iba a poder mostrar un layout de escritorio de verdad (los estilos `md:` de Tailwind necesitan ≥768px para activarse). Se resolvió sacando la vista previa de esa grilla angosta con la técnica estándar de "sangrado completo dentro de un contenedor limitado" (margen negativo al 50% del viewport) — ahora vive en su propia franja de ancho completo, debajo del formulario.
+
+**3. Vista previa PC/Móvil real, no una aproximación.** Como la vista previa ahora vive en un `<iframe>` (`/_preview-barberia`, ruta nueva y aislada, sin layout ni datos propios) en vez de renderizarse directo en la página del panel, cambiar su ancho de contenedor (1022px en "PC", 390px centrado con sombra tipo marco de teléfono en "Móvil") hace que los `md:` de Tailwind respondan de verdad al viewport del iframe — algo que **no** se puede lograr solo achicando un `<div>` (los media queries miran el viewport del documento, no el tamaño de un contenedor cualquiera). El iframe recibe los datos del formulario por `postMessage` en cada cambio, así que sigue actualizándose en vivo mientras se escribe, sin necesidad de guardar.
+
+**Cómo se probó (Playwright + sharp, instalados y desinstalados como siempre):**
+- Tercer diagnóstico limpio del guardado con pestaña nueva real — sin poder reproducir "no se reflejan los cambios".
+- El iframe muestra el nombre de la barbería apenas carga (postMessage inicial via `onLoad`).
+- Editar el eslogan sin guardar lo refleja dentro del iframe al instante.
+- El aviso de "cambios sin guardar" aparece al editar y desaparece tras guardar.
+- Medición directa (no a ojo): el documento dentro del iframe mide 390px de ancho real en modo Móvil y 1022px en modo PC — confirmado que son layouts genuinamente distintos, no la misma vista achicada.
+- Capturas de ambos modos: en PC el header muestra logo y título en fila; en Móvil, apilados y centrados, con el marco de "teléfono" visualmente distinguible del resto de la pantalla.
+
+**Por qué:**
+- Un iframe en vez de un `<div>` con ancho fijo: es la única forma correcta de que los media queries de la página respondan al ancho simulado — un detalle técnico fácil de pasar por alto (un div achicado *se ve* más chico, pero el CSS interno no lo sabe).
+- Sangrado completo en vez de ensanchar la columna dentro del layout existente: `PanelShell` es compartido por las 5 pestañas del panel — tocar su ancho ahí habría afectado a Reservas/Barberos/Servicios/Horarios sin que lo pidieran.
+- Verificar el ancho real del documento del iframe (no solo mirar una captura) antes de dar el toggle por terminado: la primera versión (columnas lado a lado) parecía funcionar a ojo pero medía solo 360px en "PC" — el mismo error que ya se había visto antes en esta sesión de dar algo por bueno sin medirlo.
+
+**Archivos afectados:**
+- Nuevo: `src/pages/panel/PreviewBarberia.jsx`.
+- Modificado: `src/routes/AppRouter.jsx` (ruta `/_preview-barberia`), `src/pages/panel/PanelPersonalizacion.jsx` (aviso de cambios sin guardar, layout de sangrado completo para la vista previa, iframe + postMessage + toggle PC/Móvil).
+
+**Pendiente / próximos pasos:**
+- Si "no toma los cambios" persiste después de probar en incógnito, ya no sería atribuible a este código — valdría la pena revisar configuración específica del navegador de Enzo (extensiones, políticas de caché).
+- El iframe tiene una altura fija (1600px en PC, 900px en Móvil) en vez de ajustarse al contenido real — si una página con muchas secciones queda más alta que eso, el iframe mostrará su propio scroll interno además del scroll del contenedor que lo envuelve. Funciona, pero no es perfecto; se podría mejorar más adelante escuchando la altura real del contenido vía postMessage si hace falta.
+
+---
+
+## 2026-08-11 - Personalización: se eliminan los CSV de prueba, botón "Guardar" al final, aviso de dispositivo móvil — versión final de esta pantalla
+
+**Qué se hizo:**
+Enzo volvió a reportar "no se ve nada de los cambios" y esta vez señaló como sospechoso a los archivos CSV de `datos-provisorios/` ("hay un problema en la base de los excel seguramente"). Esos CSV nunca fueron leídos ni escritos por la app — se crearon en una ronda anterior solo como referencia visual de los datos de prueba, y la app siempre guardó todo en `localStorage` real. Como ya eran la sospecha más probable del malentendido (y no cumplían ninguna función), se **eliminaron por completo** (`datos-provisorios/README.md`, `barberias.csv`, `barberos.csv`, `servicios.csv`) para sacar esa fuente de confusión de en medio en vez de seguir explicándola.
+
+Sobre los tres pedidos concretos de esta ronda:
+
+**1. Botón "Guardar cambios" movido al final.** Antes estaba arriba, antes de la vista previa — invitaba a guardar sin haber mirado cómo quedaba. Ahora el `<form>` envuelve todo el flujo (formulario → vista previa PC/Móvil → botón), y el botón + mensaje de resultado quedan como lo último de la pantalla, después de revisar la vista previa.
+
+**2. Aviso de dispositivo móvil.** Se reutilizó el hook ya existente `useIsMobile` (breakpoint 768px, basado en `matchMedia`) para mostrar un aviso descartable arriba de la pantalla cuando se entra a Personalización desde un celular, recomendando usar un computador para tener una vista más clara — esta pantalla tiene bastante contenido para editar y comparar contra la vista previa, algo que en una pantalla chica es más difícil. El cierre del aviso es solo de la sesión de esa pestaña (no se guarda en `localStorage`) — si se recarga la página, vuelve a aparecer, a propósito, ya que sigue siendo cierto que se está en un móvil.
+
+**3. Diagnóstico final del guardado.** Se armó un cuarto diagnóstico (Playwright), el más completo de todos: contexto limpio, edición de eslogan + color + tipografía + una sección de galería con foto real, guardado, inspección directa y cruda de `localStorage`, reload duro, y apertura de la página pública real en una pestaña nueva de verdad. Resultado: **cero errores, todo persiste correctamente en cada paso.** Con cuatro diagnósticos limpios seguidos sin poder reproducir el problema en ninguna ronda, se descarta con alta confianza un bug de código — el guardado en sí nunca fue el problema real.
+
+**Cómo se probó (Playwright + sharp, instalados y desinstalados como siempre — ya se desinstalaron al cerrar esta ronda):**
+- Build (`npm run build`) y lint (`npm run lint`) limpios, sin errores de compilación.
+- Desktop (viewport 1400px): el aviso de móvil NO aparece.
+- Orden vertical confirmado por coordenadas reales (`getBoundingClientRect`): el botón "Guardar cambios" queda por debajo de la sección "— Vista previa".
+- Ciclo completo: editar eslogan + color + tipografía + agregar sección de galería con foto → aviso "cambios sin guardar" aparece → vista previa (iframe) refleja todo sin guardar → ancho real del iframe medido en 1022px (PC) y 390px (Móvil) → guardar → aviso desaparece → `localStorage` crudo confirma los 4 campos → reload duro conserva todo → página pública real (pestaña nueva) muestra el eslogan y la sección nuevos.
+- Móvil (viewport 390px, `isMobile: true`): el aviso aparece, se puede cerrar con el botón ✕, y vuelve a aparecer tras un reload (comportamiento esperado, no es un bug).
+- Cero errores de consola ni de página en ningún escenario.
+
+**Por qué:**
+- Eliminar los CSV en vez de seguir aclarando que no se usan: después de dos rondas de confusión sobre ellos, la forma más simple y definitiva de resolverlo era que dejaran de existir — no tienen ninguna función en la app real.
+- Aviso de móvil no persistente entre reloads: es información sobre el dispositivo actual, no una preferencia — si se guardara "cerrado" en `localStorage` y Enzo volviera a entrar desde el celular en otro momento, el aviso útil no aparecería cuando sí correspondía.
+- Botón al final: coherente con cómo se usa la pantalla en la práctica — se edita, se mira la vista previa (incluyendo el modo Móvil) y solo ahí tiene sentido decidir guardar.
+
+**Archivos afectados:**
+- Eliminado: `datos-provisorios/` completo (README + 3 CSV).
+- Modificado: `src/pages/panel/PanelPersonalizacion.jsx` (alerta de dispositivo móvil, reordenamiento del `<form>` para que el botón de guardar quede al final, después de la vista previa).
+
+**Estado de esta pantalla (Personalización) al cierre de esta ronda:**
+Con este cambio se da por completa la funcionalidad pedida a lo largo de toda esta serie de rondas: identidad de marca (logo, color, tipografía, color de header con contraste automático), textos principales (eslogan, descripción), secciones configurables y reordenables (galería con fotos destacadas/leyendas/lightbox, imagen y texto), vista previa en vivo fiel a la página pública real (mismo componente `VistaBarberia`) con toggle PC/Móvil genuino, aviso de cambios sin guardar, aviso de uso desde un dispositivo móvil, y guardado al final del flujo. No quedan pendientes abiertos de esta ronda — cualquier ajuste futuro sería una funcionalidad nueva, no una corrección.
+
+---
+
+## 2026-08-11 - Equipo de barberos con foto y especialidad, Personalización en dos columnas con vista previa "sticky", y notificación de guardado
+
+**Qué se hizo:**
+Enzo pidió tres cosas puntuales, con una captura marcando en rojo el formulario y en verde el panel de previsualización, para que ambos convivan a la vista sin tener que scrollear entre uno y otro:
+
+**1. Barberos con foto y especialidad, mostrados en la página pública.** Hasta ahora la pestaña "Barberos" del panel solo permitía nombre y activo/inactivo — no había forma de mostrar quién es cada barbero al cliente final. Se agregaron dos campos por barbero: una foto (subida y comprimida igual que el logo, vía `archivoAImagenComprimida`) y una especialidad de texto libre (ej: "Fade y diseños a mano"). La página pública ahora tiene una sección nueva **"Nuestro equipo"**, ubicada justo después del encabezado — se arma sola a partir de los barberos activos, con su foto (o su inicial, como fallback, si todavía no subió una) y su especialidad debajo del nombre. No es una "sección" configurable de las que ya existían (galería / imagen y texto) porque los barberos ya son una entidad propia del sistema (con su pestaña, su alta/baja, su límite según el plan) — mezclar ambos conceptos hubiera sido confuso.
+
+De paso, se encontró y corrigió un bug preexistente (no relacionado a lo pedido, pero en la misma pantalla): el hook `useBarberiaAdmin` (usado para mostrar "X / Y según tu plan" en Barberos) nunca tuvo la rama provisoria — intentaba consultar el Supabase real inexistente y fallaba en silencio, así que el badge del límite de plan nunca se mostraba en modo demo. Se le agregó la misma rama `HAY_BACKEND_REAL` que ya tienen el resto de los hooks.
+
+**2. Personalización en dos columnas: formulario a la izquierda, vista previa "pegada" (sticky) a la derecha.** Antes la vista previa vivía debajo de todo el formulario — para comparar un cambio había que escribir, scrollear hacia abajo a mirar, volver a scrollear hacia arriba a seguir editando. Ahora, en pantallas grandes (`lg`, ≥1024px), el formulario y la vista previa van lado a lado dentro de la misma franja de sangrado completo ya usada antes; la columna de la vista previa usa `position: sticky` — mientras se scrollea el formulario (que puede ser bastante largo con varias secciones cargadas), la vista previa se queda fija en pantalla en vez de desaparecer hacia arriba. El botón "Guardar cambios" queda al final del formulario (a la izquierda), ya que ahora la vista previa está siempre visible al lado — no hace falta que esté después de ella. En pantallas chicas (por debajo de `lg`), cae de vuelta a una sola columna (formulario, luego vista previa), coherente con el aviso que ya existe recomendando usar un computador.
+
+Para que el modo "PC" de la vista previa siga siendo un layout de escritorio de verdad sin importar cuánto se angoste la columna en una pantalla más chica (un notebook de 1366px, por ejemplo, deja mucho menos que los 1024px que necesita), el iframe ahora tiene un ancho fijo de 1024px (antes era `w-full`, atado al ancho disponible) — si la columna es más angosta que eso, esa caja scrollea horizontalmente en vez de mostrar un layout mobile disfrazado de "PC".
+
+**3. Notificación de guardado con estado de carga y confirmación.** El mensaje de texto suelto junto al botón ("Cambios guardados.") se reemplazó por una tarjeta flotante (`ToastGuardado`, nueva, en `components/common/`) que aparece abajo a la derecha: muestra un spinner con "Guardando cambios…" mientras la mutación está en curso, y al terminar cambia sola a un check verde con "Cambios guardados" (o una X roja con el error, si falla) — se cierra sola después de unos segundos, sin que haya que ir a buscar el mensaje en la pantalla.
+
+**Cómo se probó (Playwright + sharp, instalados y desinstalados como siempre):**
+- Barberos: se edita la especialidad y la foto de un barbero específico (con locators escopeados por fila, no por índice — el listado se ordena alfabéticamente, así que el orden visual no es el orden de guardado) → persiste en `localStorage` → el otro barbero no se ve afectado. El badge "según tu plan" ahora aparece.
+- Página pública (mismo contexto/localStorage que la edición, para probar persistencia real): "Nuestro equipo" aparece con ambos barberos, la foto y la especialidad nueva se ven correctamente.
+- Sticky: con una sección de galería cargada (formulario ya largo, caso real), se midió la posición de la vista previa en 7 puntos de scroll entre 0 y 1400px — se mueve junto con el formulario hasta cierto punto y después queda fija en un valor constante durante un rango amplio de scroll (450px a 1400px+), confirmando que el `sticky` engancha y se mantiene, no que "pasa de largo" por casualidad.
+- Ancho del iframe siguió midiendo 1024px (PC) y 390px (Móvil) tras el rediseño — el cambio de layout no rompió el toggle.
+- Toast: aparece "Cambios guardados" con el check tras guardar, y desaparece solo después de ~2.6 segundos. (El estado "Guardando…" no se llegó a capturar en una prueba automatizada porque el guardado provisorio en `localStorage` es prácticamente instantáneo — sí se dispara en el código antes de la mutación, así que se va a ver apenas haya latencia real, por ejemplo con Supabase conectado.)
+- Cero errores de consola ni de página en ningún escenario, incluyendo el fix de `useBarberiaAdmin`.
+- Build (`npm run build`) y lint limpios.
+
+**Por qué:**
+- Equipo como sección fija (no una "sección" configurable más): los barberos ya tienen su propio ciclo de vida (alta, baja, límite de plan) en otra pestaña — tratarlos como contenido libre habría duplicado esa gestión en dos lugares.
+- `sticky` en vez de, por ejemplo, un iframe con `position: fixed`: `sticky` respeta el flujo normal del documento (no se superpone a nada, no necesita lógica de show/hide al hacer scroll) y deja de tener efecto automáticamente cuando el formulario termina, sin código extra.
+- Ancho fijo de 1024px en el iframe en vez de `w-full`: la columna derecha ahora comparte espacio con el formulario, así que su ancho real varía según el tamaño de pantalla — sin un ancho fijo, "PC" dejaría de ser un layout de escritorio genuino en notebooks más chicos, el mismo problema que ya se había resuelto una vez con el sangrado completo.
+- Toast flotante en vez del texto junto al botón: con el botón ahora en la columna izquierda (que puede quedar fuera de la vista si se scrolleó hacia la derecha... en rigor no aplica en desktop porque no hay scroll horizontal, pero sí es más visible una notificación flotante que un texto que aparece y desaparece en un lugar fijo de la pantalla) — y de paso dejarlo más cerca de un patrón de guardado estándar (loading → confirmación) que un mensaje de texto plano.
+
+**Archivos afectados:**
+- Nuevo: `src/components/common/ToastGuardado.jsx`.
+- Modificado: `src/mocks/datosProvisoriosSuperadmin.js` (barberos con `foto_url`/`especialidad`, CRUD provisorio de barberos), `src/pages/panel/hooks/useBarberosAdmin.js` (rama provisoria + columnas nuevas), `src/pages/panel/hooks/useBarberiaAdmin.js` (fix: le faltaba la rama provisoria), `src/pages/panel/hooks/usePersonalizacionAdmin.js` y `src/pages/barberias/hooks/useBarberiaPorSlug.js` (columnas nuevas en el select real de `barberos`), `src/pages/panel/PanelBarberos.jsx` (UI de foto + especialidad por barbero), `src/pages/barberias/components/VistaBarberia.jsx` (sección "Nuestro equipo"), `src/pages/panel/PanelPersonalizacion.jsx` (grid de dos columnas, vista previa sticky, ancho fijo del iframe en modo PC, toast de guardado).
+
+**Pendiente / próximos pasos:**
+- Ninguno abierto de esta ronda. A futuro, si se agregan muchas más secciones de contenido, la columna del formulario podría eventualmente superar la altura visible de la vista previa por un margen muy grande — el `sticky` sigue funcionando bien en ese caso (la vista previa simplemente queda fija más tiempo), así que no hace falta ningún ajuste adicional.
+
+---
+
+## 2026-08-11 - Personalización: el formulario va pegado al borde izquierdo real, la vista previa se estira a todo el ancho que sobra
+
+**Qué se hizo:**
+Enzo marcó de nuevo, sobre la misma captura de antes, que el resultado no era lo que pedía: el grid de dos columnas recién armado estaba centrado dentro de un `max-w-7xl` (1280px) — en una pantalla ancha eso deja espacio muerto libre a ambos lados del contenido, con el formulario empezando bastante más a la derecha del borde real de la página. Lo que pedía era más simple y más aprovechado: formulario pegado a la izquierda (con solo el margen estándar del sitio, no un centrado adicional) y la vista previa estirada para ocupar todo lo que sobra hasta el borde derecho.
+
+Se sacó el `mx-auto max-w-7xl` del grid — ahora ocupa el 100% del ancho disponible dentro de la franja de sangrado completo (que ya iba de borde a borde de la ventana). Como consecuencia, la columna derecha (`minmax(0,1fr)`) pasó a estirarse con la ventana en vez de quedar topada en ~945px. El iframe en modo PC pasó de un ancho fijo de 1024px a `w-full` con un piso de `min-w-[768px]` — se estira con el ancho real de la columna (para que el pedido de "estirada" se note de verdad, no solo la caja contenedora) pero nunca baja de 768px, el mínimo que necesita Tailwind para activar sus estilos `md:` y que "PC" siga siendo un layout de escritorio genuino aunque la ventana sea angosta; si la columna termina siendo más angosta que eso, la caja scrollea horizontalmente en vez de mostrar un layout mobile disfrazado de "PC" (mismo criterio ya aplicado antes en esta pantalla).
+
+**Cómo se probó (Playwright, instalado y desinstalado como siempre):**
+Se midió el layout en 4 anchos de ventana distintos (1920, 1600, 1366 y 1100px):
+- El formulario arranca siempre a 40px del borde izquierdo (el padding estándar del sitio) en los 4 anchos — no se corre hacia la derecha en pantallas grandes.
+- El borde derecho de la caja de vista previa queda siempre a ~40px del borde derecho de la ventana (1880/1920, 1560/1600, 1326/1366, 1060/1100) — confirma que se estira con la ventana, sin dejar espacio muerto.
+- El ancho real del documento dentro del iframe (modo PC) crece con la ventana — 1310px a 1920px de ancho, 990px a 1600px — y se frena en el piso de 768px en 1366px y 1100px, siempre ≥768 (layout de escritorio genuino garantizado en cualquier tamaño).
+- Cero errores de consola en los 4 escenarios. Build y lint limpios.
+
+**Por qué:**
+- Sin `max-w` central: el pedido explícito era "aprovechar todo el espacio de la página" — un `max-w-7xl` centrado es exactamente lo contrario, reserva espacio sin usarlo en pantallas más anchas que 1280px.
+- `w-full` con piso de 768px en el iframe (en vez de mantener el fijo de 1024px de la ronda anterior): con la columna ya sin tope, dejar el iframe fijo en 1024 hubiera dejado espacio en blanco dentro de la caja de preview en pantallas grandes — contradiciendo "estirada". El piso de 768px es lo mínimo indispensable para que sea realmente un layout de PC, no un capricho arbitrario.
+
+**Archivos afectados:**
+- Modificado: `src/pages/panel/PanelPersonalizacion.jsx` (grid sin `max-w`/centrado, iframe en modo PC con `w-full min-w-[768px]`).
+
+**Pendiente / próximos pasos:**
+- Ninguno.
+
+---
+
+## 2026-08-11 - Fix: cursor duplicado sobre la vista previa, y el título de Personalización desalineado del formulario
+
+**Qué se hizo:**
+Enzo mandó una captura señalando dos problemas puntuales del rediseño de Personalización:
+
+**1. Dos cursores a la vez sobre la vista previa.** El sitio tiene un cursor propio dibujado a mano (`Cursor.jsx`, montado una sola vez para toda la app en `main.jsx`) que sigue al mouse escuchando `pointermove` en `window` y oculta el cursor nativo del sistema (`cursor: none` vía una clase en `<body>`). El problema: el `<iframe>` de la vista previa es un documento aparte — cuando el mouse entra ahí, esta ventana deja de recibir `pointermove` (el evento le llega al documento del iframe, no al padre), así que el cursor propio se queda congelado justo en el borde por donde entró, mientras el cursor nativo del sistema vuelve a aparecer y se mueve con total normalidad *dentro* del iframe (ese documento no tiene la clase que lo oculta). De ahí los dos punteros a la vez.
+
+En vez de intentar sincronizar el cursor propio con un documento aparte (frágil y con más casos borde de los que vale la pena resolver), se desactivó por completo en `/panel` y `/admin`: son pantallas de trabajo del dueño de la barbería, no la experiencia pública de marca — no tiene sentido mantenerlo ahí y punto. Sigue funcionando exactamente igual en las páginas públicas (home, `/barberias/:slug`, `/demo`).
+
+**2. Título "Personalización" desalineado con el formulario.** Con el rediseño de la ronda anterior (formulario pegado al borde izquierdo real), el título y el párrafo de intro se quedaron atrás, todavía viviendo dentro del contenedor angosto y centrado que hereda `PanelShell` — se veían corridos hacia el centro respecto al formulario de abajo. Se movieron el `<h1>`, el párrafo, el aviso de móvil y el aviso de cambios sin guardar dentro de la misma franja de sangrado completo que ya usa el formulario, así que ahora arrancan exactamente en el mismo borde izquierdo.
+
+**Cómo se probó (Playwright, instalado y desinstalado como siempre):**
+- En `/panel/personalizacion`: tras mover el mouse (incluso sobre el área del iframe), el `<body>` ya no tiene la clase que oculta el cursor nativo (`cursor: auto`, no `none`) — confirma que el cursor propio queda completamente desactivado ahí, sin importar dónde esté el mouse.
+- En `/barberias/don-manuel` (página pública): tras mover el mouse, el `<body>` sí tiene la clase y `cursor: none` — confirma que el cursor propio sigue intacto donde corresponde.
+- Alineación: la posición horizontal (`x`) del título "Personalización" y del campo "Logo" del formulario miden exactamente lo mismo (40px, el padding estándar del sitio) — ya no hay desalineación.
+- Build y lint limpios, cero errores de página/consola.
+
+**Por qué:**
+- Desactivar en vez de sincronizar: options como inyectar el mismo cursor dentro del documento del iframe, o escuchar eventos cross-frame, agregan complejidad y casos borde (por ejemplo qué pasa en el instante exacto de cruzar el borde) para un beneficio nulo — un panel administrativo no necesita el cursor de marca.
+- Sacar el título del contenedor angosto de `PanelShell` en vez de, por ejemplo, agregarle un margen negativo calculado a mano: usar la misma franja de sangrado completo que ya tiene el formulario garantiza que ambos queden alineados por construcción, no por coincidencia de números.
+
+**Archivos afectados:**
+- Modificado: `src/components/common/Cursor.jsx` (se desactiva en rutas `/panel` y `/admin`), `src/pages/panel/PanelPersonalizacion.jsx` (título, intro y avisos movidos dentro de la franja de sangrado completo, alineados con el formulario).
+
+**Pendiente / próximos pasos:**
+- Ninguno.
+
+---
+
+## 2026-08-11 - Fix real del cursor: se apaga al instante al entrar al panel, sin esperar a que se mueva el mouse
+
+**Qué se hizo:**
+El fix de la ronda anterior (desactivar el cursor propio en `/panel` y `/admin`) tenía un defecto: la desactivación pasaba **dentro** del handler de `pointermove` — es decir, dependía de que el mouse se moviera *después* de entrar a esas rutas para recién ahí darse cuenta de que tenía que apagarse. Si Enzo navegaba al panel y el mouse quedaba quieto (por ejemplo, parado justo sobre la pestaña que acababa de clickear), la clase que oculta el cursor nativo (`tiene-cursor-propio`, heredada de la página anterior, sin que nadie la sacara todavía) se quedaba pegada — resultado: ni el cursor propio (congelado, sin recibir más movimiento) ni el nativo (oculto por la clase vieja) se veían, hasta que el mouse se movía lo suficiente. De ahí el reporte de Enzo: "se queda atrapado" y "si no entro con el mouse a la previsualización no aparece el mouse predeterminado" — dentro del iframe sí había un cursor nativo normal (documento aparte, sin la clase), así que ahí sí se veía algo; afuera, nada, hasta el primer movimiento real.
+
+La causa de fondo era estructural: `<Cursor />` se montaba en `main.jsx`, como hermano de `<AppRouter />` — **fuera** del árbol del router, sin acceso a `useLocation()`. Sin esa información reactiva, la única forma de saber "en qué ruta estoy" era leyendo `window.location.pathname` a mano dentro de un evento, lo cual es inherentemente tardío (depende de que el evento vuelva a disparar).
+
+La solución de fondo: mover `<Cursor />` adentro del árbol de rutas. Se agregó una ruta raíz nueva en `AppRouter.jsx` (`RaizConCursor`, que renderiza `<Cursor /><Outlet /></>`) envolviendo todas las rutas existentes como sus `children` — así `<Cursor />` puede usar `useLocation()` de verdad. Con `pathname` ya reactivo, `activo` (si el cursor propio debe mostrarse) pasa a calcularse en el mismo render en que cambia la ruta, y el `useEffect` que agrega/saca la clase de `<body>` reacciona en el instante — no hace falta ningún movimiento de mouse de por medio.
+
+Efecto colateral bueno, no buscado pero correcto: la vista previa (`/_preview-barberia`) vive en un `<iframe>`, que carga esta misma aplicación (mismo `index.html`, mismo bundle) en su **propio** documento/ventana — con este cambio, ese documento también monta su propia instancia de `<Cursor />`, siguiendo el mouse **local a ese documento**. Como cada instancia (la del panel y la del iframe) escucha su propia ventana, ninguna se congela nunca: dentro del iframe aparece el cursor propio de verdad (no el nativo, no uno pegado) siguiendo el mouse con total normalidad — y como la vista previa muestra la página pública real, tiene sentido que también se vea con el cursor que un cliente real vería ahí.
+
+**Cómo se probó (Playwright, instalado y desinstalado como siempre):**
+- En home (página pública), tras mover el mouse: cursor propio activo (`cursor: none` en el body, clase presente) — sin cambios respecto a antes.
+- Al entrar a `/panel/personalizacion` y medir el estado **inmediatamente**, sin mover el mouse todavía: la clase ya está sacada y `cursor: auto` — confirma que ya no depende de un movimiento posterior.
+- Con el mouse dentro del área del iframe de vista previa: el documento del iframe tiene su propia clase activa (`cursor: none` ahí adentro) mientras el documento padre (el panel) se mantiene sin la clase — cada uno independiente, sin interferirse.
+- Al sacar el mouse del iframe de vuelta al formulario: el panel se mantiene apagado (sin la clase) — no queda ningún resto prendido por haber pasado por el iframe.
+- Cero errores de consola/página. Build y lint limpios.
+
+**Por qué:**
+- Mover `<Cursor />` dentro del router en vez de parchear el timing del evento: la causa real era la falta de acceso a la ruta actual de forma reactiva — cualquier arreglo que siguiera viviendo fuera del árbol del router iba a tener que inventar alguna forma indirecta de detectar la navegación (poll de `window.location`, parchear `history.pushState`, etc.), todas más frágiles y más código que simplemente ponerlo donde `useLocation()` funciona de verdad.
+- Dejar que el iframe tenga su propia instancia de cursor en vez de suprimirlo ahí también: al ser un documento separado con su propio mouse local, no tiene el problema de congelamiento que motivó todo esto — y muestra fielmente lo que un cliente real vería en la página pública, que es justamente el objetivo de la vista previa.
+
+**Archivos afectados:**
+- Modificado: `src/main.jsx` (se saca `<Cursor />` de acá), `src/routes/AppRouter.jsx` (nueva ruta raíz `RaizConCursor` con `<Cursor /><Outlet /></>` envolviendo todas las rutas), `src/components/common/Cursor.jsx` (usa `useLocation()` en vez de leer `window.location` dentro del handler de `pointermove`).
+
+**Pendiente / próximos pasos:**
+- Ninguno.
+
+---
+
+## 2026-08-11 - Vuelta atrás parcial: un solo cursor para todo el sitio (sin excepción de panel), y la vista previa móvil deja de romper la página en un celular real
+
+**Qué se hizo:**
+La ronda anterior desactivó el cursor propio en `/panel` y `/admin` para resolver el bug del cursor duplicado sobre el iframe. Enzo aclaró que no era lo que quería: *"no solo en esta parte el mouse perdió su estilo... no quedó un mouse para todo [el sitio]"* — quiere el mismo cursor de marca en absolutamente todas las pantallas, panel incluido, sin excepciones.
+
+Con el cambio de la ronda anterior (mover `<Cursor />` adentro del árbol del router) ya se había resuelto, sin darse cuenta, la causa real del bug original: como la vista previa carga esta misma app en un `<iframe>` (documento aparte, con su propia ventana), esa instancia también termina montando su propio `<Cursor />`, que sigue el mouse **local a ese documento** — nunca se congela, porque nunca depende de eventos que le lleguen desde afuera. La excepción de rutas fue entonces un parche de más, resolviendo con una desactivación total algo que ya no hacía falta desactivar.
+
+Se revirtió la exclusión de `/panel`/`/admin` — el cursor propio vuelve a estar activo en todo el sitio — y en su lugar se resolvió el único problema real que queda: cuando el mouse **cruza el borde** hacia el iframe desde afuera, el cursor del documento padre se queda congelado ahí (porque deja de recibir `pointermove`, sea cual sea la ruta). La solución: escuchar `pointerover`/`pointerout` en la ventana — estos sí se disparan con normalidad al entrar/salir de un elemento `<iframe>` (son eventos de borde del elemento, no de movimiento continuo dentro de él) — y ocultar el cursor del padre (`opacity: 0`, sin animación congelada) mientras el mouse esté sobre el iframe, dejando que la instancia propia del iframe se haga cargo ahí adentro. Como ya no hacía falta saber la ruta actual, se deshizo también el cambio de estructura del router de la ronda anterior (innecesario ahora) — `<Cursor />` volvió a `main.jsx`, como estaba en un principio.
+
+Enzo también señaló, en la misma captura, un problema de responsividad real: en un celular real, la vista previa de Personalización seguía mostrando un "marco de teléfono" de ancho fijo (390px) — el mismo que tiene sentido cuando alguien la mira desde una pantalla grande — pero en la pantalla ya angosta de un celular real, ese ancho fijo no entraba en el espacio disponible (que además tiene el padding lateral del sitio restándole ancho) y desbordaba toda la página horizontalmente. Se resolvió: en un celular real (detectado con el mismo `useIsMobile` que ya se usa para el aviso), el iframe deja de simular un marco de teléfono de ancho fijo y simplemente ocupa el ancho disponible (`w-full`, sin marco) — ya no hace falta simular "cómo se ve en un celular" cuando literalmente se está mirando desde uno.
+
+**Cómo se probó (Playwright, instalado y desinstalado como siempre):**
+- En `/panel/personalizacion`, con el mouse sobre el formulario: `cursor: none` y la clase que activa el cursor propio están presentes — confirma que volvió a estar activo en el panel.
+- Con el mouse dentro del iframe: los 3 divs del cursor propio del padre miden `opacity: 0` (no solo invisibles por estado, medido en el DOM real) — no queda ningún cursor "fantasma" congelado en el borde. El documento del iframe, por su parte, tiene su propio cursor activo y en movimiento normal.
+- Al volver a sacar el mouse del iframe al formulario: el cursor del padre se reactiva de inmediato.
+- En viewport móvil real (390px): no existe ningún botón "PC" ni "Móvil" (no hay nada para alternar, solo existe un modo) — y el ancho total del documento mide exactamente 390px, igual que cualquier otra pantalla del panel sin iframe (antes medía 417px, 27px de desborde). El iframe ocupa los 343px disponibles dentro del padding de la página, sin desbordar.
+- Build y lint limpios, cero errores de consola/página en ningún escenario.
+
+**Por qué:**
+- Un cursor para todo el sitio, sin excepciones de ruta: es una decisión de producto de Enzo, no negociable por conveniencia técnica — la solución correcta era resolver el problema real (congelamiento en el borde del iframe), no evitarlo apagando el cursor en secciones enteras.
+- `pointerover`/`pointerout` en vez de, por ejemplo, seguir excluyendo la ruta: ataca la causa exacta (cruzar el borde de un iframe específico) en vez de una categoría entera de páginas — un iframe en cualquier otra pantalla futura del sitio también quedaría cubierto automáticamente, sin tener que acordarse de agregarlo a una lista de exclusión.
+- Sacar el "marco de teléfono" en el celular real en vez de, por ejemplo, agregarle `overflow-x-hidden` a la página para tapar el síntoma: `overflow-x-hidden` escondería la barra de scroll pero seguiría dejando contenido invisible cortado a los costados — la causa real (un ancho fijo que no entra en el espacio disponible) era evitable directamente.
+
+**Archivos afectados:**
+- Modificado: `src/components/common/Cursor.jsx` (se quita la exclusión de rutas; se agrega la detección de entrada/salida del iframe vía `pointerover`/`pointerout`), `src/routes/AppRouter.jsx` y `src/main.jsx` (se revierte la reestructuración de la ronda anterior — ya no era necesaria), `src/pages/panel/PanelPersonalizacion.jsx` (el modo Móvil no usa marco de ancho fijo cuando `esMobile` es real; el toggle PC/Móvil no se muestra en absoluto en ese caso, y el modo queda forzado a Móvil).
+
+**Pendiente / próximos pasos:**
+- Ninguno.
+
+---

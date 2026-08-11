@@ -1,5 +1,6 @@
 import { supabase } from './supabaseClient'
 import { ESTADO_ACTIVO, NOMBRE_ESTADO } from '../utils/estados'
+import { HAY_BACKEND_REAL } from '../mocks/datosProvisoriosSuperadmin'
 
 const MENSAJE_CREDENCIALES_INVALIDAS = 'Usuario o contraseña incorrectos.'
 const MENSAJE_CONEXION = 'No pudimos conectar. Revisa tu conexión e inténtalo de nuevo.'
@@ -62,6 +63,9 @@ export async function iniciarSesion({ usuario, password }) {
 }
 
 export async function cerrarSesion() {
+  // En modo provisorio (ver AuthContext) no hay sesión real de Supabase que
+  // cerrar — intentarlo solo tira un error de red contra la URL de ejemplo.
+  if (!HAY_BACKEND_REAL) return
   const { error } = await supabase.auth.signOut()
   if (error) throw error
 }

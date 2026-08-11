@@ -1,2 +1,0 @@
-id,nombre,slug,estado_id,estado_nombre,plan_id,plan_nombre,telefono_whatsapp,email_contacto,direccion,color_primario,eslogan,descripcion
-prov-barberia-1,Barbería Don Manuel,don-manuel,1,Activo,2,Equipo,+56911112222,contacto@donmanuel.cl,"Av. Irarrázaval 2140, Ñuñoa",#7a4324,"Corte de barrio, oficio de siempre","Barbería de prueba, cargada para revisar cómo se ve el panel y la página pública mientras no hay Supabase real conectado."
