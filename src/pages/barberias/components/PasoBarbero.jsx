@@ -1,11 +1,14 @@
 import { motion } from 'framer-motion'
 import { BackButton } from '../../../components/common/BackButton'
 
+// `onVolver` es opcional: elegir barbero es el primer paso del asistente
+// (para poder filtrar los servicios según lo que ese barbero ofrece), así
+// que no hay un paso anterior al cual volver.
 export function PasoBarbero({ barberos, onSeleccionar, onVolver }) {
   return (
     <div>
-      <BackButton onClick={onVolver} />
-      <h2 className="font-display mb-1 mt-3 text-xl font-light tracking-tight text-negro-barbero md:text-2xl">
+      {onVolver && <BackButton onClick={onVolver} />}
+      <h2 className={`font-display mb-1 text-xl font-light tracking-tight text-negro-barbero md:text-2xl ${onVolver ? 'mt-3' : ''}`}>
         Elige un barbero
       </h2>
 

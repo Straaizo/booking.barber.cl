@@ -1,5 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../../services/supabaseClient'
+import {
+  HAY_BACKEND_REAL,
+  listarHorariosDeBarberoProvisorios,
+  crearHorarioProvisorio,
+  actualizarHorarioProvisorio,
+} from '../../../mocks/datosProvisoriosSuperadmin'
 
 const COLUMNAS = 'id, barbero_id, dia_semana, hora_inicio, hora_fin, activo'
 
@@ -18,10 +24,14 @@ async function obtenerHorarios(barberoId) {
   return data
 }
 
+// Se usa tanto desde el panel del dueño (con un selector de barbero) como
+// desde el panel del propio barbero (siempre sobre su propio id) — el hook
+// no necesita saber quién lo está mirando, solo de qué barbero.
 export function useHorariosDeBarbero(barberoId) {
   return useQuery({
     queryKey: clave(barberoId),
-    queryFn: () => obtenerHorarios(barberoId),
+    queryFn: () =>
+      HAY_BACKEND_REAL ? obtenerHorarios(barberoId) : listarHorariosDeBarberoProvisorios(barberoId),
     enabled: Boolean(barberoId),
   })
 }
@@ -30,6 +40,7 @@ export function useCrearHorario(barberoId) {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: async (horario) => {
+      if (!HAY_BACKEND_REAL) return crearHorarioProvisorio(barberoId, horario)
       const { data, error } = await supabase
         .from('horarios_disponibles')
         .insert({ ...horario, barbero_id: barberoId, activo: true })
@@ -46,6 +57,7 @@ export function useActualizarHorario(barberoId) {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: async ({ id, cambios }) => {
+      if (!HAY_BACKEND_REAL) return actualizarHorarioProvisorio(id, cambios)
       const { data, error } = await supabase
         .from('horarios_disponibles')
         .update(cambios)

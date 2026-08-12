@@ -62,6 +62,22 @@ export function Cursor() {
 
   const activo = tienePunteroFino && !prefiereReducido
 
+  // El aviso al iframe de que se acaba de ir el mouse (más abajo) es la
+  // mitad que le faltaba a esto: `pointerleave` en la ventana del iframe
+  // (para que SU PROPIO cursor se oculte solo) no siempre llega de forma
+  // confiable al cruzar directo de vuelta al documento padre — sin ese
+  // aviso, el cursor de adentro del iframe podía quedar prendido, encimado
+  // con el de este documento, que se vuelve a mostrar apenas el mouse sale.
+  // No hace falta el aviso contrario ("volviste a entrar"): el propio
+  // `pointermove` real dentro del iframe ya lo revela solo.
+  useEffect(() => {
+    function alAvisoDeVisibilidad(evento) {
+      if (evento.data?.tipo === 'cursor-propio-fuera-de-vista') setVisible(false)
+    }
+    window.addEventListener('message', alAvisoDeVisibilidad)
+    return () => window.removeEventListener('message', alAvisoDeVisibilidad)
+  }, [])
+
   useEffect(() => {
     if (!activo) return
 
@@ -83,7 +99,10 @@ export function Cursor() {
     }
 
     function alSalirDeUnElemento(evento) {
-      if (evento.target.tagName === 'IFRAME') sobreIframe.current = false
+      if (evento.target.tagName === 'IFRAME') {
+        sobreIframe.current = false
+        evento.target.contentWindow?.postMessage({ tipo: 'cursor-propio-fuera-de-vista' }, '*')
+      }
     }
 
     function ocultar() {

@@ -1884,3 +1884,264 @@ Enzo también señaló, en la misma captura, un problema de responsividad real: 
 - Ninguno.
 
 ---
+
+## 2026-08-11 - Selectores de archivo con diseño propio, y "Nuestro equipo" pasa a ser reordenable desde Personalización
+
+**Qué se hizo:**
+Dos pedidos de Enzo:
+
+**1. Los selectores de archivo ("Choose File / No file chosen") ahora tienen diseño propio.** El input nativo de tipo archivo se ve distinto en cada navegador y no admite estilos directos — hasta ahora se mostraba tal cual, en texto crudo sin ninguna relación visual con la paleta del sitio. Se creó `SelectorArchivo` (nuevo, en `components/common/`): un `<label>` estilizado como botón secundario (mismo lenguaje que ya usan los botones "+ Galería de fotos" — borde gris cálido, texto versalita, hover a cobre) que envuelve un input de archivo oculto — clickear el botón en cualquier parte abre el selector, comportamiento nativo del `<label>` sin JS de por medio. Se reemplazaron los 4 selectores de archivo que había en el panel: logo, imagen de una sección "imagen y texto", carga múltiple de fotos de una galería (en Personalización), y foto de barbero (en la pestaña Barberos, que ya tenía un estilo de texto/link y pasó al mismo botón que todos los demás, por consistencia).
+
+**2. "Nuestro equipo" pasa a ser reordenable desde Personalización.** Hasta ahora el orden de los barberos en la sección "Nuestro equipo" de la página pública era simplemente el orden en que venían de la base (alfabético en el query real, de carga en el mock) — no había forma de elegirlo. Se agregó una nueva sección numerada ("03 Nuestro equipo", entre "Textos principales" y "Secciones de la página", que pasó a ser la "04" — el orden de los grupos del panel ahora refleja el orden real de la página pública: header → equipo → secciones → reserva) que lista los barberos activos (traídos de la pestaña Barberos, no duplicados ni editables acá — para eso ya está esa pestaña) con botones ↑/↓ para reordenarlos. El orden elegido se guarda como un array de ids (`orden_equipo`, campo nuevo dentro de `personalizacion`) y se aplica tanto en la vista previa en vivo como en la página pública real, a través de una única función compartida (`ordenarEquipo`, en `utils/personalizacion.js`) que usan ambas — la misma garantía de "la vista previa nunca se desincroniza de la página real" que ya se usa para el resto de esta pantalla. Un barbero recién agregado desde la pestaña Barberos (que todavía no aparece en el orden guardado) no desaparece: se agrega solo al final de la lista.
+
+**Cómo se probó (Playwright + sharp, instalados y desinstalados como siempre):**
+- El texto nativo "Choose File / No file chosen" ya no aparece en pantalla en ningún selector — confirmado con una búsqueda de ese texto en la página (0 resultados).
+- El botón "Seleccionar imagen" del logo mide como una caja real con borde y radio de 6px — no el input crudo del navegador.
+- Se subió el orden de "Ignacio Soto" un lugar en el panel → el orden cambió correctamente ahí, se reflejó al instante en la vista previa (iframe, sin guardar todavía) → tras guardar, `localStorage` guardó `orden_equipo: ['prov-barbero-2', 'prov-barbero-1']` (el id de Ignacio primero) → la página pública real, navegada aparte, mostró el nuevo orden (Ignacio antes que Manuel) — confirmado también con una captura de pantalla.
+- Cero errores de consola/página. Build y lint limpios.
+
+**Por qué:**
+- Un componente `SelectorArchivo` compartido en vez de estilizar cada input por separado: los 4 casos son exactamente el mismo patrón (label + input oculto) — escribirlo una vez evita que quede alguno con un estilo levemente distinto a los demás.
+- `orden_equipo` como array de ids (no un campo en cada fila de `barberos`, ej. un `orden` numérico por barbero): así el orden vive junto con el resto de las decisiones de personalización (mismo objeto, mismo guardado, mismo botón "Guardar cambios"), sin tener que agregar una mutación aparte cada vez que se reordena — coherente con cómo ya funciona el reordenamiento de `secciones`.
+- No hacer editable la foto/especialidad desde esta pantalla (solo el orden): esos datos ya tienen un lugar donde se editan (pestaña Barberos) — duplicar esos campos acá hubiera sido dos lugares para la misma información, con riesgo de que se desincronicen.
+
+**Archivos afectados:**
+- Nuevo: `src/components/common/SelectorArchivo.jsx`.
+- Modificado: `src/utils/personalizacion.js` (`orden_equipo` en `normalizarPersonalizacion`, nueva función `ordenarEquipo`), `src/pages/panel/hooks/usePersonalizacionAdmin.js` y `src/pages/barberias/hooks/useBarberiaPorSlug.js` (columna `orden_equipo` en el select real de `personalizacion`), `src/pages/barberias/components/VistaBarberia.jsx` (`SeccionEquipo` usa `ordenarEquipo`), `src/pages/panel/PanelPersonalizacion.jsx` (sección "03 Nuestro equipo" reordenable, selectores de archivo estilizados), `src/pages/panel/PanelBarberos.jsx` (selector de archivo estilizado).
+
+**Pendiente / próximos pasos:**
+- Ninguno.
+
+---
+
+## 2026-08-11 - "Nuestro equipo" deja de ser un bloque fijo: pasa a ser una sección más, reordenable junto a galerías e imagen-y-texto
+
+**Qué se hizo:**
+Enzo pidió poder ordenar TODAS las secciones de Personalización entre sí, no solo el equipo entre sus propios barberos — con un ejemplo concreto: poder mostrar el equipo antes o después de las fotos del trabajo, según lo que cada barbería prefiera. El objetivo de fondo, dicho explícitamente, es que las páginas no terminen todas pareciéndose entre sí — coherente con la idea original de esta pantalla (cada barbería con identidad propia).
+
+Hasta la ronda anterior, "Nuestro equipo" vivía como un bloque fijo, siempre renderizado justo después del encabezado — con orden propio (`orden_equipo`, quién va primero de los barberos) pero sin poder moverse como bloque respecto a las demás secciones (galerías, imagen y texto). Se cambió el modelo: **"equipo" pasó a ser un tipo de sección más**, dentro del mismo array `secciones` que ya usan galería e imagen-y-texto — así que ahora se reordena con las mismas flechas ↑/↓ que ya movían el resto, intercalándose libremente entre ellas.
+
+Como cualquier barbería que ya tenía `secciones` guardadas de antes de este cambio no tenía ninguna de tipo "equipo" todavía, `normalizarPersonalizacion` (compartida entre el panel y la página pública) detecta esa situación y le agrega una al principio de la lista — la misma posición visual que ya tenía el bloque fijo — así nadie pierde su "Nuestro equipo" de la nada por este cambio; de ahí en más, ya se puede mover como cualquier otra sección.
+
+En el panel, el acordeón de "Secciones de la página" ahora tiene tres tipos en vez de dos: al abrir una sección de tipo "Equipo" se ve la misma lista de barberos con sus flechas ↑/↓ que existía antes en su propio grupo aparte (ese grupo se eliminó — ya no hace falta, el equipo vive junto con las demás secciones) — el título de esa sección también se puede editar, igual que el título de una galería. También se agregó un botón "+ Nuestro equipo" para volver a agregarla si alguien la borra a propósito (con "Eliminar", el mismo botón que ya tienen las demás secciones).
+
+**Cómo se probó (Playwright + sharp, instalados y desinstalados como siempre):**
+- Con `localStorage` recién limpiado (simulando una barbería que nunca tocó esta pantalla), "Equipo" ya aparece en la lista de "Secciones de la página" sin que nadie la agregara — confirma la migración automática. El grupo aparte "Nuestro equipo" ya no existe en la pantalla.
+- La página pública, antes de tocar nada, sigue mostrando "Nuestro equipo" como primer bloque después del encabezado — mismo lugar que antes del cambio.
+- Se agregó una galería con una foto y se subió un lugar (equivalente a bajar "Equipo" un lugar) → el panel refleja el nuevo orden de tipos (`['Galería', 'Equipo']`) → tras guardar, la página pública real muestra "Nuestro trabajo" (la galería) antes que "Nuestro equipo" — el orden elegido en el panel se respeta exactamente.
+- Cero errores de consola/página. Build y lint limpios.
+
+**Por qué:**
+- "Equipo" como sección del mismo array, no un array/orden aparte: es la forma más directa de lograr "que se pueda intercalar con las demás" — con dos listas separadas (una para el orden entre bloques, otra para el orden entre barberos) hubiera hecho falta inventar alguna forma de mezclarlas al renderizar; como sección del mismo array, el orden entre bloques sale gratis de cómo ya funciona `secciones`.
+- Migración automática (agregar la sección si no existe) en vez de pedirle a cada barbería que la agregue a mano: nadie debería notar este cambio de arquitectura interno — la página se sigue viendo exactamente igual hasta que alguien decide tocar el orden.
+- `orden_equipo` (el orden entre barberos) se mantiene como campo aparte de `personalizacion`, no dentro de la sección: solo puede haber una razón real para tener varias secciones "equipo" (nunca pasa en la práctica) y mover ese campo adentro de la sección hubiera complicado el código sin un beneficio real hoy.
+
+**Archivos afectados:**
+- Modificado: `src/utils/personalizacion.js` (`'equipo'` en `TIPOS_SECCION`, migración automática en `normalizarPersonalizacion`), `src/pages/barberias/components/VistaBarberia.jsx` (`SeccionEquipo` se renderiza dentro del `secciones.map`, ya no como bloque fijo aparte), `src/pages/panel/PanelPersonalizacion.jsx` (se elimina el grupo aparte "Nuestro equipo"; el acordeón de "Secciones de la página" gana el tipo "Equipo", con su editor de título y su lista de barberos reordenable adentro).
+
+**Pendiente / próximos pasos:**
+- Ninguno.
+
+---
+
+## 2026-08-11 - Fix: doble scroll en la vista previa (el iframe scrolleaba por su cuenta además de la caja que lo contiene)
+
+**Qué se hizo:**
+Enzo reportó, con una captura, dos scrollbars visibles en la vista previa de Personalización. La causa: el `<iframe>` tenía una altura FIJA (1600px en modo PC, 900px en Móvil, puesta a mano en una ronda anterior) — con el contenido real de la página ya más largo que eso (sobre todo después de sumar la sección "Nuestro equipo" y galerías con varias fotos), el iframe quedaba con su propio scroll interno para ver el resto, ADEMÁS del scroll de la caja exterior (`max-h-[80vh] overflow-auto`, que existe a propósito para que la vista previa no estire la pantalla entera). Dos scrolls anidados, uno pegado al otro.
+
+Esto ya estaba anotado como una imperfección conocida desde que se armó el iframe + toggle PC/Móvil ("se podría mejorar más adelante escuchando la altura real del contenido vía postMessage si hace falta") — llegó el momento de resolverlo. Se agregó un `ResizeObserver` dentro de `PreviewBarberia.jsx` (la página que vive en el iframe) que mide la altura real del contenido (`document.documentElement.scrollHeight`) cada vez que cambia — nueva foto, texto más largo, cambio de fuente, lo que sea — y la avisa al panel por `postMessage`. `PanelPersonalizacion.jsx` escucha ese aviso y usa esa altura exacta como la altura del `<iframe>` (en vez del valor fijo de antes), con `scrolling="no"` como respaldo. Con el iframe siempre exactamente tan alto como su contenido, ya no tiene motivo para scrollear por su cuenta — el único scroll que queda es el de la caja exterior, el que siempre fue intencional.
+
+Al cambiar entre modo PC y Móvil (que cambia el ancho del iframe y por lo tanto cómo se acomoda el contenido) la altura vieja se descarta de inmediato para no mostrar, por un instante, la altura de un ancho que ya no es el actual — el `ResizeObserver` manda la altura correcta enseguida.
+
+**Cómo se probó (Playwright + sharp, instalados y desinstalados como siempre):**
+- Medido directamente (altura CSS del iframe vs. altura real de su contenido, `scrollHeight`): iguales en todo momento — antes de tocar nada, después de agregar una galería con 3 fotos, cambiado a Móvil, y vuelto a PC.
+- Con un cambio más grande (8 fotos agregadas de una), la altura CSS del iframe creció exactamente junto con la altura real del contenido (de 1600px a 1673px) — confirma que se ajusta de verdad al contenido, no un número fijo por casualidad.
+- Verificado explícitamente que el documento dentro del iframe nunca queda con su propio scroll (`scrollHeight` nunca supera `clientHeight`) en ningún escenario probado.
+- Cero errores de consola/página. Build y lint limpios.
+
+**Por qué:**
+- `ResizeObserver` en vez de recalcular la altura solo al cargar el iframe: el contenido cambia constantemente mientras se edita (cada tecla en un campo de texto, cada foto que se agrega) — un cálculo puntual al montar se desactualiza con el primer cambio.
+- Altura dinámica en vez de simplemente agrandar el valor fijo (ej. subir de 1600 a 2000px): cualquier número fijo nuevo iba a quedar corto de nuevo en cuanto la barbería agregara más contenido — la causa real era tener un número fijo, no que el número fuera chico.
+
+**Archivos afectados:**
+- Modificado: `src/pages/panel/PreviewBarberia.jsx` (mide y avisa su altura real vía `ResizeObserver` + `postMessage`), `src/pages/panel/PanelPersonalizacion.jsx` (escucha esa altura y la aplica al `<iframe>` en vez de un valor fijo).
+
+**Pendiente / próximos pasos:**
+- Ninguno.
+
+---
+
+## 2026-08-11 - Dirección y teléfono de WhatsApp editables desde Personalización, con opción de burbuja flotante en vez del enlace del header
+
+**Qué se hizo:**
+Enzo pidió tres cosas relacionadas con el contacto de la barbería, hasta ahora sin ningún lugar donde editarlas desde el panel: la dirección, el teléfono usado para el botón de WhatsApp, y una forma de elegir cómo se muestra ese WhatsApp en la página pública.
+
+**1. Dirección y teléfono de WhatsApp, editables.** Ambos campos ya existían en la base (`barberia.direccion`, `barberia.telefono_whatsapp`) y ya se mostraban en el encabezado de la página pública, pero no había ninguna pantalla del panel donde cambiarlos — quedaban fijos en lo que sea que tuvieran cargado desde el alta de la barbería. Se agregaron como dos campos de texto más en "02 Textos y contacto" (antes "Textos principales" — el nombre cambió para reflejar que ahora también vive el contacto ahí).
+
+**2. Elegir entre el enlace de siempre o una burbuja flotante.** Se agregó un campo nuevo, `estilo_whatsapp` (`'enlace'` por defecto, o `'burbuja'`), con un toggle de dos botones (mismo lenguaje visual que el toggle PC/Móvil de la vista previa). En `'enlace'` (el comportamiento de siempre) se ve el texto "Escribir por WhatsApp" junto a la dirección, en el encabezado. En `'burbuja'` ese texto desaparece del encabezado y en su lugar aparece un botón circular fijo en la esquina inferior derecha, visible en toda la página pública (no solo en el encabezado) — con el color de marca de la barbería (`--color-cobre`) en vez del verde tradicional de WhatsApp, para no salirse de la paleta que cada barbería ya eligió. Son mutuamente excluyentes: nunca se muestran los dos a la vez.
+
+**Cómo se probó (Playwright, instalado y desinstalado como siempre):**
+- Los campos nuevos (Dirección, Teléfono de WhatsApp, el toggle) aparecen en el panel.
+- Editar la dirección y el teléfono se refleja al instante en la vista previa, sin guardar todavía.
+- Cambiar a "Burbuja flotante" hace desaparecer el enlace de texto del encabezado en la vista previa y aparece la burbuja — confirmado también dentro del iframe.
+- Tras guardar, la página pública real: muestra la dirección nueva, no muestra el enlace de texto, y sí muestra la burbuja — con un `href` de WhatsApp correctamente armado a partir del teléfono nuevo (`https://wa.me/56987654321?text=...`, normalizado a partir de "+56 9 8765 4321").
+- Cero errores de consola/página. Build y lint limpios.
+
+**Por qué:**
+- Dos campos en la barbería (no dentro de `personalizacion`) en vez de moverlos: ya vivían ahí y ya los usa el flujo de reserva/booking en otras partes de la página — moverlos hubiera significado tocar más código del necesario para lo que se pidió (poder editarlos, no reubicarlos).
+- Burbuja con el color de marca en vez del verde de WhatsApp: WhatsApp es reconocible por la forma (círculo, ícono, posición fija en la esquina) sin necesidad de su verde característico — usar ese verde específico hubiera sido la primera excepción a la paleta del sitio desde que se armó esta pantalla.
+- Mutuamente excluyentes (no "mostrar ambos"): fue explícito en el pedido — dos formas de llegar al mismo WhatsApp en la misma página es redundante, no una mejora.
+
+**Archivos afectados:**
+- Modificado: `src/utils/personalizacion.js` (`estilo_whatsapp` en `normalizarPersonalizacion`), `src/mocks/datosProvisoriosSuperadmin.js` (guarda `direccion`/`telefono_whatsapp` en el mock provisorio), `src/pages/panel/hooks/usePersonalizacionAdmin.js` y `src/pages/barberias/hooks/useBarberiaPorSlug.js` (columna `estilo_whatsapp` en el select real; `direccion`/`telefono_whatsapp` correctamente separados hacia la tabla `barberias` al guardar), `src/pages/barberias/components/VistaBarberia.jsx` (nuevo componente `BurbujaWhatsApp`; el enlace del encabezado se oculta cuando el estilo elegido es burbuja), `src/pages/panel/PanelPersonalizacion.jsx` (campos de Dirección/Teléfono, toggle de estilo, grupo renombrado a "Textos y contacto").
+
+**Pendiente / próximos pasos:**
+- Ninguno.
+
+---
+
+## 2026-08-11 - Fix real del "doble scroll" (afectaba a la burbuja de WhatsApp) + burbuja con color, tamaño y efecto de pulso
+
+**Qué se hizo:**
+Enzo reportó que la burbuja de WhatsApp (agregada la ronda anterior) "rompía" la vista previa, y pidió tres mejoras más: poder agrandarla (la encontró muy chica), poder elegirle su propio color, y darle un efecto de "pulso" flotante.
+
+**La causa real del "rompe la página" — encontrada al investigar, no dicha por Enzo:** el fix del doble-scroll de la ronda anterior (hacer que el `<iframe>` de la vista previa creciera exactamente a la altura de su contenido, sin scroll propio) tuvo un efecto secundario no previsto: un elemento con `position: fixed` se ancla al *viewport* del documento donde vive — y si ese documento (el de adentro del iframe) nunca scrollea porque mide exactamente lo que su contenido, su "viewport" pasa a ser el documento COMPLETO, no lo que se ve en pantalla. Resultado: la burbuja quedaba pegada al final de todo el contenido (después del footer) en vez de flotar visible mientras se scrollea la vista previa — exactamentente lo que "rompe la página" describe.
+
+Se revirtió esa parte del fix anterior: el `<iframe>` de la vista previa vuelve a tener una altura FIJA (`80vh`, antes eran 1600px/900px separados por modo) y scrollea por dentro si el contenido es más alto — como una ventana de navegador real. Se sacó el `<div>` exterior que scrolleaba por fuera (ya no hace falta: con un solo elemento que scrollea, no hay contra qué desincronizarse) y se eliminó por completo el mecanismo de `ResizeObserver` + `postMessage` que medía la altura real del contenido (se había armado la ronda pasada para el problema de doble-scroll, que ahora se resuelve distinto). Con el iframe scrolleando de nuevo por su cuenta, el `position: fixed` de la burbuja vuelve a anclarse a lo que se ve en pantalla, como en cualquier navegador real — y de paso, esto es lo que hace que la vista previa se sienta como una ventana real en vez de una página sin límites.
+
+**Las otras tres mejoras, todas en la burbuja:**
+- **Tamaño**: tres opciones (Chica/Mediana/Grande — 48px/56px/72px), con botones tipo toggle, mismo lenguaje que el resto de los controles de esta pantalla.
+- **Color propio**: un selector de color más (mismo patrón que "Color de marca"/"Color del header") — sin elegir nada, sigue usando el color de marca de la barbería, como antes.
+- **Efecto de pulso**: un aro que se expande y se desvanece detrás del botón (`animate-ping`, ya viene con Tailwind) — el mismo lenguaje visual que ya usan las burbujas de chat de cualquier sitio, para que se note que es interactivo sin tener que explicarlo.
+
+**Cómo se probó (Playwright + sharp, instalados y desinstalados como siempre):**
+- Con una galería de 6 fotos agregada (para que el contenido real sea más alto que la ventana de la vista previa): el documento mide 1673px de alto pero el viewport del iframe solo 800px — confirmado que scrollea por dentro.
+- Medido la posición de la burbuja ANTES y DESPUÉS de scrollear 400px dentro del iframe: exactamente la misma posición (`top: 724` en ambos casos) — confirma que el `position: fixed` quedó pegado al viewport visible, no al final del documento.
+- Cambiar el color a un valor custom y el tamaño a "Grande": se refleja en la vista previa (72×72px, color aplicado) y persiste igual en la página pública real tras guardar.
+- Cero errores de consola/página. Build y lint limpios.
+
+**Por qué:**
+- Volver a un alto fijo con scroll interno (en vez de seguir ajustando la altura al contenido): es la única forma de que `position: fixed` funcione como se espera dentro de un iframe — un iframe sin scroll propio nunca va a tener un "viewport visible" distinto de "todo el documento", sin importar qué tan bien se mida la altura.
+- Tamaños predefinidos (Chica/Mediana/Grande) en vez de un campo numérico libre: alcanza para lo que se pidió ("demasiado pequeño, poder agrandarlo") sin la complejidad de validar un número arbitrario que podría quedar ilegible o gigante por error.
+- `animate-ping` de Tailwind en vez de una animación armada a mano: es exactamente el efecto pedido ("como con pulsaciones"), ya viene incluido, sin sumar código de animación nuevo para algo que el framework ya resuelve.
+
+**Archivos afectados:**
+- Modificado: `src/pages/panel/PreviewBarberia.jsx` (se sacó el `ResizeObserver`/aviso de altura), `src/pages/panel/PanelPersonalizacion.jsx` (iframe con altura fija `80vh` y scroll propio, sin caja exterior con su propio scroll; UI de color/tamaño de la burbuja), `src/utils/personalizacion.js` (`whatsapp_color`/`whatsapp_tamano` en `normalizarPersonalizacion`), `src/pages/barberias/components/VistaBarberia.jsx` (`BurbujaWhatsApp` con tamaño/color configurables y aro de pulso), `src/pages/panel/hooks/usePersonalizacionAdmin.js` y `src/pages/barberias/hooks/useBarberiaPorSlug.js` (columnas nuevas en el select real).
+
+**Pendiente / próximos pasos:**
+- Ninguno.
+
+---
+
+## 2026-08-11 - Fix: el cursor de la vista previa se quedaba prendido al salir de ella (avisado por postMessage, no por esperar un evento del navegador)
+
+**Qué se hizo:**
+Enzo volvió a ver el cursor duplicado — esta vez con una idea concreta de cómo arreglarlo: que el cursor de adentro de la vista previa desaparezca al salir de ella, y solo vuelva a aparecer al pasar el mouse por encima. Esa es exactamente la pieza que faltaba.
+
+El cursor de adentro del iframe (una instancia propia de `<Cursor />`, corriendo en ese documento aparte — ver la entrada de la ronda anterior) escuchaba `pointerleave` en su propia ventana para ocultarse solo al salir. En la práctica, ese evento no siempre llega apenas el mouse cruza directo del iframe al documento padre — así que el cursor de adentro podía quedar prendido un instante (o quedarse prendido del todo) justo cuando el cursor del panel se vuelve a mostrar, encimados los dos a la vez.
+
+En vez de seguir dependiendo de que el iframe se dé cuenta solo, ahora el PADRE (que sí sabe con certeza, vía `pointerout`, el instante exacto en que el mouse deja el elemento `<iframe>`) le manda un aviso directo por `postMessage` en ese momento — "el mouse ya no está sobre vos" — y el cursor de adentro se oculta al toque, sin esperar a que le llegue su propio evento. No hace falta el aviso contrario ("volviste a entrar"): el movimiento real del mouse dentro del iframe ya lo revela solo, apenas hay el primer `pointermove` genuino ahí adentro.
+
+**Cómo se probó (Playwright, instalado y desinstalado como siempre; se reinició el servidor de desarrollo de cero para descartar cualquier resto de tantas rondas de recarga en caliente):**
+- Con el mouse recién movido hacia adentro de la vista previa: el cursor del panel mide opacidad 0 (oculto) y el de adentro del iframe tiene alguna opacidad > 0 (visible) — correcto.
+- Con el mouse recién sacado de la vista previa (medido a los 150ms, a propósito corto, para que el aviso tenga que ser instantáneo y no "eventualmente correcto"): el cursor de adentro del iframe ya mide opacidad 0 en los tres — confirma que se oculta al toque, no después de un rato.
+- Medido de nuevo 400ms más tarde: se mantiene oculto — no es un parpadeo que se prende solo.
+- Cero errores de consola/página. Build y lint limpios.
+
+**Por qué:**
+- Avisar desde el padre en vez de confiar en que el iframe detecte su propia salida: el padre YA tiene la fuente de verdad más confiable (el mismo `pointerout` que ya usa para ocultar su propio cursor) — reusarla para avisarle al iframe es más directo que esperar a que un evento de navegador, con comportamiento no 100% uniforme entre navegadores en el borde de un iframe, se dispare por su cuenta.
+- Sin aviso de "volviste a entrar": agregarlo hubiera sido lógica de más para un caso que el `pointermove` real ya cubre solo — el mouse moviéndose de verdad adentro del iframe siempre va a disparar ese evento ahí.
+
+**Archivos afectados:**
+- Modificado: `src/components/common/Cursor.jsx` (el padre avisa por `postMessage` al salir de un `<iframe>`; nuevo listener que oculta el cursor propio al recibir ese aviso).
+
+**Pendiente / próximos pasos:**
+- Si Enzo sigue viendo el cursor duplicado después de este cambio, probar primero en una pestaña nueva o con un refresh forzado — la pestaña donde lo vio venía de muchas rondas de recarga en caliente (HMR) durante esta misma sesión de trabajo, y no se puede descartar por completo que algo de ese historial quedara pegado en esa pestaña puntual.
+
+---
+
+## 2026-08-11 - Panel propio para barberos (reservas, horarios y servicios) + el asistente de reserva elige primero al barbero
+
+**Qué se hizo:**
+La más grande hasta ahora: Enzo pidió que el asistente de reserva público elija primero al barbero (no el servicio) — porque cada barbero puede ofrecer cosas distintas — y que los barberos tengan su propio panel para ver/administrar sus horarios, reservas y servicios, con un interruptor que el dueño puede prender por barbero para darle servicios y precios propios en vez de los compartidos de la barbería.
+
+**Investigación previa:** antes de tocar nada se revisó a fondo cómo estaba armado hoy el asistente de reserva, el modelo de datos (mock y los `select` de Supabase ya existentes en el código, aunque no haya backend real conectado), el panel de barbero que ya existía (`/panel/precios`, solo dejaba tocar precios del catálogo compartido) y los paneles del dueño (Reservas/Servicios/Horarios). Encontrado clave: el cálculo de horarios disponibles YA es 100% por barbero (`horarios_disponibles.barbero_id`, `reservas.barbero_id`) — buena base para invertir el orden sin tocar esa lógica. Lo que no existía en ningún lado era una relación entre `servicios` y `barbero_id`, ni un flag de "catálogo propio" en `barberos`.
+
+Con eso se le presentaron a Enzo dos decisiones de producto (no técnicas) antes de empezar:
+1. Al activar "servicios propios" por primera vez, ¿arranca vacío o con una copia editable del catálogo compartido? → **copia editable** (menos trabajo inicial para el barbero).
+2. Como no hay backend real conectado, la sesión de prueba siempre entra como dueño — ¿agregar un selector temporal "Ver como" para poder probar el panel de barbero en este entorno? → **sí**.
+
+**1. Asistente de reserva: Barbero → Servicio → Horario → Datos** (antes era Servicio → Barbero). Con el barbero elegido primero, el paso de Servicio se filtra a lo que ese barbero realmente ofrece: si no tiene catálogo propio, ve el catálogo compartido de la barbería (como todos, comportamiento de siempre); si lo tiene, ve solo el suyo. Con un solo barbero activo (el caso más común) ese paso se sigue saltando solo — pero el filtrado de servicios se sigue aplicando igual, no depende de que se muestre el paso.
+
+**2. "Servicios propios" por barbero.** Nuevo interruptor en la pestaña "Barberos" del dueño, junto al de activar/desactivar — al prenderlo, ese barbero pasa a tener su PROPIO catálogo (una copia inicial del compartido, después independiente); al apagarlo, vuelve a usar el compartido sin perder lo que tenía armado (se guarda, no se borra, por si se reactiva más adelante).
+
+**3. Panel de barbero, expandido.** Antes era una sola pantalla ("Mis precios", solo editar precio/oferta del catálogo compartido). Ahora es un panel con tres pestañas, en `/panel/barbero` (antes `/panel/precios`):
+   - **Reservas**: solo las suyas, con el mismo botón de cancelar que ya tiene el dueño.
+   - **Horarios**: los suyos, con la misma edición por bloques de día que ya tenía el dueño (sin el selector de "elegir qué barbero", porque siempre es él mismo).
+   - **Servicios**: si NO tiene catálogo propio, ve el compartido y solo puede tocar precio/oferta (como antes). Si SÍ lo tiene, tiene el mismo CRUD completo que tiene el dueño sobre el compartido — crear, editar, publicar/ocultar.
+
+**4. Selector temporal "Ver como" (Dueño / Barbero).** En la barra superior del panel (solo visible sin backend real) — alterna entre el perfil de dueño y el de cualquiera de los barberos ya cargados, guardado en `localStorage`, así Enzo puede probar y mostrar ambos lados del panel sin que exista login real todavía. Se autodesactiva junto con el resto del modo provisorio en cuanto haya un backend real conectado.
+
+**Deuda técnica resuelta de paso:** los hooks de Reservas/Servicios/Horarios del dueño, el panel de barbero, y el asistente de reserva público (fuera del caso especial de la barbería `/demo`) nunca tuvieron la rama `HAY_BACKEND_REAL` — pegaban contra el Supabase real inexistente y fallaban en este entorno, igual que ya había pasado antes con otros hooks. Se les agregó esa rama a los seis, y se sumaron `horarios_disponibles` y `reservas` al mock provisorio como sus propias listas (antes no existían ahí en absoluto para una barbería normal, solo para la demo) — así que además de la funcionalidad nueva, **el asistente de reserva público y los 3 paneles de gestión (dueño) ahora funcionan de verdad en este entorno sin backend real**, cosa que antes no pasaba.
+
+**Cómo se probó (Playwright, instalado y desinstalado como siempre, con el servidor de desarrollo reiniciado de cero para evitar cualquier resto de tantas rondas de recarga en caliente):**
+- Flujo público completo: "Elige un barbero" es el primer paso → se elige a Manuel Rojas → "Elige un servicio" muestra el catálogo compartido → se elige "Corte clásico" → "Elige día y hora" muestra 4 horas disponibles (el seed de horarios ya cargado) → se completan los datos y se confirma → "¡Reserva confirmada!" con el resumen correcto.
+- Panel del dueño: se activa "Servicios propios" para Manuel Rojas → se clonaron correctamente sus 3 servicios (con ids nuevos y `barbero_id` puesto) → el texto cambia a "Tiene sus propios servicios y precios".
+- Selector "Ver como" → Barbero: Manuel Rojas → redirige a `/panel/barbero/reservas`, con las 3 pestañas nuevas visibles.
+- Pestaña Servicios del barbero: muestra su catálogo PROPIO (los 3 clonados), editable con CRUD completo.
+- Pestaña Horarios del barbero: muestra los 6 bloques del seed (lunes a sábado, 10:00–19:00).
+- Pestaña Reservas del barbero: aparece la reserva creada en el paso público, con los datos correctos del cliente.
+- Vuelto a "Ver como" Dueño: la bandeja de reservas del panel admin muestra la misma reserva, con "Manuel Rojas" como barbero.
+- Repetido el flujo público desde cero: al elegir a Manuel Rojas ahora se le ofrece su catálogo PROPIO (ya no el compartido) — confirma que el filtro por `usa_catalogo_propio` funciona en ambas direcciones.
+- Cero errores de consola/página en los 11 puntos verificados. Build y lint limpios.
+
+**Por qué:**
+- Investigar el código existente antes de tocar nada (en vez de asumir el modelo de datos): el hallazgo de que horarios/reservas ya eran por barbero cambió el alcance real del trabajo — sin esa base, invertir el orden del asistente hubiera sido mucho más grande.
+- Copia editable al activar servicios propios (no vacío): así lo pidió Enzo explícitamente, y tiene sentido de negocio — un barbero no debería quedarse sin poder cobrar nada mientras arma su catálogo desde cero.
+- No borrar los servicios propios al desactivar: si el dueño prueba a activar/desactivar mientras decide, el barbero no pierde el trabajo de armar su catálogo por una decisión reversible.
+- Selector "Ver como" en vez de simplemente no poder probarlo: sin esto, toda esta funcionalidad hubiera quedado sin verificar de verdad en este entorno — se autodesactiva solo, mismo criterio que ya se usa en todo el resto del modo provisorio.
+
+**Archivos afectados:**
+- Nuevo: `src/pages/panel/PanelBarberoLayout.jsx`, `PanelBarberoReservas.jsx`, `PanelBarberoHorarios.jsx`, `PanelBarberoServicios.jsx`.
+- Eliminado: `src/pages/panel/PanelBarbero.jsx` (reemplazado por los 4 anteriores).
+- Modificado: `src/mocks/datosProvisoriosSuperadmin.js` (`horarios_disponibles` y `reservas` como tablas propias, `barbero_id` en servicios, `usa_catalogo_propio` en barberos, perfil provisorio de barbero), `src/context/AuthContext.jsx` y `src/components/panel/PanelShell.jsx` (selector "Ver como"), `src/utils/roles.js` (`/panel/precios` → `/panel/barbero`), `src/routes/AppRouter.jsx` (rutas nuevas del panel de barbero), `src/pages/barberias/components/AsistenteReserva.jsx` + `PasoBarbero.jsx` + `PasoServicio.jsx` (orden invertido, filtrado de servicios), `src/pages/panel/hooks/useServiciosAdmin.js`, `useServiciosPanel.js`, `useHorariosAdmin.js`, `useReservasBandeja.js`, `useBarberosAdmin.js` (rama provisoria + columnas nuevas + mutaciones de catálogo propio), `src/pages/barberias/hooks/useHorariosDisponibles.js`, `useReservasDelDia.js`, `useCrearReserva.js` (rama provisoria más allá del caso demo), `src/pages/panel/PanelBarberos.jsx` (interruptor de catálogo propio).
+
+**Pendiente / próximos pasos:**
+- Ninguno funcional. A futuro: si se agregan muchos barberos con catálogo propio, podría convenir un indicador visual en la pestaña "Servicios" del dueño aclarando que ese barbero tiene su propio catálogo aparte (hoy solo se ve desde "Barberos") — no se pidió, no se hizo.
+
+---
+
+## 2026-08-11 - Fix: el interruptor de "servicios propios" no cambiaba nada real, y guardado explícito en vez de automático en el catálogo del barbero
+
+**Qué se hizo:**
+Enzo probó el interruptor de la ronda anterior y notó el problema de fondo: estuviera prendido o apagado, el barbero igual podía modificar los servicios (antes, con el interruptor apagado, todavía se le dejaba tocar precio y oferta del catálogo compartido — el mismo comportamiento de siempre, previo a que existiera este interruptor). Si "apagado" y "prendido" terminan permitiendo lo mismo (poder tocar algo), el interruptor no representa una decisión real — de ahí el "pierde criterio" que señaló.
+
+**El fix real: el interruptor ahora es sobre el PERMISO de edición, no sobre "qué lista se muestra".**
+- **Apagado** (por defecto): el barbero ve el catálogo compartido de la barbería en **solo lectura** — ningún campo editable, ni precio ni nada. Si quiere cambiar algo, tiene que pedírselo a su dueño.
+- **Prendido**: el barbero tiene su propio catálogo (arranca como copia del compartido, ver la ronda anterior) con edición completa — nombre, duración, precio, oferta, publicado/oculto.
+
+De paso, se aclaró el texto junto al interruptor en la pestaña "Barberos" del dueño para que quede inequívoco qué decide: "Puede crear y editar sus propios servicios y precios" vs. "Solo puede ver el catálogo compartido — no puede modificarlo" (antes decía solo "Usa el catálogo compartido...", que describía la lista pero no el permiso).
+
+**Guardado explícito, no automático.** Antes, cada campo del catálogo propio se guardaba solo al perder el foco (`onBlur`), campo por campo — Enzo pidió que hubiera un botón "Guardar cambios" que confirme el cambio de una vez. Ahora los campos del catálogo propio del barbero quedan en un borrador local (no se manda nada mientras se edita) y aparece un aviso "Tenés cambios sin guardar" + un botón "Guardar cambios" (deshabilitado si no hay nada pendiente) que confirma todos los cambios juntos, con una notificación de guardado (reusando `ToastGuardado`, el mismo componente que ya se usa en Personalización). Alta de un servicio nuevo sigue siendo su propio paso explícito (ya tenía su botón "Crear servicio", sin cambios ahí).
+
+**Cómo se probó (Playwright, instalado y desinstalado como siempre, con el servidor de desarrollo reiniciado de cero):**
+- Con el interruptor apagado (default): "Ver como" Barbero → pestaña Servicios muestra 0 campos editables (`<input>`) en toda la pantalla — puede ver "Corte clásico" pero no tocar nada.
+- Se activa el interruptor desde el panel del dueño → el texto junto a él cambia correctamente entre los dos estados aclarados.
+- Con el interruptor prendido: la pestaña Servicios del barbero muestra el catálogo propio editable, con el botón "Guardar cambios" deshabilitado (sin cambios pendientes todavía).
+- Se edita un precio (sin guardar) → aparece "Tenés cambios sin guardar", el botón se habilita, y el valor en `localStorage` **sigue siendo el viejo** — confirma que nada se guarda solo mientras se edita.
+- Se aprieta "Guardar cambios" → el aviso desaparece, aparece el toast "Cambios guardados", y recién ahí el valor en `localStorage` queda actualizado.
+- Cero errores de consola/página en los 5 puntos verificados. Build y lint limpios.
+
+**Por qué:**
+- Solo lectura en vez de "editar precio igual que antes": era exactamente la ambigüedad que señaló Enzo — un interruptor que no cambia el comportamiento real no sirve de nada, sin importar qué tan bien esté explicado en el texto de al lado.
+- Borrador local + un solo botón de guardado (en vez de seguir con guardado automático por campo): fue un pedido explícito, y de paso da más margen para editar varios campos de varios servicios antes de confirmar, en vez de ir guardando de a un campo cada vez que se saca el foco.
+- Reusar `ToastGuardado` en vez de armar una notificación nueva: mismo lenguaje visual de guardado que ya conoce el dueño en Personalización — no hacía falta un patrón nuevo para esto.
+
+**Archivos afectados:**
+- Eliminado: `src/pages/panel/components/FilaServicioPrecio.jsx` y el hook `useActualizarPrecioServicio` (ya no se usan — el modo "apagado" pasó a ser de solo lectura).
+- Modificado: `src/pages/panel/PanelBarberoServicios.jsx` (reescrito: modo solo-lectura + modo catálogo propio con borrador local y "Guardar cambios"), `src/pages/panel/hooks/useServiciosPanel.js` (se saca el hook de precio-solo, ya sin uso), `src/pages/panel/PanelBarberos.jsx` (texto del interruptor aclarado).
+
+**Pendiente / próximos pasos:**
+- Ninguno.
+
+---

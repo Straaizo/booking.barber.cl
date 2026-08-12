@@ -10,6 +10,7 @@ import { LightboxGaleria } from '../components/LightboxGaleria'
 import { oscurecerHex, esColorClaro } from '../../../utils/color'
 import { linkWhatsApp } from '../../../utils/formatos'
 import { asegurarFuenteCargada, pilaFuente } from '../../../utils/fuentes'
+import { ordenarEquipo } from '../../../utils/personalizacion'
 
 // Grilla editorial, no una fila de fotos del mismo tamaño: las fotos
 // marcadas "grande" ocupan el doble de espacio (2 columnas × 2 filas), como
@@ -61,18 +62,21 @@ function SeccionGaleria({ seccion, nombreBarberia }) {
   )
 }
 
-// A diferencia de las secciones de galería/imagen-y-texto (contenido libre,
-// configurable), el equipo se arma solo a partir de los barberos ya cargados
-// en la pestaña "Barberos" del panel — foto y especialidad son opcionales,
+// A diferencia del contenido de galería/imagen-y-texto (libre, escrito a
+// mano en el panel), el equipo se arma solo a partir de los barberos ya
+// cargados en la pestaña "Barberos" — foto y especialidad son opcionales,
 // así que un barbero recién agregado (sin foto todavía) igual aparece con su
-// inicial, en vez de quedar afuera.
-function SeccionEquipo({ barberos }) {
-  const equipo = (barberos ?? []).filter((b) => b.activo)
+// inicial, en vez de quedar afuera. Es una sección más entre las demás
+// (`seccion.tipo === 'equipo'`, ver el `secciones.map` de VistaBarberia) para
+// que cada barbería pueda ubicarla donde quiera — antes o después de sus
+// fotos de trabajo, por ejemplo — en vez de vivir fija siempre en el mismo lugar.
+function SeccionEquipo({ titulo, barberos, ordenEquipo }) {
+  const equipo = ordenarEquipo(barberos, ordenEquipo)
   if (equipo.length === 0) return null
 
   return (
     <>
-      <SectionRule indice="—" texto="Nuestro equipo" tono="oscuro" />
+      <SectionRule indice="—" texto={titulo || 'Nuestro equipo'} tono="oscuro" />
       <div className="grid grid-cols-2 gap-6 px-6 py-8 md:grid-cols-3 md:gap-8 md:px-10 lg:grid-cols-4">
         {equipo.map((barbero) => (
           <div key={barbero.id} className="flex flex-col items-center gap-3 text-center">
@@ -97,6 +101,58 @@ function SeccionEquipo({ barberos }) {
         ))}
       </div>
     </>
+  )
+}
+
+// Chica/mediana/grande en vez de un tamaño único: el pedido explícito fue
+// "es demasiado pequeño, poder agrandarlo" — con distintos anchos de pantalla
+// y densidades, lo que se ve bien en una no se ve bien en otra.
+const TAMANOS_BURBUJA_WHATSAPP = {
+  chica: { caja: 'h-12 w-12', icono: 22 },
+  mediana: { caja: 'h-14 w-14', icono: 28 },
+  grande: { caja: 'h-[4.5rem] w-[4.5rem]', icono: 36 },
+}
+
+// Botón circular fijo en la esquina, visible en toda la página — la
+// alternativa al enlace de texto del encabezado (`estilo_whatsapp:
+// 'burbuja'` en vez de `'enlace'`, mutuamente excluyentes). Por defecto usa
+// el color de marca (`color`, ya resuelto por quien llama a partir de
+// `whatsapp_color` o `color_primario`) en vez del verde tradicional de
+// WhatsApp — sigue siendo reconocible por la forma, la posición fija y el
+// ícono, sin salirse de la paleta que cada barbería ya eligió; si de verdad
+// quiere ese color puede elegirlo a mano. El aro que se expande y se
+// desvanece detrás (`animate-ping`, ya viene con Tailwind) es el efecto de
+// "pulso" — el mismo lenguaje visual que ya usan las burbujas de chat de
+// cualquier sitio, para que se note que es interactivo sin tener que leer nada.
+function BurbujaWhatsApp({ telefono, nombreBarberia, color, tamano }) {
+  const { caja, icono } = TAMANOS_BURBUJA_WHATSAPP[tamano] ?? TAMANOS_BURBUJA_WHATSAPP.mediana
+  const estiloColor = color ? { backgroundColor: color } : undefined
+
+  return (
+    <a
+      href={linkWhatsApp(telefono, `Hola, tengo una consulta para ${nombreBarberia}`)}
+      target="_blank"
+      rel="noreferrer"
+      aria-label="Escribir por WhatsApp"
+      className={`fixed bottom-5 right-5 z-40 flex items-center justify-center rounded-full text-hueso shadow-lg transition-transform duration-200 hover:scale-105 ${caja} ${color ? '' : 'bg-cobre-oscuro'}`}
+      style={estiloColor}
+    >
+      <span
+        aria-hidden="true"
+        className={`absolute inset-0 rounded-full opacity-40 animate-ping ${color ? '' : 'bg-cobre-oscuro'}`}
+        style={estiloColor}
+      />
+      <svg
+        viewBox="0 0 32 32"
+        width={icono}
+        height={icono}
+        fill="currentColor"
+        aria-hidden="true"
+        className="relative z-10"
+      >
+        <path d="M16.04 4C9.4 4 4 9.37 4 16c0 2.4.7 4.63 1.9 6.5L4.4 28l5.7-1.5c1.8 1 3.86 1.5 5.94 1.5 6.63 0 12.04-5.37 12.04-12S22.67 4 16.04 4Zm0 21.9c-1.9 0-3.75-.5-5.35-1.46l-.38-.22-3.4.9.9-3.32-.24-.4A9.83 9.83 0 0 1 6.1 16c0-5.48 4.47-9.9 9.94-9.9 5.47 0 9.94 4.42 9.94 9.9s-4.47 9.9-9.94 9.9Zm5.44-7.42c-.3-.15-1.75-.86-2.02-.96-.27-.1-.47-.15-.67.15-.2.3-.77.96-.94 1.16-.17.2-.35.22-.65.07-.3-.15-1.25-.46-2.38-1.47-.88-.78-1.47-1.75-1.65-2.05-.17-.3-.02-.46.13-.61.15-.15.35-.4.52-.6.17-.2.23-.35.35-.58.12-.23.06-.43-.04-.6-.1-.17-.62-1.5-.85-2.06-.22-.53-.45-.46-.62-.47h-.53c-.17 0-.45.06-.68.32-.23.26-.9.88-.9 2.14s.93 2.48 1.06 2.65c.13.17 1.83 2.8 4.5 3.82 2.66 1.02 2.66.68 3.14.63.48-.05 1.55-.63 1.77-1.24.22-.6.22-1.12.15-1.24-.07-.13-.27-.2-.57-.35Z" />
+      </svg>
+    </a>
   )
 }
 
@@ -191,11 +247,11 @@ export function VistaBarberia({ barberia }) {
           </div>
         </div>
 
-        {(barberia.direccion || barberia.telefono_whatsapp) && (
+        {(barberia.direccion || (barberia.telefono_whatsapp && personalizacion.estilo_whatsapp !== 'burbuja')) && (
           <ScrollReveal delay={0.15}>
             <div className={`relative mx-auto mt-8 flex max-w-lg flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm md:mx-0 md:max-w-none md:justify-start ${claseContacto}`}>
               {barberia.direccion && <span>{barberia.direccion}</span>}
-              {barberia.telefono_whatsapp && (
+              {barberia.telefono_whatsapp && personalizacion.estilo_whatsapp !== 'burbuja' && (
                 <HoverLink
                   href={linkWhatsApp(
                     barberia.telefono_whatsapp,
@@ -211,14 +267,22 @@ export function VistaBarberia({ barberia }) {
         )}
       </header>
 
-      <SeccionEquipo barberos={barberia.barberos} />
-
       {secciones.map((seccion) => {
         if (seccion.tipo === 'galeria') {
           return <SeccionGaleria key={seccion.id} seccion={seccion} nombreBarberia={barberia.nombre} />
         }
         if (seccion.tipo === 'imagen_texto') {
           return <SeccionImagenTexto key={seccion.id} seccion={seccion} />
+        }
+        if (seccion.tipo === 'equipo') {
+          return (
+            <SeccionEquipo
+              key={seccion.id}
+              titulo={seccion.titulo}
+              barberos={barberia.barberos}
+              ordenEquipo={personalizacion.orden_equipo}
+            />
+          )
         }
         return null
       })}
@@ -238,6 +302,15 @@ export function VistaBarberia({ barberia }) {
       </main>
 
       <Footer variante="minimal" />
+
+      {barberia.telefono_whatsapp && personalizacion.estilo_whatsapp === 'burbuja' && (
+        <BurbujaWhatsApp
+          telefono={barberia.telefono_whatsapp}
+          nombreBarberia={barberia.nombre}
+          color={personalizacion.whatsapp_color || personalizacion.color_primario}
+          tamano={personalizacion.whatsapp_tamano}
+        />
+      )}
     </div>
   )
 }

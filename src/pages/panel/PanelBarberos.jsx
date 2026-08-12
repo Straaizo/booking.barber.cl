@@ -3,14 +3,21 @@ import { useAuth } from '../../hooks/useAuth'
 import { Loader } from '../../components/common/Loader'
 import { Button } from '../../components/common/Button'
 import { Interruptor } from '../../components/panel/Interruptor'
+import { SelectorArchivo } from '../../components/common/SelectorArchivo'
 import { archivoAImagenComprimida } from '../../utils/imagenes'
 import { useBarberiaAdmin } from './hooks/useBarberiaAdmin'
-import { useBarberosAdmin, useCrearBarbero, useActualizarBarbero } from './hooks/useBarberosAdmin'
+import {
+  useBarberosAdmin,
+  useCrearBarbero,
+  useActualizarBarbero,
+  useActivarCatalogoPropio,
+  useDesactivarCatalogoPropio,
+} from './hooks/useBarberosAdmin'
 
 // Foto + especialidad de cada barbero se muestran tal cual en la página
 // pública, en la sección "Nuestro equipo" (ver VistaBarberia.jsx) — por eso
 // viven acá, junto al resto de los datos del barbero, y no en Personalización.
-function TarjetaBarbero({ barbero, onCambiar }) {
+function TarjetaBarbero({ barbero, onCambiar, onCambiarCatalogoPropio, cambiandoCatalogo }) {
   const [subiendo, setSubiendo] = useState(false)
 
   async function subirFoto(evento) {
@@ -40,10 +47,12 @@ function TarjetaBarbero({ barbero, onCambiar }) {
           <span className={`font-medium ${barbero.activo ? 'text-negro-barbero' : 'text-gris-calido-400 line-through'}`}>
             {barbero.nombre}
           </span>
-          <label className="cursor-pointer text-xs text-cobre-texto underline-offset-2 hover:underline">
-            {subiendo ? 'Subiendo…' : barbero.foto_url ? 'Cambiar foto' : 'Agregar foto'}
-            <input type="file" accept="image/*" onChange={subirFoto} className="hidden" />
-          </label>
+          <SelectorArchivo
+            etiqueta={barbero.foto_url ? 'Cambiar foto' : 'Agregar foto'}
+            cargando={subiendo}
+            onChange={subirFoto}
+            className="w-fit px-2.5 py-1.5"
+          />
         </div>
       </div>
 
@@ -63,6 +72,26 @@ function TarjetaBarbero({ barbero, onCambiar }) {
           onCambiar={(valor) => onCambiar({ activo: valor })}
         />
       </div>
+
+      {/* Esto decide si este barbero puede MODIFICAR algo en su pestaña
+          "Servicios" o no — apagado, solo puede mirar el catálogo compartido
+          (lo administra el dueño); prendido, tiene su propio catálogo
+          editable, arrancando con una copia del compartido para no partir
+          de cero. No es solo "qué lista ve" — es literalmente el permiso de
+          edición. */}
+      <div className="flex items-center gap-3 border-t border-gris-calido-100 pt-3 sm:w-full sm:border-t-0 sm:pt-0 sm:pl-3">
+        <Interruptor
+          activo={Boolean(barbero.usa_catalogo_propio)}
+          etiqueta={`Servicios propios de ${barbero.nombre}`}
+          disabled={cambiandoCatalogo}
+          onCambiar={onCambiarCatalogoPropio}
+        />
+        <span className="versalitas text-xs text-gris-calido-500">
+          {barbero.usa_catalogo_propio
+            ? 'Puede crear y editar sus propios servicios y precios'
+            : 'Solo puede ver el catálogo compartido — no puede modificarlo'}
+        </span>
+      </div>
     </div>
   )
 }
@@ -73,9 +102,21 @@ export function PanelBarberos() {
   const { data: barberos, isLoading, isError } = useBarberosAdmin(perfil.barberia_id)
   const crearBarbero = useCrearBarbero(perfil.barberia_id)
   const actualizarBarbero = useActualizarBarbero(perfil.barberia_id)
+  const activarCatalogoPropio = useActivarCatalogoPropio(perfil.barberia_id)
+  const desactivarCatalogoPropio = useDesactivarCatalogoPropio(perfil.barberia_id)
 
   const [nombreNuevo, setNombreNuevo] = useState('')
   const [errorEnvio, setErrorEnvio] = useState(null)
+  const [cambiandoCatalogoId, setCambiandoCatalogoId] = useState(null)
+
+  async function alternarCatalogoPropio(barberoId, activar) {
+    setCambiandoCatalogoId(barberoId)
+    try {
+      await (activar ? activarCatalogoPropio : desactivarCatalogoPropio).mutateAsync(barberoId)
+    } finally {
+      setCambiandoCatalogoId(null)
+    }
+  }
 
   const maxBarberos = barberia?.planes?.max_barberos ?? null
   const totalBarberos = barberos?.length ?? 0
@@ -137,6 +178,8 @@ export function PanelBarberos() {
                 key={barbero.id}
                 barbero={barbero}
                 onCambiar={(cambios) => actualizarBarbero.mutate({ id: barbero.id, cambios })}
+                onCambiarCatalogoPropio={(valor) => alternarCatalogoPropio(barbero.id, valor)}
+                cambiandoCatalogo={cambiandoCatalogoId === barbero.id}
               />
             ))}
           </div>

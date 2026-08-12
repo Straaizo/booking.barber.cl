@@ -1,9 +1,11 @@
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../../../services/supabaseClient'
 import { esBarberoDemo, HORARIOS_DEMO } from '../../../config/demo'
+import { HAY_BACKEND_REAL, listarHorariosDisponiblesProvisorios } from '../../../mocks/datosProvisoriosSuperadmin'
 
 async function obtenerHorarios(barberoId) {
   if (esBarberoDemo(barberoId)) return HORARIOS_DEMO
+  if (!HAY_BACKEND_REAL) return listarHorariosDisponiblesProvisorios(barberoId)
 
   const { data, error } = await supabase
     .from('horarios_disponibles')

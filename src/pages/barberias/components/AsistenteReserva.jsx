@@ -44,30 +44,45 @@ export function AsistenteReserva({ barberia }) {
   const serviciosActivos = barberia.servicios.filter((servicio) => servicio.activo)
   const hayVariosBarberos = barberosActivos.length > 1
 
-  const [paso, setPaso] = useState('servicio')
-  const [servicio, setServicio] = useState(null)
+  // El barbero se elige primero (no el servicio) porque cada barbero puede
+  // ofrecer un catálogo de servicios distinto — recién con el barbero
+  // elegido se sabe qué servicios corresponde mostrar en el paso siguiente.
+  // Con un solo barbero se auto-selecciona y ese paso ni se muestra, pero el
+  // filtrado de servicios sigue aplicando igual.
+  const [paso, setPaso] = useState(hayVariosBarberos ? 'barbero' : 'servicio')
   const [barbero, setBarbero] = useState(
     barberosActivos.length === 1 ? barberosActivos[0] : null
   )
+  const [servicio, setServicio] = useState(null)
   const [horario, setHorario] = useState(null)
 
   const crearReserva = useCrearReserva()
 
+  // Si el barbero tiene catálogo propio (lo habilitó el dueño), solo se le
+  // ofrecen SUS servicios (`servicio.barbero_id === barbero.id`) — si no,
+  // el catálogo compartido de la barbería (`servicio.barbero_id` vacío).
+  const serviciosDelBarbero = barbero
+    ? serviciosActivos.filter((servicio) =>
+        barbero.usa_catalogo_propio ? servicio.barbero_id === barbero.id : !servicio.barbero_id
+      )
+    : []
+
   const secuenciaPasos = hayVariosBarberos
-    ? ['servicio', 'barbero', 'horario', 'datos']
+    ? ['barbero', 'servicio', 'horario', 'datos']
     : ['servicio', 'horario', 'datos']
   const etiquetasPasos = hayVariosBarberos
-    ? ['Servicio', 'Barbero', 'Horario', 'Tus datos']
+    ? ['Barbero', 'Servicio', 'Horario', 'Tus datos']
     : ['Servicio', 'Horario', 'Tus datos']
   const indiceActivo = secuenciaPasos.indexOf(paso)
 
-  function elegirServicio(servicioElegido) {
-    setServicio(servicioElegido)
-    setPaso(hayVariosBarberos ? 'barbero' : 'horario')
-  }
-
   function elegirBarbero(barberoElegido) {
     setBarbero(barberoElegido)
+    setServicio(null)
+    setPaso('servicio')
+  }
+
+  function elegirServicio(servicioElegido) {
+    setServicio(servicioElegido)
     setPaso('horario')
   }
 
@@ -129,14 +144,14 @@ export function AsistenteReserva({ barberia }) {
           exit="sale"
           transition={{ duration: 0.3, ease: EASE_ENTRADA }}
         >
-          {paso === 'servicio' && (
-            <PasoServicio servicios={serviciosActivos} onSeleccionar={elegirServicio} />
-          )}
           {paso === 'barbero' && (
-            <PasoBarbero
-              barberos={barberosActivos}
-              onSeleccionar={elegirBarbero}
-              onVolver={() => volverA('servicio')}
+            <PasoBarbero barberos={barberosActivos} onSeleccionar={elegirBarbero} />
+          )}
+          {paso === 'servicio' && (
+            <PasoServicio
+              servicios={serviciosDelBarbero}
+              onSeleccionar={elegirServicio}
+              onVolver={hayVariosBarberos ? () => volverA('barbero') : undefined}
             />
           )}
           {paso === 'horario' && (
@@ -144,7 +159,7 @@ export function AsistenteReserva({ barberia }) {
               barbero={barbero}
               servicio={servicio}
               onSeleccionar={elegirHorario}
-              onVolver={() => volverA(hayVariosBarberos ? 'barbero' : 'servicio')}
+              onVolver={() => volverA('servicio')}
             />
           )}
           {paso === 'datos' && (

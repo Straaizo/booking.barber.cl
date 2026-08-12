@@ -15,9 +15,9 @@ async function obtenerBarberiaParaPersonalizacionReal(barberiaId) {
     .select(
       `
       id, nombre, slug, logo_url, direccion, telefono_whatsapp,
-      personalizacion (color_primario, color_header, fuente_display, eslogan, descripcion, banner_url, secciones),
-      servicios (id, nombre, duracion_minutos, precio_clp, precio_oferta, oferta_activa, oferta_vence, activo),
-      barberos (id, nombre, activo, foto_url, especialidad)
+      personalizacion (color_primario, color_header, fuente_display, eslogan, descripcion, banner_url, secciones, orden_equipo, estilo_whatsapp, whatsapp_color, whatsapp_tamano),
+      servicios (id, nombre, duracion_minutos, precio_clp, precio_oferta, oferta_activa, oferta_vence, activo, barbero_id),
+      barberos (id, nombre, activo, foto_url, especialidad, usa_catalogo_propio)
     `
     )
     .eq('id', barberiaId)
@@ -39,13 +39,15 @@ export function usePersonalizacionAdmin(barberiaId) {
   })
 }
 
-// `logo_url` vive en `barberias`, el resto en `personalizacion` (1:1 por
-// `barberia_id`) — se separan acá para no obligar a quien llama a saber en
-// qué tabla vive cada campo.
+// `logo_url`, `direccion` y `telefono_whatsapp` viven en `barberias`, el
+// resto en `personalizacion` (1:1 por `barberia_id`) — se separan acá para
+// no obligar a quien llama a saber en qué tabla vive cada campo.
 async function guardarPersonalizacionReal(barberiaId, cambios) {
-  const { logo_url, ...personalizacionCambios } = cambios
-  if (logo_url !== undefined) {
-    const { error } = await supabase.from('barberias').update({ logo_url }).eq('id', barberiaId)
+  const { logo_url, direccion, telefono_whatsapp, ...personalizacionCambios } = cambios
+  const cambiosBarberia = { logo_url, direccion, telefono_whatsapp }
+  const hayCambiosBarberia = Object.values(cambiosBarberia).some((v) => v !== undefined)
+  if (hayCambiosBarberia) {
+    const { error } = await supabase.from('barberias').update(cambiosBarberia).eq('id', barberiaId)
     if (error) throw error
   }
   if (Object.keys(personalizacionCambios).length > 0) {

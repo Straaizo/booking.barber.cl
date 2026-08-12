@@ -1,9 +1,11 @@
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../../../services/supabaseClient'
 import { esBarberoDemo } from '../../../config/demo'
+import { HAY_BACKEND_REAL, listarReservasDelDiaProvisorias } from '../../../mocks/datosProvisoriosSuperadmin'
 
 async function obtenerReservasDelDia(barberoId, fechaISO) {
   if (esBarberoDemo(barberoId)) return []
+  if (!HAY_BACKEND_REAL) return listarReservasDelDiaProvisorias(barberoId, fechaISO)
 
   const inicio = `${fechaISO}T00:00:00`
   const fin = `${fechaISO}T23:59:59`

@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../../services/supabaseClient'
 import { onReservaCreada } from '../../../services/eventosReserva'
 import { esBarberoDemo } from '../../../config/demo'
+import { HAY_BACKEND_REAL, crearReservaProvisoria } from '../../../mocks/datosProvisoriosSuperadmin'
 
 async function simularReservaDemo(reserva) {
   await new Promise((resolver) => setTimeout(resolver, 500))
@@ -10,6 +11,7 @@ async function simularReservaDemo(reserva) {
 
 async function insertarReserva(reserva) {
   if (esBarberoDemo(reserva.barbero_id)) return simularReservaDemo(reserva)
+  if (!HAY_BACKEND_REAL) return crearReservaProvisoria(reserva)
 
   const { data, error } = await supabase
     .from('reservas')

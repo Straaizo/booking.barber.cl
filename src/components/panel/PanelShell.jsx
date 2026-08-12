@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
+import { rutaPorRol, ROL_ADMIN, ROL_BARBERO } from '../../utils/roles'
 
 const NOMBRES_ROL = { 1: 'Superadmin', 2: 'Administrador', 3: 'Barbero' }
 
@@ -7,12 +8,21 @@ const NOMBRES_ROL = { 1: 'Superadmin', 2: 'Administrador', 3: 'Barbero' }
 // superior densa con identidad de marca + sesión, y una franja lateral
 // opcional para navegación cuando el panel tiene más de una sección.
 export function PanelShell({ titulo, nav, children }) {
-  const { perfil, cerrarSesion } = useAuth()
+  const { perfil, cerrarSesion, verComo, cambiarVerComo, barberosParaSelector } = useAuth()
   const navigate = useNavigate()
 
   async function salir() {
     await cerrarSesion()
     navigate('/login', { replace: true })
+  }
+
+  // TEMPORAL: solo existe mientras no hay backend real (`cambiarVerComo` es
+  // `null` en cuanto lo hay) — sin login real todavía no hay otra forma de
+  // entrar como barbero para probar su panel.
+  function alCambiarVerComo(evento) {
+    const valor = evento.target.value
+    cambiarVerComo(valor)
+    navigate(rutaPorRol(valor === 'dueno' ? ROL_ADMIN : ROL_BARBERO), { replace: true })
   }
 
   return (
@@ -34,6 +44,23 @@ export function PanelShell({ titulo, nav, children }) {
               {NOMBRES_ROL[perfil?.rol_id]}
             </span>
           </span>
+          {cambiarVerComo && (
+            <label className="hidden items-center gap-2 md:flex">
+              <span className="versalitas text-xs text-gris-calido-400">Ver como</span>
+              <select
+                value={verComo}
+                onChange={alCambiarVerComo}
+                className="min-h-9 rounded-md border border-gris-calido-700 bg-negro-barbero px-2 py-1 text-xs text-hueso outline-none"
+              >
+                <option value="dueno">Dueño</option>
+                {barberosParaSelector.map((barbero) => (
+                  <option key={barbero.id} value={barbero.id}>
+                    Barbero: {barbero.nombre}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
           <button
             type="button"
             onClick={salir}

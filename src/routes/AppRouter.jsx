@@ -5,7 +5,10 @@ import { RutaBarberia } from '../pages/barberias/RutaBarberia'
 import { RutaDemo } from '../pages/demo/RutaDemo'
 import { Login } from '../pages/Login/Login'
 import { RutaProtegida } from './RutaProtegida'
-import { PanelBarbero } from '../pages/panel/PanelBarbero'
+import { PanelBarberoLayout } from '../pages/panel/PanelBarberoLayout'
+import { PanelBarberoReservas } from '../pages/panel/PanelBarberoReservas'
+import { PanelBarberoHorarios } from '../pages/panel/PanelBarberoHorarios'
+import { PanelBarberoServicios } from '../pages/panel/PanelBarberoServicios'
 import { PanelAdminLayout } from '../pages/panel/PanelAdminLayout'
 import { PanelReservas } from '../pages/panel/PanelReservas'
 import { PanelBarberos } from '../pages/panel/PanelBarberos'
@@ -41,7 +44,18 @@ const router = createBrowserRouter([
   },
   {
     element: <RutaProtegida rolesPermitidos={[ROL_BARBERO]} />,
-    children: [{ path: '/panel/precios', element: <PanelBarbero /> }],
+    children: [
+      {
+        path: '/panel/barbero',
+        element: <PanelBarberoLayout />,
+        children: [
+          { index: true, element: <Navigate to="/panel/barbero/reservas" replace /> },
+          { path: 'reservas', element: <PanelBarberoReservas /> },
+          { path: 'horarios', element: <PanelBarberoHorarios /> },
+          { path: 'servicios', element: <PanelBarberoServicios /> },
+        ],
+      },
+    ],
   },
   {
     element: <RutaProtegida rolesPermitidos={[ROL_ADMIN]} />,

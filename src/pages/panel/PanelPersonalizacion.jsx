@@ -5,9 +5,11 @@ import { Loader } from '../../components/common/Loader'
 import { Button } from '../../components/common/Button'
 import { HoverLink } from '../../components/common/HoverLink'
 import { ToastGuardado } from '../../components/common/ToastGuardado'
+import { SelectorArchivo } from '../../components/common/SelectorArchivo'
 import { usePersonalizacionAdmin, useGuardarPersonalizacion } from './hooks/usePersonalizacionAdmin'
 import { archivoAImagenComprimida } from '../../utils/imagenes'
 import { FUENTES_DISPONIBLES, asegurarFuenteCargada } from '../../utils/fuentes'
+import { ordenarEquipo } from '../../utils/personalizacion'
 
 // La vista previa usa exactamente el mismo componente que la página pública
 // real (`VistaBarberia`, renderizado dentro de un <iframe> — ver
@@ -17,6 +19,8 @@ function construirVistaPrevia(barberia, form) {
   return {
     ...barberia,
     logo_url: form.logo_url,
+    direccion: form.direccion,
+    telefono_whatsapp: form.telefono_whatsapp,
     personalizacion: {
       color_primario: form.color_primario || null,
       color_header: form.color_header || null,
@@ -24,6 +28,10 @@ function construirVistaPrevia(barberia, form) {
       eslogan: form.eslogan,
       descripcion: form.descripcion,
       secciones: form.secciones,
+      orden_equipo: form.orden_equipo,
+      estilo_whatsapp: form.estilo_whatsapp,
+      whatsapp_color: form.whatsapp_color || null,
+      whatsapp_tamano: form.whatsapp_tamano,
     },
   }
 }
@@ -32,26 +40,37 @@ function formularioDesdeBarberia(barberia) {
   const p = barberia.personalizacion ?? {}
   return {
     logo_url: barberia.logo_url ?? null,
+    direccion: barberia.direccion ?? '',
+    telefono_whatsapp: barberia.telefono_whatsapp ?? '',
     color_primario: p.color_primario ?? '',
     color_header: p.color_header ?? '',
     fuente_display: p.fuente_display || 'fraunces',
     eslogan: p.eslogan ?? '',
     descripcion: p.descripcion ?? '',
     secciones: p.secciones ?? [],
+    orden_equipo: p.orden_equipo ?? [],
+    estilo_whatsapp: p.estilo_whatsapp || 'enlace',
+    whatsapp_color: p.whatsapp_color ?? '',
+    whatsapp_tamano: p.whatsapp_tamano || 'mediana',
   }
 }
 
 function nuevaSeccion(tipo) {
   const id = 'sec-' + Date.now() + '-' + Math.floor(Math.random() * 1000)
-  return tipo === 'galeria'
-    ? { id, tipo: 'galeria', titulo: '', imagenes: [] }
-    : { id, tipo: 'imagen_texto', imagen: null, titulo: '', texto: '' }
+  if (tipo === 'galeria') return { id, tipo: 'galeria', titulo: '', imagenes: [] }
+  if (tipo === 'equipo') return { id, tipo: 'equipo', titulo: 'Nuestro equipo' }
+  return { id, tipo: 'imagen_texto', imagen: null, titulo: '', texto: '' }
 }
 
-function resumenSeccion(seccion) {
+const ETIQUETA_TIPO_SECCION = { galeria: 'Galería', imagen_texto: 'Imagen y texto', equipo: 'Equipo' }
+
+function resumenSeccion(seccion, cantidadBarberos) {
   if (seccion.tipo === 'galeria') {
     const n = seccion.imagenes?.length ?? 0
     return `${seccion.titulo || 'Sin título'} — ${n} foto${n === 1 ? '' : 's'}`
+  }
+  if (seccion.tipo === 'equipo') {
+    return `${seccion.titulo || 'Nuestro equipo'} — ${cantidadBarberos} barbero${cantidadBarberos === 1 ? '' : 's'}`
   }
   return seccion.titulo || 'Sin título'
 }
@@ -139,6 +158,7 @@ export function PanelPersonalizacion() {
   // lo que se ve en la vista previa todavía no es lo que ve un cliente real
   // en la página pública (recién se publica al guardar).
   const hayCambiosSinGuardar = form && formGuardado !== null && JSON.stringify(form) !== formGuardado
+  const equipoOrdenado = form && barberia ? ordenarEquipo(barberia.barberos, form.orden_equipo) : []
 
   async function subirLogo(evento) {
     const archivo = evento.target.files?.[0]
@@ -174,6 +194,22 @@ export function PanelPersonalizacion() {
       const secciones = [...f.secciones]
       ;[secciones[indice], secciones[destino]] = [secciones[destino], secciones[indice]]
       return { ...f, secciones }
+    })
+  }
+
+  // El orden guardado (`orden_equipo`) puede no incluir todavía a todos los
+  // barberos activos (uno recién agregado desde la pestaña Barberos, o el
+  // orden nunca se tocó) — `ordenarEquipo` ya resuelve eso agregándolos al
+  // final. Acá se recalcula la lista completa y visible antes de mover, así
+  // el resultado del swap siempre queda explícito para todos, no solo para
+  // los que ya estaban en la lista guardada.
+  function moverBarberoEnEquipo(indice, direccion) {
+    setForm((f) => {
+      const idsActuales = ordenarEquipo(barberia.barberos, f.orden_equipo).map((b) => b.id)
+      const destino = indice + direccion
+      if (destino < 0 || destino >= idsActuales.length) return f
+      ;[idsActuales[indice], idsActuales[destino]] = [idsActuales[destino], idsActuales[indice]]
+      return { ...f, orden_equipo: idsActuales }
     })
   }
 
@@ -254,12 +290,18 @@ export function PanelPersonalizacion() {
     try {
       await guardar.mutateAsync({
         logo_url: form.logo_url,
+        direccion: form.direccion,
+        telefono_whatsapp: form.telefono_whatsapp,
         color_primario: form.color_primario || null,
         color_header: form.color_header || null,
         fuente_display: form.fuente_display,
         eslogan: form.eslogan,
         descripcion: form.descripcion,
         secciones: form.secciones,
+        orden_equipo: form.orden_equipo,
+        estilo_whatsapp: form.estilo_whatsapp,
+        whatsapp_color: form.whatsapp_color || null,
+        whatsapp_tamano: form.whatsapp_tamano,
       })
       setFormGuardado(JSON.stringify(form))
       setEstadoToast('ok')
@@ -339,7 +381,7 @@ export function PanelPersonalizacion() {
           <section className="flex flex-col gap-6">
             <TituloGrupo numero="01">Identidad</TituloGrupo>
 
-            <label className="flex flex-col gap-2">
+            <div className="flex flex-col gap-2">
               <span className="versalitas text-xs text-gris-calido-500">Logo</span>
               <div className="flex items-center gap-4">
                 {form.logo_url ? (
@@ -349,7 +391,7 @@ export function PanelPersonalizacion() {
                     Sin logo
                   </span>
                 )}
-                <input type="file" accept="image/*" onChange={subirLogo} className="text-sm" />
+                <SelectorArchivo etiqueta="Seleccionar imagen" cargando={subiendo} onChange={subirLogo} />
                 {form.logo_url && (
                   <button
                     type="button"
@@ -360,7 +402,7 @@ export function PanelPersonalizacion() {
                   </button>
                 )}
               </div>
-            </label>
+            </div>
 
             <div className="grid grid-cols-2 gap-6">
               <label className="flex flex-col gap-2">
@@ -428,7 +470,7 @@ export function PanelPersonalizacion() {
           </section>
 
           <section className="flex flex-col gap-6">
-            <TituloGrupo numero="02">Textos principales</TituloGrupo>
+            <TituloGrupo numero="02">Textos y contacto</TituloGrupo>
 
             <label className="flex flex-col gap-2">
               <span className="versalitas text-xs text-gris-calido-500">Eslogan</span>
@@ -451,13 +493,122 @@ export function PanelPersonalizacion() {
                 className="border-b border-gris-calido-200 bg-transparent py-2 text-sm text-negro-barbero outline-none transition-colors focus:border-cobre"
               />
             </label>
+
+            <label className="flex flex-col gap-2">
+              <span className="versalitas text-xs text-gris-calido-500">Dirección</span>
+              <input
+                type="text"
+                value={form.direccion}
+                onChange={(e) => setForm((f) => ({ ...f, direccion: e.target.value }))}
+                placeholder="Av. Irarrázaval 2140, Ñuñoa"
+                className="min-h-11 border-b border-gris-calido-200 bg-transparent py-2 text-negro-barbero outline-none transition-colors focus:border-cobre"
+              />
+            </label>
+
+            <label className="flex flex-col gap-2">
+              <span className="versalitas text-xs text-gris-calido-500">Teléfono de WhatsApp</span>
+              <input
+                type="tel"
+                value={form.telefono_whatsapp}
+                onChange={(e) => setForm((f) => ({ ...f, telefono_whatsapp: e.target.value }))}
+                placeholder="+56 9 1111 2222"
+                className="min-h-11 border-b border-gris-calido-200 bg-transparent py-2 text-negro-barbero outline-none transition-colors focus:border-cobre"
+              />
+            </label>
+
+            <div className="flex flex-col gap-2">
+              <span className="versalitas text-xs text-gris-calido-500">Cómo mostrar el WhatsApp</span>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setForm((f) => ({ ...f, estilo_whatsapp: 'enlace' }))}
+                  className={`versalitas rounded-md border px-3 py-2 text-xs transition-colors ${
+                    form.estilo_whatsapp === 'enlace'
+                      ? 'border-cobre text-cobre-texto'
+                      : 'border-gris-calido-200 text-gris-calido-500'
+                  }`}
+                >
+                  Enlace en el header
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setForm((f) => ({ ...f, estilo_whatsapp: 'burbuja' }))}
+                  className={`versalitas rounded-md border px-3 py-2 text-xs transition-colors ${
+                    form.estilo_whatsapp === 'burbuja'
+                      ? 'border-cobre text-cobre-texto'
+                      : 'border-gris-calido-200 text-gris-calido-500'
+                  }`}
+                >
+                  Burbuja flotante
+                </button>
+              </div>
+              <span className="text-xs text-gris-calido-500">
+                {form.estilo_whatsapp === 'burbuja'
+                  ? 'Un botón circular fijo en la esquina, visible en toda la página.'
+                  : 'El texto "Escribir por WhatsApp" junto a la dirección, en el encabezado.'}
+              </span>
+            </div>
+
+            {form.estilo_whatsapp === 'burbuja' && (
+              <div className="flex flex-col gap-4 rounded-lg border border-gris-calido-200 p-4">
+                <label className="flex flex-col gap-2">
+                  <span className="versalitas text-xs text-gris-calido-500">Color de la burbuja</span>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="color"
+                      value={form.whatsapp_color || '#a85c32'}
+                      onChange={(e) => setForm((f) => ({ ...f, whatsapp_color: e.target.value }))}
+                      className="h-11 w-14 cursor-pointer border border-gris-calido-200 bg-transparent"
+                    />
+                    {form.whatsapp_color && (
+                      <button
+                        type="button"
+                        onClick={() => setForm((f) => ({ ...f, whatsapp_color: '' }))}
+                        className="text-xs text-gris-calido-500 hover:text-red-700"
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+                  <span className="text-xs text-gris-calido-500">
+                    Sin elegir, usa el color de marca (arriba, en Identidad).
+                  </span>
+                </label>
+
+                <div className="flex flex-col gap-2">
+                  <span className="versalitas text-xs text-gris-calido-500">Tamaño</span>
+                  <div className="flex gap-2">
+                    {[
+                      ['chica', 'Chica'],
+                      ['mediana', 'Mediana'],
+                      ['grande', 'Grande'],
+                    ].map(([valor, etiqueta]) => (
+                      <button
+                        key={valor}
+                        type="button"
+                        onClick={() => setForm((f) => ({ ...f, whatsapp_tamano: valor }))}
+                        className={`versalitas rounded-md border px-3 py-2 text-xs transition-colors ${
+                          form.whatsapp_tamano === valor
+                            ? 'border-cobre text-cobre-texto'
+                            : 'border-gris-calido-200 text-gris-calido-500'
+                        }`}
+                      >
+                        {etiqueta}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
           </section>
 
           <section className="flex flex-col gap-4">
             <TituloGrupo numero="03">Secciones de la página</TituloGrupo>
             <p className="-mt-2 text-xs text-gris-calido-500">
               Click en una sección para abrirla y editarla — el orden de la lista es el orden real en
-              tu página, entre el encabezado y el formulario de reserva.
+              tu página, entre el encabezado y el formulario de reserva. Incluye galerías, bloques de
+              imagen y texto, y tu equipo de barberos — todo se puede reordenar entre sí, por ejemplo
+              para mostrar el equipo antes o después de las fotos del trabajo.
             </p>
 
             {form.secciones.map((seccion, indice) => {
@@ -475,9 +626,11 @@ export function PanelPersonalizacion() {
                     >
                       <span className="text-xs text-gris-calido-400">{abierta ? '▾' : '▸'}</span>
                       <span className="versalitas shrink-0 text-xs text-gris-calido-500">
-                        {seccion.tipo === 'galeria' ? 'Galería' : 'Imagen y texto'}
+                        {ETIQUETA_TIPO_SECCION[seccion.tipo]}
                       </span>
-                      <span className="truncate text-sm text-negro-barbero">{resumenSeccion(seccion)}</span>
+                      <span className="truncate text-sm text-negro-barbero">
+                        {resumenSeccion(seccion, equipoOrdenado.length)}
+                      </span>
                     </button>
                     <div className="flex shrink-0 gap-2 text-xs text-gris-calido-500">
                       <button type="button" onClick={() => moverSeccion(indice, -1)} disabled={indice === 0} className="disabled:opacity-30">
@@ -549,12 +702,11 @@ export function PanelPersonalizacion() {
                               </div>
                             ))}
                           </div>
-                          <input
-                            type="file"
-                            accept="image/*"
+                          <SelectorArchivo
+                            etiqueta="Agregar fotos"
+                            cargando={subiendo}
                             multiple
                             onChange={(e) => agregarImagenesAGaleria(seccion.id, e)}
-                            className="text-sm"
                           />
                         </div>
                       )}
@@ -569,7 +721,11 @@ export function PanelPersonalizacion() {
                                 Sin foto
                               </span>
                             )}
-                            <input type="file" accept="image/*" onChange={(e) => subirImagenDeSeccion(seccion.id, e)} className="text-sm" />
+                            <SelectorArchivo
+                              etiqueta="Seleccionar imagen"
+                              cargando={subiendo}
+                              onChange={(e) => subirImagenDeSeccion(seccion.id, e)}
+                            />
                           </div>
                           <input
                             type="text"
@@ -585,6 +741,63 @@ export function PanelPersonalizacion() {
                             placeholder="Texto que acompaña a la imagen"
                             className="border-b border-gris-calido-200 bg-transparent py-2 text-sm text-negro-barbero outline-none transition-colors focus:border-cobre"
                           />
+                        </div>
+                      )}
+
+                      {seccion.tipo === 'equipo' && (
+                        <div className="flex flex-col gap-4">
+                          <input
+                            type="text"
+                            value={seccion.titulo}
+                            onChange={(e) => actualizarSeccion(seccion.id, { titulo: e.target.value })}
+                            placeholder="Título de la sección — ej: Nuestro equipo"
+                            className="min-h-11 border-b border-gris-calido-200 bg-transparent py-2 text-sm text-negro-barbero outline-none transition-colors focus:border-cobre"
+                          />
+                          <p className="text-xs text-gris-calido-500">
+                            Este es el orden en que aparecen. Para agregar, quitar o editar la foto y la
+                            especialidad de un barbero, ve a la pestaña "Barberos".
+                          </p>
+                          {equipoOrdenado.length === 0 ? (
+                            <p className="text-sm text-gris-calido-500">Todavía no tienes barberos activos.</p>
+                          ) : (
+                            <div className="flex flex-col gap-2">
+                              {equipoOrdenado.map((barbero, i) => (
+                                <div
+                                  key={barbero.id}
+                                  className="flex items-center justify-between gap-3 rounded-lg border border-gris-calido-200 bg-white px-3 py-2"
+                                >
+                                  <div className="flex items-center gap-3">
+                                    {barbero.foto_url ? (
+                                      <img src={barbero.foto_url} alt={barbero.nombre} className="h-9 w-9 rounded-full object-cover" />
+                                    ) : (
+                                      <span className="flex h-9 w-9 items-center justify-center rounded-full border border-gris-calido-200 text-xs text-gris-calido-400">
+                                        {barbero.nombre.trim().charAt(0).toUpperCase()}
+                                      </span>
+                                    )}
+                                    <span className="text-sm text-negro-barbero">{barbero.nombre}</span>
+                                  </div>
+                                  <div className="flex gap-2 text-xs text-gris-calido-500">
+                                    <button
+                                      type="button"
+                                      onClick={() => moverBarberoEnEquipo(i, -1)}
+                                      disabled={i === 0}
+                                      className="disabled:opacity-30"
+                                    >
+                                      ↑
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => moverBarberoEnEquipo(i, 1)}
+                                      disabled={i === equipoOrdenado.length - 1}
+                                      className="disabled:opacity-30"
+                                    >
+                                      ↓
+                                    </button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
@@ -608,6 +821,18 @@ export function PanelPersonalizacion() {
               >
                 + Imagen y texto
               </button>
+              {/* Normalmente ya existe una (se agrega sola la primera vez que
+                  se carga esta pantalla) — este botón solo hace falta si se
+                  la borró a propósito y se quiere volver a mostrar el equipo. */}
+              {!form.secciones.some((s) => s.tipo === 'equipo') && (
+                <button
+                  type="button"
+                  onClick={() => agregarSeccion('equipo')}
+                  className="versalitas rounded-md border border-gris-calido-200 px-3 py-2 text-xs text-gris-calido-700 hover:border-cobre hover:text-cobre-texto"
+                >
+                  + Nuestro equipo
+                </button>
+              )}
             </div>
           </section>
 
@@ -669,20 +894,29 @@ export function PanelPersonalizacion() {
                 alrededor (viendo esto desde una pantalla grande) — en un
                 celular real ese ancho fijo no entra en el espacio ya angosto
                 de la propia pantalla y desborda la página; ahí el iframe
-                simplemente ocupa el ancho disponible (`w-full`), sin marco. */}
-            <div className="max-h-[80vh] overflow-auto rounded-lg border border-gris-calido-200 bg-white">
+                simplemente ocupa el ancho disponible (`w-full`), sin marco.
+                La ALTURA es fija (80% del alto de la ventana) y el <iframe>
+                scrollea por dentro si el contenido es más alto — a propósito
+                nomás: es lo mismo que pasa en un navegador real (una ventana
+                de tamaño fijo, con scroll interno), y es lo único que hace
+                que elementos con posición fija de verdad (como la burbuja de
+                WhatsApp) queden pegados al borde de ESTA ventana en vez de
+                aparecer perdidos al final de todo el contenido. Por eso no
+                hay ningún `overflow` puesto en esta caja de afuera — el único
+                scroll tiene que ser el del <iframe>, nunca dos superpuestos. */}
+            <div className="overflow-hidden rounded-lg border border-gris-calido-200 bg-white">
               <div className={modoVista === 'movil' && !esMobile ? 'mx-auto w-[390px] py-4' : ''}>
                 <iframe
                   ref={iframeRef}
                   src="/_preview-barberia"
                   title="Vista previa de la página pública"
                   onLoad={alCargarIframe}
-                  className={`border-0 bg-hueso ${
+                  className={`h-[80vh] border-0 bg-hueso ${
                     modoVista === 'movil'
                       ? esMobile
-                        ? 'h-[900px] w-full'
-                        : 'h-[900px] w-[390px] rounded-lg shadow-lg'
-                      : 'h-[1600px] w-full min-w-[768px]'
+                        ? 'w-full'
+                        : 'w-[390px] rounded-lg shadow-lg'
+                      : 'w-full min-w-[768px]'
                   }`}
                 />
               </div>

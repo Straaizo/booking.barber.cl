@@ -1,5 +1,6 @@
 import { ESTADO_ACTIVO, ESTADO_PENDIENTE_ACTIVACION } from '../utils/estados'
 import { normalizarPersonalizacion } from '../utils/personalizacion'
+import { ROL_BARBERO } from '../utils/roles'
 
 // TEMPORAL: mientras no haya un Supabase real conectado (VITE_SUPABASE_URL
 // en `.env` sigue siendo el placeholder de ejemplo), el panel superadmin y la
@@ -41,26 +42,62 @@ const BARBERIAS_SEED = [
       banner_url: null,
       secciones: [],
     },
+    // `barbero_id: null` = servicio compartido de la barbería (lo que ve
+    // cualquier barbero por defecto). Un servicio con `barbero_id` puesto es
+    // del catálogo PROPIO de ese barbero — solo existe si el dueño le activó
+    // "servicios propios" (ver `activarCatalogoPropioProvisorio` más abajo).
     servicios: [
-      { id: 'prov-servicio-1', nombre: 'Corte clásico', duracion_minutos: 30, precio_clp: 8000, precio_oferta: null, oferta_activa: false, oferta_vence: null, activo: true },
-      { id: 'prov-servicio-2', nombre: 'Corte + Barba', duracion_minutos: 45, precio_clp: 13000, precio_oferta: 11000, oferta_activa: true, oferta_vence: null, activo: true },
-      { id: 'prov-servicio-3', nombre: 'Afeitado a la antigua', duracion_minutos: 25, precio_clp: 7500, precio_oferta: null, oferta_activa: false, oferta_vence: null, activo: true },
+      { id: 'prov-servicio-1', nombre: 'Corte clásico', duracion_minutos: 30, precio_clp: 8000, precio_oferta: null, oferta_activa: false, oferta_vence: null, activo: true, barbero_id: null },
+      { id: 'prov-servicio-2', nombre: 'Corte + Barba', duracion_minutos: 45, precio_clp: 13000, precio_oferta: 11000, oferta_activa: true, oferta_vence: null, activo: true, barbero_id: null },
+      { id: 'prov-servicio-3', nombre: 'Afeitado a la antigua', duracion_minutos: 25, precio_clp: 7500, precio_oferta: null, oferta_activa: false, oferta_vence: null, activo: true, barbero_id: null },
     ],
     barberos: [
-      { id: 'prov-barbero-1', nombre: 'Manuel Rojas', activo: true, foto_url: null, especialidad: 'Cortes clásicos y degradados' },
-      { id: 'prov-barbero-2', nombre: 'Ignacio Soto', activo: true, foto_url: null, especialidad: 'Barba y afeitado a la antigua' },
+      { id: 'prov-barbero-1', nombre: 'Manuel Rojas', activo: true, foto_url: null, especialidad: 'Cortes clásicos y degradados', usa_catalogo_propio: false },
+      { id: 'prov-barbero-2', nombre: 'Ignacio Soto', activo: true, foto_url: null, especialidad: 'Barba y afeitado a la antigua', usa_catalogo_propio: false },
     ],
     historial: [],
   },
 ]
 
+// Lunes a sábado, 10:00–19:00 para los dos barberos de la barbería seed —
+// mismo horario estándar que ya usaba la barbería demo (`config/demo.js`),
+// para que el asistente de reserva tenga algo que mostrar sin configurar
+// nada primero.
+function horarioEstandarPara(barberoId) {
+  return [1, 2, 3, 4, 5, 6].map((diaSemana) => ({
+    id: `prov-horario-${barberoId}-${diaSemana}`,
+    barbero_id: barberoId,
+    dia_semana: diaSemana,
+    hora_inicio: '10:00',
+    hora_fin: '19:00',
+    activo: true,
+  }))
+}
+
+const HORARIOS_DISPONIBLES_SEED = [
+  ...horarioEstandarPara('prov-barbero-1'),
+  ...horarioEstandarPara('prov-barbero-2'),
+]
+
+const RESERVAS_SEED = []
+
 function leerEstado() {
   try {
     const crudo = localStorage.getItem(CLAVE_STORAGE)
     if (!crudo) throw new Error('sin datos guardados todavía')
-    return JSON.parse(crudo)
+    const estado = JSON.parse(crudo)
+    // Migración suave para sesiones que guardaron el estado antes de que
+    // existieran `horarios_disponibles`/`reservas` como tablas propias.
+    estado.horarios_disponibles = estado.horarios_disponibles ?? HORARIOS_DISPONIBLES_SEED
+    estado.reservas = estado.reservas ?? RESERVAS_SEED
+    return estado
   } catch {
-    const inicial = { barberias: BARBERIAS_SEED, planes: PLANES_SEED }
+    const inicial = {
+      barberias: BARBERIAS_SEED,
+      planes: PLANES_SEED,
+      horarios_disponibles: HORARIOS_DISPONIBLES_SEED,
+      reservas: RESERVAS_SEED,
+    }
     localStorage.setItem(CLAVE_STORAGE, JSON.stringify(inicial))
     return inicial
   }
@@ -68,6 +105,10 @@ function leerEstado() {
 
 function guardarEstado(estado) {
   localStorage.setItem(CLAVE_STORAGE, JSON.stringify(estado))
+}
+
+function idNuevo(prefijo) {
+  return `${prefijo}-${Date.now()}-${Math.floor(Math.random() * 10000)}`
 }
 
 export async function listarBarberiasProvisorias() {
@@ -214,6 +255,8 @@ export async function guardarPersonalizacionProvisoria(barberiaId, cambios) {
   if (!barberia) throw new Error('Barbería provisoria no encontrada: ' + barberiaId)
   barberia.personalizacion = { ...barberia.personalizacion, ...cambios }
   if ('logo_url' in cambios) barberia.logo_url = cambios.logo_url
+  if ('direccion' in cambios) barberia.direccion = cambios.direccion
+  if ('telefono_whatsapp' in cambios) barberia.telefono_whatsapp = cambios.telefono_whatsapp
   guardarEstado(estado)
   return barberia.personalizacion
 }
@@ -229,7 +272,7 @@ export async function crearBarberoProvisorio(barberiaId, nombre) {
   const estado = leerEstado()
   const barberia = estado.barberias.find((b) => b.id === barberiaId)
   if (!barberia) throw new Error('Barbería provisoria no encontrada: ' + barberiaId)
-  const nuevo = { id: 'prov-barbero-' + Date.now(), nombre, activo: true, foto_url: null, especialidad: '' }
+  const nuevo = { id: 'prov-barbero-' + Date.now(), nombre, activo: true, foto_url: null, especialidad: '', usa_catalogo_propio: false }
   barberia.barberos = [...(barberia.barberos ?? []), nuevo]
   guardarEstado(estado)
   return nuevo
@@ -247,4 +290,220 @@ export async function actualizarBarberoProvisorio(barberiaId, id, cambios) {
   })
   guardarEstado(estado)
   return actualizado
+}
+
+// Al activar "servicios propios" por primera vez, el barbero arranca con
+// una COPIA editable del catálogo compartido (no de cero) — así puede seguir
+// cobrando lo mismo que ya cobraba y ajustar desde ahí, en vez de tener que
+// armar su lista entera antes de poder seguir recibiendo reservas. Si ya
+// tenía servicios propios de una activación anterior (los desactivó y volvió
+// a activar), no se duplican — se reusan los que ya tenía.
+export async function activarCatalogoPropioProvisorio(barberiaId, barberoId) {
+  const estado = leerEstado()
+  const barberia = estado.barberias.find((b) => b.id === barberiaId)
+  if (!barberia) throw new Error('Barbería provisoria no encontrada: ' + barberiaId)
+  const barbero = barberia.barberos.find((b) => b.id === barberoId)
+  if (!barbero) throw new Error('Barbero provisorio no encontrado: ' + barberoId)
+
+  const yaTieneCatalogoPropio = barberia.servicios.some((s) => s.barbero_id === barberoId)
+  if (!yaTieneCatalogoPropio) {
+    const copias = barberia.servicios
+      .filter((s) => !s.barbero_id)
+      .map((s) => ({ ...s, id: idNuevo('prov-servicio'), barbero_id: barberoId }))
+    barberia.servicios = [...barberia.servicios, ...copias]
+  }
+  barbero.usa_catalogo_propio = true
+  guardarEstado(estado)
+  return barbero
+}
+
+// Se guardan los servicios propios (no se borran) al desactivar — si el
+// dueño lo vuelve a activar más adelante, el barbero recupera lo que ya
+// tenía armado en vez de partir de cero otra vez.
+export async function desactivarCatalogoPropioProvisorio(barberiaId, barberoId) {
+  const estado = leerEstado()
+  const barberia = estado.barberias.find((b) => b.id === barberiaId)
+  if (!barberia) throw new Error('Barbería provisoria no encontrada: ' + barberiaId)
+  const barbero = barberia.barberos.find((b) => b.id === barberoId)
+  if (!barbero) throw new Error('Barbero provisorio no encontrado: ' + barberoId)
+  barbero.usa_catalogo_propio = false
+  guardarEstado(estado)
+  return barbero
+}
+
+// Catálogo COMPARTIDO de la barbería (`barbero_id` vacío) — lo que administra
+// el dueño desde la pestaña "Servicios" del panel admin.
+export async function listarServiciosAdminProvisorios(barberiaId) {
+  const { barberias } = leerEstado()
+  const barberia = barberias.find((b) => b.id === barberiaId)
+  if (!barberia) throw new Error('Barbería provisoria no encontrada: ' + barberiaId)
+  return barberia.servicios.filter((s) => !s.barbero_id).sort((a, b) => a.nombre.localeCompare(b.nombre))
+}
+
+export async function crearServicioAdminProvisorio(barberiaId, datos) {
+  const estado = leerEstado()
+  const barberia = estado.barberias.find((b) => b.id === barberiaId)
+  if (!barberia) throw new Error('Barbería provisoria no encontrada: ' + barberiaId)
+  const nuevo = { id: idNuevo('prov-servicio'), activo: true, barbero_id: null, ...datos }
+  barberia.servicios = [...barberia.servicios, nuevo]
+  guardarEstado(estado)
+  return nuevo
+}
+
+// Catálogo PROPIO de un barbero (`barbero_id` puesto) — lo administra el
+// barbero mismo desde su panel, solo si el dueño le activó "servicios propios".
+export async function listarServiciosDeBarberoProvisorios(barberiaId, barberoId) {
+  const { barberias } = leerEstado()
+  const barberia = barberias.find((b) => b.id === barberiaId)
+  if (!barberia) throw new Error('Barbería provisoria no encontrada: ' + barberiaId)
+  return barberia.servicios.filter((s) => s.barbero_id === barberoId).sort((a, b) => a.nombre.localeCompare(b.nombre))
+}
+
+export async function crearServicioDeBarberoProvisorio(barberiaId, barberoId, datos) {
+  const estado = leerEstado()
+  const barberia = estado.barberias.find((b) => b.id === barberiaId)
+  if (!barberia) throw new Error('Barbería provisoria no encontrada: ' + barberiaId)
+  const nuevo = { id: idNuevo('prov-servicio'), activo: true, barbero_id: barberoId, ...datos }
+  barberia.servicios = [...barberia.servicios, nuevo]
+  guardarEstado(estado)
+  return nuevo
+}
+
+// Genérica — sirve tanto para un servicio compartido (panel admin) como para
+// uno propio de un barbero (panel barbero): ambos son filas del mismo array,
+// solo cambia qué lista los trae a la pantalla.
+export async function actualizarServicioProvisorio(barberiaId, id, cambios) {
+  const estado = leerEstado()
+  const barberia = estado.barberias.find((b) => b.id === barberiaId)
+  if (!barberia) throw new Error('Barbería provisoria no encontrada: ' + barberiaId)
+  let actualizado = null
+  barberia.servicios = barberia.servicios.map((s) => {
+    if (s.id !== id) return s
+    actualizado = { ...s, ...cambios }
+    return actualizado
+  })
+  guardarEstado(estado)
+  return actualizado
+}
+
+export async function listarHorariosDisponiblesProvisorios(barberoId) {
+  const { horarios_disponibles } = leerEstado()
+  return horarios_disponibles
+    .filter((h) => h.barbero_id === barberoId && h.activo)
+    .sort((a, b) => a.dia_semana - b.dia_semana)
+}
+
+// Para el panel (dueño o el barbero editando lo suyo) — a diferencia de la
+// anterior, incluye también los bloques desactivados (para poder reactivarlos).
+export async function listarHorariosDeBarberoProvisorios(barberoId) {
+  const { horarios_disponibles } = leerEstado()
+  return horarios_disponibles
+    .filter((h) => h.barbero_id === barberoId)
+    .sort((a, b) => a.dia_semana - b.dia_semana)
+}
+
+export async function crearHorarioProvisorio(barberoId, datos) {
+  const estado = leerEstado()
+  const nuevo = { id: idNuevo('prov-horario'), barbero_id: barberoId, activo: true, ...datos }
+  estado.horarios_disponibles = [...estado.horarios_disponibles, nuevo]
+  guardarEstado(estado)
+  return nuevo
+}
+
+export async function actualizarHorarioProvisorio(id, cambios) {
+  const estado = leerEstado()
+  let actualizado = null
+  estado.horarios_disponibles = estado.horarios_disponibles.map((h) => {
+    if (h.id !== id) return h
+    actualizado = { ...h, ...cambios }
+    return actualizado
+  })
+  guardarEstado(estado)
+  return actualizado
+}
+
+export async function listarReservasDelDiaProvisorias(barberoId, fechaISO) {
+  const { reservas } = leerEstado()
+  return reservas
+    .filter(
+      (r) =>
+        r.barbero_id === barberoId &&
+        r.estado !== 'cancelada' &&
+        r.fecha_hora.slice(0, 10) === fechaISO
+    )
+    .map((r) => ({ fecha_hora: r.fecha_hora, servicio_id: r.servicio_id }))
+}
+
+export async function crearReservaProvisoria(reserva) {
+  const estado = leerEstado()
+  const nueva = { id: idNuevo('prov-reserva'), ...reserva }
+  estado.reservas = [...estado.reservas, nueva]
+  guardarEstado(estado)
+  return nueva
+}
+
+// Arma el mismo shape que devuelve el select real con joins
+// (`servicios(nombre, precio_clp)`, `barberos(nombre)`) a mano, buscando en
+// las listas de esa barbería — en el mock no hay joins de verdad.
+function conNombresProvisorios(reserva, barberia) {
+  const servicio = barberia?.servicios.find((s) => s.id === reserva.servicio_id)
+  const barbero = barberia?.barberos.find((b) => b.id === reserva.barbero_id)
+  return {
+    ...reserva,
+    servicios: servicio ? { nombre: servicio.nombre, precio_clp: servicio.precio_clp } : null,
+    barberos: barbero ? { nombre: barbero.nombre } : null,
+  }
+}
+
+export async function listarReservasBandejaProvisorias(barberiaId) {
+  const { barberias, reservas } = leerEstado()
+  const barberia = barberias.find((b) => b.id === barberiaId)
+  return reservas
+    .filter((r) => r.barberia_id === barberiaId)
+    .sort((a, b) => a.fecha_hora.localeCompare(b.fecha_hora))
+    .map((r) => conNombresProvisorios(r, barberia))
+}
+
+// Mismo shape que la anterior, pero filtrado a un solo barbero — para su
+// propio panel de reservas, no el del dueño (que ve todas las de la barbería).
+export async function listarReservasDeBarberoProvisorias(barberoId) {
+  const { barberias, reservas } = leerEstado()
+  const barberia = barberias.find((b) => b.barberos?.some((x) => x.id === barberoId))
+  return reservas
+    .filter((r) => r.barbero_id === barberoId)
+    .sort((a, b) => a.fecha_hora.localeCompare(b.fecha_hora))
+    .map((r) => conNombresProvisorios(r, barberia))
+}
+
+export async function cancelarReservaProvisoria(id) {
+  const estado = leerEstado()
+  estado.reservas = estado.reservas.map((r) => (r.id === id ? { ...r, estado: 'cancelada' } : r))
+  guardarEstado(estado)
+}
+
+// Para el selector temporal "Ver como" (dueño/barbero) del panel — no hay
+// login real que resolver todavía, así que esto reemplaza a una consulta de
+// `usuarios` por rol. Se lee de forma síncrona (sin awaits) porque
+// `AuthContext` necesita el perfil disponible antes del primer render, igual
+// que el resto del modo provisorio.
+export function listarBarberosParaSelectorProvisorio() {
+  const { barberias } = leerEstado()
+  const barberia = barberias.find((b) => b.id === ID_BARBERIA_PROVISORIA)
+  return (barberia?.barberos ?? []).map((b) => ({ id: b.id, nombre: b.nombre }))
+}
+
+export function perfilProvisorioParaBarbero(barberoId) {
+  const { barberias } = leerEstado()
+  const barberia = barberias.find((b) => b.id === ID_BARBERIA_PROVISORIA)
+  const barbero = barberia?.barberos.find((b) => b.id === barberoId)
+  if (!barbero) return null
+  return {
+    id: 'prov-usuario-barbero-' + barbero.id,
+    usuario: barbero.nombre,
+    nombre: `${barbero.nombre} (modo provisorio)`,
+    rol_id: ROL_BARBERO,
+    barberia_id: ID_BARBERIA_PROVISORIA,
+    barbero_id: barbero.id,
+    barberias: { estado_id: ESTADO_ACTIVO },
+  }
 }

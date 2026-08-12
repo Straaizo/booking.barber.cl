@@ -1,12 +1,23 @@
 import { motion } from 'framer-motion'
+import { BackButton } from '../../../components/common/BackButton'
 import { formatoCLP, ofertaVigente } from '../../../utils/formatos'
 
-export function PasoServicio({ servicios, onSeleccionar }) {
+// `onVolver` es opcional: cuando hay un solo barbero (se auto-selecciona sin
+// mostrar ese paso), este termina siendo el primer paso del asistente y no
+// tiene a dónde volver.
+export function PasoServicio({ servicios, onSeleccionar, onVolver }) {
   return (
     <div>
-      <h2 className="font-display mb-1 text-xl font-light tracking-tight text-negro-barbero md:text-2xl">
+      {onVolver && <BackButton onClick={onVolver} />}
+      <h2 className={`font-display mb-1 text-xl font-light tracking-tight text-negro-barbero md:text-2xl ${onVolver ? 'mt-3' : ''}`}>
         Elige un servicio
       </h2>
+
+      {servicios.length === 0 && (
+        <p className="mt-4 text-sm text-gris-calido-700">
+          Este barbero no tiene servicios disponibles por ahora.
+        </p>
+      )}
 
       <div className="mt-4 flex flex-col">
         {servicios.map((servicio) => {

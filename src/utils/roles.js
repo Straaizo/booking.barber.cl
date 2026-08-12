@@ -6,6 +6,6 @@ export const ROL_BARBERO = 3
 export function rutaPorRol(rolId) {
   if (rolId === ROL_SUPERADMIN) return '/admin'
   if (rolId === ROL_ADMIN) return '/panel'
-  if (rolId === ROL_BARBERO) return '/panel/precios'
+  if (rolId === ROL_BARBERO) return '/panel/barbero'
   return '/login'
 }
