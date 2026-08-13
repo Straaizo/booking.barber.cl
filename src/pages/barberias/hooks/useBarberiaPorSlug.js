@@ -11,7 +11,7 @@ async function obtenerBarberiaPorSlug(slug) {
       id, slug, nombre, telefono_whatsapp, email_contacto, direccion, logo_url, estado_id,
       personalizacion (color_primario, color_header, fuente_display, eslogan, descripcion, banner_url, secciones, orden_equipo, estilo_whatsapp, whatsapp_color, whatsapp_tamano),
       servicios (id, nombre, duracion_minutos, precio_clp, precio_oferta, oferta_activa, oferta_vence, activo, barbero_id),
-      barberos (id, nombre, activo, foto_url, especialidad, usa_catalogo_propio)
+      barberos (id, nombre, activo, foto_url, especialidad, usa_catalogo_propio, intervalo_reserva_minutos)
     `
     )
     .eq('slug', slug)

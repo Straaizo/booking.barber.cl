@@ -1,6 +1,7 @@
 import { ESTADO_ACTIVO, ESTADO_PENDIENTE_ACTIVACION } from '../utils/estados'
 import { normalizarPersonalizacion } from '../utils/personalizacion'
 import { ROL_BARBERO } from '../utils/roles'
+import { generarUsuarioDesdeNombre } from '../utils/usuarios'
 
 // TEMPORAL: mientras no haya un Supabase real conectado (VITE_SUPABASE_URL
 // en `.env` sigue siendo el placeholder de ejemplo), el panel superadmin y la
@@ -14,6 +15,12 @@ const CLAVE_STORAGE = 'booking_barber_datos_provisorios_v1'
 
 export const ID_BARBERIA_PROVISORIA = 'prov-barberia-1'
 export const ID_USUARIO_PROVISORIO = 'prov-usuario-1'
+
+// Credenciales del dueño en modo provisorio — fijas (no generadas) para que
+// siempre se pueda entrar a probar sin tener que ir a mirar el localStorage.
+// Se autodesactivan junto con el resto de lo provisorio en cuanto haya un
+// Supabase real conectado.
+export const ADMIN_PROVISORIO = { usuario: 'demo', password_provisoria: 'demo1234' }
 
 const PLANES_SEED = [
   { id: 1, nombre: 'Solo', precio_clp: 5000, max_barberos: 1, orden: 1 },
@@ -52,8 +59,8 @@ const BARBERIAS_SEED = [
       { id: 'prov-servicio-3', nombre: 'Afeitado a la antigua', duracion_minutos: 25, precio_clp: 7500, precio_oferta: null, oferta_activa: false, oferta_vence: null, activo: true, barbero_id: null },
     ],
     barberos: [
-      { id: 'prov-barbero-1', nombre: 'Manuel Rojas', activo: true, foto_url: null, especialidad: 'Cortes clásicos y degradados', usa_catalogo_propio: false },
-      { id: 'prov-barbero-2', nombre: 'Ignacio Soto', activo: true, foto_url: null, especialidad: 'Barba y afeitado a la antigua', usa_catalogo_propio: false },
+      { id: 'prov-barbero-1', nombre: 'Manuel Rojas', activo: true, foto_url: null, especialidad: 'Cortes clásicos y degradados', usa_catalogo_propio: false, intervalo_reserva_minutos: 30, usuario: 'mrojas', password_provisoria: 'barbero123' },
+      { id: 'prov-barbero-2', nombre: 'Ignacio Soto', activo: true, foto_url: null, especialidad: 'Barba y afeitado a la antigua', usa_catalogo_propio: false, intervalo_reserva_minutos: 30, usuario: 'isoto', password_provisoria: 'barbero123' },
     ],
     historial: [],
   },
@@ -80,6 +87,7 @@ const HORARIOS_DISPONIBLES_SEED = [
 ]
 
 const RESERVAS_SEED = []
+const EXCEPCIONES_HORARIO_SEED = []
 
 function leerEstado() {
   try {
@@ -87,9 +95,11 @@ function leerEstado() {
     if (!crudo) throw new Error('sin datos guardados todavía')
     const estado = JSON.parse(crudo)
     // Migración suave para sesiones que guardaron el estado antes de que
-    // existieran `horarios_disponibles`/`reservas` como tablas propias.
+    // existieran `horarios_disponibles`/`reservas`/`excepciones_horario` como
+    // tablas propias.
     estado.horarios_disponibles = estado.horarios_disponibles ?? HORARIOS_DISPONIBLES_SEED
     estado.reservas = estado.reservas ?? RESERVAS_SEED
+    estado.excepciones_horario = estado.excepciones_horario ?? EXCEPCIONES_HORARIO_SEED
     return estado
   } catch {
     const inicial = {
@@ -97,6 +107,7 @@ function leerEstado() {
       planes: PLANES_SEED,
       horarios_disponibles: HORARIOS_DISPONIBLES_SEED,
       reservas: RESERVAS_SEED,
+      excepciones_horario: EXCEPCIONES_HORARIO_SEED,
     }
     localStorage.setItem(CLAVE_STORAGE, JSON.stringify(inicial))
     return inicial
@@ -268,11 +279,27 @@ export async function listarBarberosProvisorios(barberiaId) {
   return [...(barberia.barberos ?? [])].sort((a, b) => a.nombre.localeCompare(b.nombre))
 }
 
-export async function crearBarberoProvisorio(barberiaId, nombre) {
+function usuariosOcupadosProvisorios(estado) {
+  const usuariosDeBarberos = estado.barberias.flatMap((b) => (b.barberos ?? []).map((barbero) => barbero.usuario))
+  return [ADMIN_PROVISORIO.usuario, ...usuariosDeBarberos].filter(Boolean)
+}
+
+export async function crearBarberoProvisorio(barberiaId, nombre, password) {
   const estado = leerEstado()
   const barberia = estado.barberias.find((b) => b.id === barberiaId)
   if (!barberia) throw new Error('Barbería provisoria no encontrada: ' + barberiaId)
-  const nuevo = { id: 'prov-barbero-' + Date.now(), nombre, activo: true, foto_url: null, especialidad: '', usa_catalogo_propio: false }
+  const usuario = generarUsuarioDesdeNombre(nombre, usuariosOcupadosProvisorios(estado))
+  const nuevo = {
+    id: 'prov-barbero-' + Date.now(),
+    nombre,
+    activo: true,
+    foto_url: null,
+    especialidad: '',
+    usa_catalogo_propio: false,
+    intervalo_reserva_minutos: 30,
+    usuario,
+    password_provisoria: password,
+  }
   barberia.barberos = [...(barberia.barberos ?? []), nuevo]
   guardarEstado(estado)
   return nuevo
@@ -290,6 +317,57 @@ export async function actualizarBarberoProvisorio(barberiaId, id, cambios) {
   })
   guardarEstado(estado)
   return actualizado
+}
+
+// El dueño escribe la contraseña nueva a mano (no una generada al azar) —
+// tiene que poder ser algo que el barbero pueda usar de inmediato, ahí
+// mismo, sin depender de que alguien le dicte o le escriba una cadena rara.
+export async function establecerContrasenaBarberoProvisoria(barberiaId, id, password) {
+  const estado = leerEstado()
+  const barberia = estado.barberias.find((b) => b.id === barberiaId)
+  if (!barberia) throw new Error('Barbería provisoria no encontrada: ' + barberiaId)
+  let actualizado = null
+  barberia.barberos = (barberia.barberos ?? []).map((b) => {
+    if (b.id !== id) return b
+    actualizado = { ...b, password_provisoria: password }
+    return actualizado
+  })
+  guardarEstado(estado)
+  return actualizado
+}
+
+// Borra al barbero y todo lo que era solo suyo (su horario, sus excepciones
+// puntuales, y su catálogo propio si tenía uno) — las reservas ya tomadas se
+// dejan intactas, son un registro histórico, no algo que le "pertenece" al
+// barbero en el mismo sentido.
+export async function eliminarBarberoProvisorio(barberiaId, id) {
+  const estado = leerEstado()
+  const barberia = estado.barberias.find((b) => b.id === barberiaId)
+  if (!barberia) throw new Error('Barbería provisoria no encontrada: ' + barberiaId)
+  barberia.barberos = (barberia.barberos ?? []).filter((b) => b.id !== id)
+  barberia.servicios = (barberia.servicios ?? []).filter((s) => s.barbero_id !== id)
+  estado.horarios_disponibles = estado.horarios_disponibles.filter((h) => h.barbero_id !== id)
+  estado.excepciones_horario = estado.excepciones_horario.filter((e) => e.barbero_id !== id)
+  guardarEstado(estado)
+}
+
+// Valida usuario+contraseña contra el dueño provisorio o cualquier barbero de
+// la (única) barbería provisoria — reemplaza al selector "Ver como" como la
+// forma real de entrar como barbero, dentro de este modo de prueba. La
+// contraseña vive en texto plano en `localStorage` porque no hay backend
+// real que la resguarde todavía — aceptable solo porque esto es
+// explícitamente modo de prueba, nunca producción.
+export function validarCredencialesProvisorias(usuario, password) {
+  const usuarioNormalizado = usuario.trim().toLowerCase()
+  if (usuarioNormalizado === ADMIN_PROVISORIO.usuario && password === ADMIN_PROVISORIO.password_provisoria) {
+    return { tipo: 'dueno' }
+  }
+  const { barberias } = leerEstado()
+  const barberia = barberias.find((b) => b.id === ID_BARBERIA_PROVISORIA)
+  const barbero = (barberia?.barberos ?? []).find(
+    (b) => b.usuario?.toLowerCase() === usuarioNormalizado && b.password_provisoria === password
+  )
+  return barbero ? { tipo: 'barbero', barberoId: barbero.id } : null
 }
 
 // Al activar "servicios propios" por primera vez, el barbero arranca con
@@ -422,6 +500,41 @@ export async function actualizarHorarioProvisorio(id, cambios) {
   return actualizado
 }
 
+// Excepciones puntuales: un bloque distinto (o el día cerrado entero) para
+// una fecha exacta, sin tocar el horario semanal recurrente — pensado para
+// "llego tarde mañana" o "no trabajo ese día en particular", no para un
+// cambio permanente (eso ya lo cubre `horarios_disponibles`).
+export async function listarExcepcionesDeBarberoProvisorias(barberoId) {
+  const { excepciones_horario } = leerEstado()
+  return excepciones_horario
+    .filter((e) => e.barbero_id === barberoId)
+    .sort((a, b) => a.fecha.localeCompare(b.fecha))
+}
+
+export async function crearExcepcionProvisoria(barberoId, datos) {
+  const estado = leerEstado()
+  const nueva = {
+    id: idNuevo('prov-excepcion'),
+    barbero_id: barberoId,
+    cerrado: false,
+    hora_inicio: null,
+    hora_fin: null,
+    ...datos,
+  }
+  estado.excepciones_horario = [
+    ...estado.excepciones_horario.filter((e) => !(e.barbero_id === barberoId && e.fecha === nueva.fecha)),
+    nueva,
+  ]
+  guardarEstado(estado)
+  return nueva
+}
+
+export async function eliminarExcepcionProvisoria(id) {
+  const estado = leerEstado()
+  estado.excepciones_horario = estado.excepciones_horario.filter((e) => e.id !== id)
+  guardarEstado(estado)
+}
+
 export async function listarReservasDelDiaProvisorias(barberoId, fechaISO) {
   const { reservas } = leerEstado()
   return reservas
@@ -499,7 +612,7 @@ export function perfilProvisorioParaBarbero(barberoId) {
   if (!barbero) return null
   return {
     id: 'prov-usuario-barbero-' + barbero.id,
-    usuario: barbero.nombre,
+    usuario: barbero.usuario,
     nombre: `${barbero.nombre} (modo provisorio)`,
     rol_id: ROL_BARBERO,
     barberia_id: ID_BARBERIA_PROVISORIA,

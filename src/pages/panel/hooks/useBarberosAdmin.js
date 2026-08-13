@@ -5,11 +5,13 @@ import {
   listarBarberosProvisorios,
   crearBarberoProvisorio,
   actualizarBarberoProvisorio,
+  eliminarBarberoProvisorio,
+  establecerContrasenaBarberoProvisoria,
   activarCatalogoPropioProvisorio,
   desactivarCatalogoPropioProvisorio,
 } from '../../../mocks/datosProvisoriosSuperadmin'
 
-const COLUMNAS = 'id, nombre, activo, foto_url, especialidad, usa_catalogo_propio'
+const COLUMNAS = 'id, nombre, activo, foto_url, especialidad, usa_catalogo_propio, intervalo_reserva_minutos'
 
 function clave(barberiaId) {
   return ['barberos_admin', barberiaId]
@@ -38,8 +40,8 @@ export function useBarberosAdmin(barberiaId) {
 export function useCrearBarbero(barberiaId) {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: async (nombre) => {
-      if (!HAY_BACKEND_REAL) return crearBarberoProvisorio(barberiaId, nombre)
+    mutationFn: async ({ nombre, password }) => {
+      if (!HAY_BACKEND_REAL) return crearBarberoProvisorio(barberiaId, nombre, password)
       const { data, error } = await supabase
         .from('barberos')
         .insert({ barberia_id: barberiaId, nombre, activo: true })
@@ -65,6 +67,36 @@ export function useActualizarBarbero(barberiaId) {
         .single()
       if (error) throw error
       return data
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: clave(barberiaId) }),
+  })
+}
+
+export function useEliminarBarbero(barberiaId) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (barberoId) => {
+      if (!HAY_BACKEND_REAL) return eliminarBarberoProvisorio(barberiaId, barberoId)
+      const { error } = await supabase.from('barberos').delete().eq('id', barberoId)
+      if (error) throw error
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: clave(barberiaId) }),
+  })
+}
+
+// El dueño escribe la contraseña nueva a mano. Del lado real todavía no hay
+// forma de hacer esto: cambiar la contraseña de una cuenta de verdad
+// necesita la clave de servicio de Supabase, que nunca puede vivir en código
+// de navegador — requiere una función de servidor (Edge Function) que hoy
+// no existe.
+export function useEstablecerContrasenaBarbero(barberiaId) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ barberoId, password }) => {
+      if (!HAY_BACKEND_REAL) return establecerContrasenaBarberoProvisoria(barberiaId, barberoId, password)
+      throw new Error(
+        'Cambiar la contraseña todavía no está disponible con el backend real conectado — falta la función de servidor que actualice la cuenta.'
+      )
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: clave(barberiaId) }),
   })

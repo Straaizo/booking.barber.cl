@@ -2,9 +2,11 @@ import { useEffect, useState } from 'react'
 import { useAuth } from '../../hooks/useAuth'
 import { Loader } from '../../components/common/Loader'
 import { Button } from '../../components/common/Button'
-import { useBarberosAdmin } from './hooks/useBarberosAdmin'
+import { useBarberosAdmin, useActualizarBarbero } from './hooks/useBarberosAdmin'
 import { useHorariosDeBarbero, useCrearHorario, useActualizarHorario } from './hooks/useHorariosAdmin'
 import { FilaHorario } from './components/FilaHorario'
+import { SelectorIntervaloReserva } from './components/SelectorIntervaloReserva'
+import { ExcepcionesHorario } from './components/ExcepcionesHorario'
 
 const DIAS = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
 
@@ -20,6 +22,8 @@ export function PanelHorarios() {
   const { data: horarios, isLoading, isError } = useHorariosDeBarbero(barberoId)
   const crearHorario = useCrearHorario(barberoId)
   const actualizarHorario = useActualizarHorario(barberoId)
+  const actualizarBarbero = useActualizarBarbero(perfil.barberia_id)
+  const barberoActivo = barberos?.find((b) => b.id === barberoId)
 
   const [nuevo, setNuevo] = useState({ dia_semana: '1', hora_inicio: '09:00', hora_fin: '19:00' })
   const [errorEnvio, setErrorEnvio] = useState(null)
@@ -79,6 +83,21 @@ export function PanelHorarios() {
             ))}
           </div>
 
+          {barberoActivo && (
+            <div className="mt-6 flex flex-col gap-4">
+              <SelectorIntervaloReserva
+                barbero={barberoActivo}
+                onGuardar={(valor) =>
+                  actualizarBarbero.mutateAsync({
+                    id: barberoActivo.id,
+                    cambios: { intervalo_reserva_minutos: valor },
+                  })
+                }
+              />
+              <ExcepcionesHorario barberoId={barberoActivo.id} />
+            </div>
+          )}
+
           <div className="mt-8">
             {isLoading && (
               <div className="py-12">
@@ -99,7 +118,7 @@ export function PanelHorarios() {
             )}
 
             {horarios && horarios.length > 0 && (
-              <div className="border-t border-gris-calido-200">
+              <div className="flex flex-col gap-4">
                 {horarios.map((horario) => (
                   <FilaHorario
                     key={horario.id}
@@ -111,53 +130,55 @@ export function PanelHorarios() {
             )}
           </div>
 
-          <div className="mt-10 border-t border-cobre/25 pt-6">
+          <div className="mt-8">
             <span className="versalitas text-xs text-cobre">— Nuevo bloque de horario</span>
             <form
               onSubmit={agregarHorario}
-              className="mt-4 grid grid-cols-2 gap-x-4 gap-y-4 md:grid-cols-[1fr_8rem_8rem_auto] md:items-end"
+              className="mt-3 rounded-lg border border-dashed border-cobre/40 bg-cobre/5 p-5"
             >
-              <label className="col-span-2 flex flex-col gap-2 md:col-span-1">
-                <span className="versalitas text-xs text-gris-calido-500">Día</span>
-                <select
-                  value={nuevo.dia_semana}
-                  onChange={(e) => setNuevo((n) => ({ ...n, dia_semana: e.target.value }))}
-                  className="min-h-11 border-b border-gris-calido-200 bg-transparent py-2 text-negro-barbero outline-none transition-colors focus:border-cobre"
-                >
-                  {DIAS.map((dia, indice) => (
-                    <option key={dia} value={indice}>
-                      {dia}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="flex flex-col gap-2">
-                <span className="versalitas text-xs text-gris-calido-500">Desde</span>
-                <input
-                  type="time"
-                  value={nuevo.hora_inicio}
-                  onChange={(e) => setNuevo((n) => ({ ...n, hora_inicio: e.target.value }))}
-                  className="numeros-tabulares min-h-11 border-b border-gris-calido-200 bg-transparent py-2 text-negro-barbero outline-none transition-colors focus:border-cobre"
-                />
-              </label>
-              <label className="flex flex-col gap-2">
-                <span className="versalitas text-xs text-gris-calido-500">Hasta</span>
-                <input
-                  type="time"
-                  value={nuevo.hora_fin}
-                  onChange={(e) => setNuevo((n) => ({ ...n, hora_fin: e.target.value }))}
-                  className="numeros-tabulares min-h-11 border-b border-gris-calido-200 bg-transparent py-2 text-negro-barbero outline-none transition-colors focus:border-cobre"
-                />
-              </label>
-              <Button as="button" type="submit" disabled={crearHorario.isPending} className="h-fit">
-                {crearHorario.isPending ? 'Creando…' : 'Agregar'}
-              </Button>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-4 md:grid-cols-[1fr_8rem_8rem_auto] md:items-end">
+                <label className="col-span-2 flex flex-col gap-1 md:col-span-1">
+                  <span className="versalitas text-xs text-gris-calido-500">Día</span>
+                  <select
+                    value={nuevo.dia_semana}
+                    onChange={(e) => setNuevo((n) => ({ ...n, dia_semana: e.target.value }))}
+                    className="min-h-11 border-b border-gris-calido-200 bg-transparent py-1 text-negro-barbero outline-none transition-colors focus:border-cobre"
+                  >
+                    {DIAS.map((dia, indice) => (
+                      <option key={dia} value={indice}>
+                        {dia}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="flex flex-col gap-1">
+                  <span className="versalitas text-xs text-gris-calido-500">Desde</span>
+                  <input
+                    type="time"
+                    value={nuevo.hora_inicio}
+                    onChange={(e) => setNuevo((n) => ({ ...n, hora_inicio: e.target.value }))}
+                    className="numeros-tabulares min-h-11 border-b border-gris-calido-200 bg-transparent py-1 text-negro-barbero outline-none transition-colors focus:border-cobre"
+                  />
+                </label>
+                <label className="flex flex-col gap-1">
+                  <span className="versalitas text-xs text-gris-calido-500">Hasta</span>
+                  <input
+                    type="time"
+                    value={nuevo.hora_fin}
+                    onChange={(e) => setNuevo((n) => ({ ...n, hora_fin: e.target.value }))}
+                    className="numeros-tabulares min-h-11 border-b border-gris-calido-200 bg-transparent py-1 text-negro-barbero outline-none transition-colors focus:border-cobre"
+                  />
+                </label>
+                <Button as="button" type="submit" disabled={crearHorario.isPending} className="h-fit">
+                  {crearHorario.isPending ? 'Creando…' : 'Agregar'}
+                </Button>
+              </div>
+              {errorEnvio && (
+                <p role="alert" className="mt-3 text-sm text-red-700">
+                  {errorEnvio}
+                </p>
+              )}
             </form>
-            {errorEnvio && (
-              <p role="alert" className="mt-3 text-sm text-red-700">
-                {errorEnvio}
-              </p>
-            )}
           </div>
         </>
       )}

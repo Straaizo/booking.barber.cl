@@ -68,7 +68,7 @@ export function PanelServicios() {
         )}
 
         {servicios && servicios.length > 0 && (
-          <div className="border-t border-gris-calido-200">
+          <div className="flex flex-col gap-4">
             {servicios.map((servicio) => (
               <FilaServicioAdmin
                 key={servicio.id}
@@ -80,52 +80,54 @@ export function PanelServicios() {
         )}
       </div>
 
-      <div className="mt-10 border-t border-cobre/25 pt-6">
+      <div className="mt-8">
         <span className="versalitas text-xs text-cobre">— Nuevo servicio</span>
         <form
           onSubmit={agregarServicio}
-          className="mt-4 grid grid-cols-2 gap-x-4 gap-y-4 md:grid-cols-[1.4fr_6rem_8rem_auto] md:items-end"
+          className="mt-3 rounded-lg border border-dashed border-cobre/40 bg-cobre/5 p-5"
         >
-          <label className="col-span-2 flex flex-col gap-2 md:col-span-1">
-            <span className="versalitas text-xs text-gris-calido-500">Nombre</span>
-            <input
-              type="text"
-              value={nuevo.nombre}
-              onChange={(e) => setNuevo((n) => ({ ...n, nombre: e.target.value }))}
-              placeholder="Ej: Corte + Barba"
-              className="min-h-11 border-b border-gris-calido-200 bg-transparent py-2 text-negro-barbero outline-none transition-colors focus:border-cobre"
-            />
-          </label>
-          <label className="flex flex-col gap-2">
-            <span className="versalitas text-xs text-gris-calido-500">Duración (min)</span>
-            <input
-              type="number"
-              min="0"
-              value={nuevo.duracion_minutos}
-              onChange={(e) => setNuevo((n) => ({ ...n, duracion_minutos: e.target.value }))}
-              className="numeros-tabulares min-h-11 border-b border-gris-calido-200 bg-transparent py-2 text-negro-barbero outline-none transition-colors focus:border-cobre"
-            />
-          </label>
-          <label className="flex flex-col gap-2">
-            <span className="versalitas text-xs text-gris-calido-500">Precio</span>
-            <input
-              type="number"
-              min="0"
-              value={nuevo.precio_clp}
-              onChange={(e) => setNuevo((n) => ({ ...n, precio_clp: e.target.value }))}
-              placeholder="12000"
-              className="numeros-tabulares min-h-11 border-b border-gris-calido-200 bg-transparent py-2 text-negro-barbero outline-none transition-colors focus:border-cobre"
-            />
-          </label>
-          <Button as="button" type="submit" disabled={crearServicio.isPending} className="h-fit">
-            {crearServicio.isPending ? 'Creando…' : 'Crear servicio'}
-          </Button>
+          <div className="grid grid-cols-2 gap-x-4 gap-y-4 md:grid-cols-[1.4fr_8rem_10rem_auto] md:items-end">
+            <label className="col-span-2 flex flex-col gap-1 md:col-span-1">
+              <span className="versalitas text-xs text-gris-calido-500">Nombre</span>
+              <input
+                type="text"
+                value={nuevo.nombre}
+                onChange={(e) => setNuevo((n) => ({ ...n, nombre: e.target.value }))}
+                placeholder="Ej: Corte + Barba"
+                className="min-h-11 border-b border-gris-calido-200 bg-transparent py-1 text-negro-barbero outline-none transition-colors focus:border-cobre"
+              />
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="versalitas text-xs text-gris-calido-500">Duración (min)</span>
+              <input
+                type="number"
+                min="0"
+                value={nuevo.duracion_minutos}
+                onChange={(e) => setNuevo((n) => ({ ...n, duracion_minutos: e.target.value }))}
+                className="numeros-tabulares min-h-11 border-b border-gris-calido-200 bg-transparent py-1 text-negro-barbero outline-none transition-colors focus:border-cobre"
+              />
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="versalitas text-xs text-gris-calido-500">Precio</span>
+              <input
+                type="number"
+                min="0"
+                value={nuevo.precio_clp}
+                onChange={(e) => setNuevo((n) => ({ ...n, precio_clp: e.target.value }))}
+                placeholder="12000"
+                className="numeros-tabulares min-h-11 border-b border-gris-calido-200 bg-transparent py-1 text-negro-barbero outline-none transition-colors focus:border-cobre"
+              />
+            </label>
+            <Button as="button" type="submit" disabled={crearServicio.isPending} className="h-fit">
+              {crearServicio.isPending ? 'Creando…' : 'Crear servicio'}
+            </Button>
+          </div>
+          {errorEnvio && (
+            <p role="alert" className="mt-3 text-sm text-red-700">
+              {errorEnvio}
+            </p>
+          )}
         </form>
-        {errorEnvio && (
-          <p role="alert" className="mt-3 text-sm text-red-700">
-            {errorEnvio}
-          </p>
-        )}
       </div>
     </div>
   )

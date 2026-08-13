@@ -11,7 +11,7 @@ import modelUrl from '../../assets/models-3d/barbers_pole.glb'
 
 const TARGET_HEIGHT = 2.7
 const STATIC_ROTATION_Y = 1.3
-const FLOAT_AMPLITUDE = 0.1
+const FLOAT_AMPLITUDE = 0.1 
 const FLOAT_SPEED = 1.8
 
 

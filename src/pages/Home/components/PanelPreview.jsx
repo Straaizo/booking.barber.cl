@@ -3,12 +3,16 @@ import { SectionRule } from '../../../components/common/SectionRule'
 import { ScrollReveal } from '../../../components/animations/ScrollReveal'
 import { EASE_ENTRADA, DURACION_BASE } from '../../../components/animations/easing'
 
-const NAV = ['Reservas', 'Barberos', 'Servicios', 'Horarios']
+const NAV = ['Reservas', 'Barberos', 'Servicios', 'Horarios', 'Personalización']
 
+// Mismos campos que muestra `FilaReserva` de verdad (PanelReservas.jsx):
+// cliente + su WhatsApp, servicio + barbero + precio, y cancelar — antes esta
+// maqueta solo mostraba cliente/servicio/hora, mostrando menos de lo que el
+// panel real hace.
 const RESERVAS_DEMO = [
-  { id: 1, cliente: 'Matías Rojas', servicio: 'Corte + Barba', hora: '10:30' },
-  { id: 2, cliente: 'Ignacio Paredes', servicio: 'Corte clásico', hora: '11:15' },
-  { id: 3, cliente: 'Diego Fuentes', servicio: 'Afeitado', hora: '12:00' },
+  { id: 1, cliente: 'Matías Rojas', telefono: '+56 9 8765 4321', servicio: 'Corte + Barba', barbero: 'Javier Muñoz', precio: '$13.000', hora: '10:30' },
+  { id: 2, cliente: 'Ignacio Paredes', telefono: '+56 9 5432 1098', servicio: 'Corte clásico', barbero: 'Cristóbal Díaz', precio: '$8.000', hora: '11:15' },
+  { id: 3, cliente: 'Diego Fuentes', telefono: '+56 9 1122 3344', servicio: 'Afeitado', barbero: 'Javier Muñoz', precio: '$7.500', hora: '12:00' },
 ]
 
 const ANOTACIONES = [
@@ -50,26 +54,35 @@ function Mockup() {
         </div>
 
         <div className="flex-1 p-5 md:p-7">
-          <div className="flex items-baseline justify-between">
-            <h4 className="font-display text-lg font-light tracking-tight text-negro-barbero md:text-xl">
-              Reservas de hoy
-            </h4>
-            <span className="numeros-tabulares text-xs text-gris-calido-500">
-              {RESERVAS_DEMO.length} nuevas
-            </span>
-          </div>
+          <h4 className="font-display text-lg font-light tracking-tight text-negro-barbero md:text-xl">
+            Reservas
+          </h4>
+          <p className="mt-1 text-xs text-gris-calido-500">
+            Todas las reservas de tu barbería, ordenadas por fecha.
+          </p>
 
           <div className="mt-4 flex flex-col">
             {RESERVAS_DEMO.map((reserva) => (
               <div
                 key={reserva.id}
-                className="flex items-center justify-between gap-3 border-b border-gris-calido-100 py-3 text-sm first:border-t first:border-t-gris-calido-100"
+                className="grid grid-cols-[auto_1fr_auto] items-center gap-3 border-b border-gris-calido-100 py-3 text-sm first:border-t first:border-t-gris-calido-100"
               >
-                <span className="font-medium text-negro-barbero">{reserva.cliente}</span>
-                <span className="hidden text-gris-calido-500 sm:inline">
-                  {reserva.servicio}
-                </span>
-                <span className="numeros-tabulares text-negro-barbero">{reserva.hora}</span>
+                <span className="numeros-tabulares text-gris-calido-500">{reserva.hora}</span>
+                <div className="min-w-0">
+                  <span className="block truncate font-medium text-negro-barbero">
+                    {reserva.cliente}
+                  </span>
+                  <span className="versalitas hidden text-[10px] text-gris-calido-500 sm:block">
+                    {reserva.servicio} · {reserva.barbero} · {reserva.precio}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  tabIndex={-1}
+                  className="versalitas hidden shrink-0 text-[10px] text-red-700/70 underline decoration-red-700/30 md:inline"
+                >
+                  Cancelar
+                </button>
               </div>
             ))}
           </div>

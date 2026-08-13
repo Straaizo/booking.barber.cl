@@ -49,13 +49,13 @@ function CatalogoCompartidoSoloLectura({ barberiaId }) {
         )}
 
         {servicios && servicios.length > 0 && (
-          <div className="border-t border-gris-calido-200">
+          <div className="flex flex-col gap-3">
             {servicios.map((servicio) => {
               const enOferta = ofertaVigente(servicio)
               return (
                 <div
                   key={servicio.id}
-                  className="flex items-center justify-between gap-4 border-b border-gris-calido-200 py-4"
+                  className="flex items-center justify-between gap-4 rounded-lg border border-gris-calido-200 bg-white px-5 py-4"
                 >
                   <div>
                     <span className={`block font-medium ${servicio.activo ? 'text-negro-barbero' : 'text-gris-calido-400 line-through'}`}>
@@ -97,24 +97,56 @@ const SERVICIO_VACIO = { nombre: '', duracion_minutos: '30', precio_clp: '' }
 // cambios" en el padre) — a diferencia de FilaServicioAdmin (que usa la
 // misma pantalla del dueño y guarda cada campo solo, al perder el foco), acá
 // se pidió explícitamente que el barbero tenga que confirmar el cambio.
+// Misma tarjeta y misma agrupación que FilaServicioAdmin (el interruptor de
+// "oferta activa" pegado a su precio, "publicado" arriba junto al nombre) —
+// para que las dos pantallas de servicios del sitio se sientan como la misma
+// interfaz, no como dos diseños distintos.
 function FilaServicioPropioBorrador({ servicio, cambios, onCambio }) {
   const valor = (campo) => (cambios && campo in cambios ? cambios[campo] : servicio[campo])
+  const tieneCambios = Boolean(cambios)
 
   return (
-    <div className="border-b border-gris-calido-200 py-5">
-      <div className="grid grid-cols-2 gap-x-4 gap-y-3 md:grid-cols-[1.4fr_6rem_8rem_8rem]">
-        <label className="col-span-2 flex flex-col gap-1 md:col-span-1">
+    <div
+      className={`rounded-lg border bg-white p-5 transition-colors ${
+        tieneCambios ? 'border-cobre' : 'border-gris-calido-200 hover:border-gris-calido-300'
+      }`}
+    >
+      <div className="flex items-start justify-between gap-4">
+        <label className="flex min-w-0 flex-1 flex-col gap-1">
           <span className="versalitas text-xs text-gris-calido-500">Nombre</span>
           <input
             type="text"
             value={valor('nombre')}
             onChange={(e) => onCambio(servicio.id, 'nombre', e.target.value)}
-            className="min-h-11 border-b border-gris-calido-200 bg-transparent py-1 font-medium text-negro-barbero outline-none transition-colors focus:border-cobre"
+            className="min-h-11 border-b border-gris-calido-200 bg-transparent py-1 text-base font-medium text-negro-barbero outline-none transition-colors focus:border-cobre"
           />
         </label>
 
+        {/* Espaciador invisible de la misma altura que la etiqueta "Nombre"
+            — así el interruptor queda a la altura real del input de al lado
+            en vez de un padding calculado a ojo. */}
+        <div className="flex shrink-0 flex-col gap-1">
+          <span aria-hidden="true" className="versalitas invisible text-xs">
+            Nombre
+          </span>
+          <div className="flex min-h-11 items-center gap-2">
+            <Interruptor
+              activo={valor('activo')}
+              etiqueta={`Publicado: ${servicio.nombre}`}
+              onCambiar={(v) => onCambio(servicio.id, 'activo', v)}
+            />
+            <span className="versalitas text-xs text-gris-calido-500">
+              {valor('activo') ? 'Publicado' : 'Oculto'}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-4 border-t border-gris-calido-100 pt-4 md:grid-cols-[8rem_10rem_12rem]">
         <label className="flex flex-col gap-1">
-          <span className="versalitas text-xs text-gris-calido-500">Duración (min)</span>
+          <span className="versalitas flex min-h-7 items-center text-xs text-gris-calido-500">
+            Duración (min)
+          </span>
           <input
             type="number"
             min="0"
@@ -126,7 +158,9 @@ function FilaServicioPropioBorrador({ servicio, cambios, onCambio }) {
         </label>
 
         <label className="flex flex-col gap-1">
-          <span className="versalitas text-xs text-gris-calido-500">Precio</span>
+          <span className="versalitas flex min-h-7 items-center text-xs text-gris-calido-500">
+            Precio
+          </span>
           <input
             type="number"
             min="0"
@@ -137,8 +171,19 @@ function FilaServicioPropioBorrador({ servicio, cambios, onCambio }) {
           />
         </label>
 
-        <label className="flex flex-col gap-1">
-          <span className="versalitas text-xs text-gris-calido-500">Precio oferta</span>
+        {/* `min-h-7` en las tres etiquetas de esta fila (esta y las dos de
+            arriba) las deja a la misma altura — sin eso, esta columna queda
+            más alta que las otras dos (por el interruptor) y el input de
+            acá abajo termina más abajo, desalineando toda la fila. */}
+        <div className="col-span-2 flex flex-col gap-1 md:col-span-1">
+          <div className="flex min-h-7 items-center justify-between">
+            <span className="versalitas text-xs text-gris-calido-500">Precio oferta</span>
+            <Interruptor
+              activo={valor('oferta_activa')}
+              etiqueta={`Oferta activa de ${servicio.nombre}`}
+              onCambiar={(v) => onCambio(servicio.id, 'oferta_activa', v)}
+            />
+          </div>
           <input
             type="number"
             min="0"
@@ -148,28 +193,6 @@ function FilaServicioPropioBorrador({ servicio, cambios, onCambio }) {
             onChange={(e) => onCambio(servicio.id, 'precio_oferta', e.target.value)}
             className="numeros-tabulares min-h-11 border-b border-gris-calido-200 bg-transparent py-1 text-negro-barbero outline-none transition-colors focus:border-cobre"
           />
-        </label>
-      </div>
-
-      <div className="mt-4 flex flex-wrap items-center gap-x-8 gap-y-3">
-        <div className="flex items-center gap-3">
-          <Interruptor
-            activo={valor('oferta_activa')}
-            etiqueta={`Oferta activa de ${servicio.nombre}`}
-            onCambiar={(v) => onCambio(servicio.id, 'oferta_activa', v)}
-          />
-          <span className="versalitas text-xs text-gris-calido-500">Oferta activa</span>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <Interruptor
-            activo={valor('activo')}
-            etiqueta={`Publicado: ${servicio.nombre}`}
-            onCambiar={(v) => onCambio(servicio.id, 'activo', v)}
-          />
-          <span className="versalitas text-xs text-gris-calido-500">
-            {valor('activo') ? 'Publicado' : 'Oculto'}
-          </span>
         </div>
       </div>
     </div>
@@ -249,11 +272,15 @@ function CatalogoPropio({ barberiaId, barberoId }) {
 
   return (
     <div>
-      <p className="mt-2 max-w-lg text-sm text-gris-calido-700">
-        Tienes tu propio catálogo de servicios — creá, editá o quitá lo que necesites, sin afectar
-        el catálogo del resto de la barbería. Los cambios quedan pendientes hasta que apretás
-        "Guardar cambios".
-      </p>
+      <div className="flex flex-wrap items-baseline justify-between gap-3">
+        <p className="max-w-lg text-sm text-gris-calido-700">
+          Tienes tu propio catálogo de servicios — creá, editá o quitá lo que necesites, sin
+          afectar el catálogo del resto de la barbería.
+        </p>
+        {hayCambiosPendientes && (
+          <span className="versalitas shrink-0 text-xs text-cobre-texto">● Tenés cambios sin guardar</span>
+        )}
+      </div>
 
       <div className="mt-8">
         {isLoading && (
@@ -276,7 +303,7 @@ function CatalogoPropio({ barberiaId, barberoId }) {
 
         {servicios && servicios.length > 0 && (
           <>
-            <div className="border-t border-gris-calido-200">
+            <div className="flex flex-col gap-4">
               {servicios.map((servicio) => (
                 <FilaServicioPropioBorrador
                   key={servicio.id}
@@ -287,7 +314,14 @@ function CatalogoPropio({ barberiaId, barberoId }) {
               ))}
             </div>
 
-            <div className="mt-6 flex items-center gap-4">
+            {/* Fijo al pie mientras hay algo pendiente, para no tener que
+                scrollear de vuelta arriba a buscar el botón después de editar
+                el último servicio de una lista larga. */}
+            <div
+              className={`sticky bottom-4 z-10 mt-6 flex items-center gap-4 rounded-lg border border-gris-calido-200 bg-white/95 p-3 shadow-lg backdrop-blur transition-opacity ${
+                hayCambiosPendientes ? 'opacity-100' : 'pointer-events-none opacity-0'
+              }`}
+            >
               <Button
                 as="button"
                 type="button"
@@ -297,60 +331,63 @@ function CatalogoPropio({ barberiaId, barberoId }) {
               >
                 Guardar cambios
               </Button>
-              {hayCambiosPendientes && (
-                <span className="versalitas text-xs text-cobre-texto">Tenés cambios sin guardar</span>
-              )}
+              <span className="versalitas text-xs text-gris-calido-500">
+                Tenés cambios sin guardar en {Object.keys(cambiosPendientes).length} servicio
+                {Object.keys(cambiosPendientes).length === 1 ? '' : 's'}
+              </span>
             </div>
           </>
         )}
       </div>
 
-      <div className="mt-10 border-t border-cobre/25 pt-6">
+      <div className="mt-8">
         <span className="versalitas text-xs text-cobre">— Nuevo servicio</span>
         <form
           onSubmit={agregarServicio}
-          className="mt-4 grid grid-cols-2 gap-x-4 gap-y-4 md:grid-cols-[1.4fr_6rem_8rem_auto] md:items-end"
+          className="mt-3 rounded-lg border border-dashed border-cobre/40 bg-cobre/5 p-5"
         >
-          <label className="col-span-2 flex flex-col gap-2 md:col-span-1">
-            <span className="versalitas text-xs text-gris-calido-500">Nombre</span>
-            <input
-              type="text"
-              value={nuevo.nombre}
-              onChange={(e) => setNuevo((n) => ({ ...n, nombre: e.target.value }))}
-              placeholder="Ej: Corte + Barba"
-              className="min-h-11 border-b border-gris-calido-200 bg-transparent py-2 text-negro-barbero outline-none transition-colors focus:border-cobre"
-            />
-          </label>
-          <label className="flex flex-col gap-2">
-            <span className="versalitas text-xs text-gris-calido-500">Duración (min)</span>
-            <input
-              type="number"
-              min="0"
-              value={nuevo.duracion_minutos}
-              onChange={(e) => setNuevo((n) => ({ ...n, duracion_minutos: e.target.value }))}
-              className="numeros-tabulares min-h-11 border-b border-gris-calido-200 bg-transparent py-2 text-negro-barbero outline-none transition-colors focus:border-cobre"
-            />
-          </label>
-          <label className="flex flex-col gap-2">
-            <span className="versalitas text-xs text-gris-calido-500">Precio</span>
-            <input
-              type="number"
-              min="0"
-              value={nuevo.precio_clp}
-              onChange={(e) => setNuevo((n) => ({ ...n, precio_clp: e.target.value }))}
-              placeholder="12000"
-              className="numeros-tabulares min-h-11 border-b border-gris-calido-200 bg-transparent py-2 text-negro-barbero outline-none transition-colors focus:border-cobre"
-            />
-          </label>
-          <Button as="button" type="submit" disabled={crearServicio.isPending} className="h-fit">
-            {crearServicio.isPending ? 'Creando…' : 'Crear servicio'}
-          </Button>
+          <div className="grid grid-cols-2 gap-x-4 gap-y-4 md:grid-cols-[1.4fr_8rem_10rem_auto] md:items-end">
+            <label className="col-span-2 flex flex-col gap-1 md:col-span-1">
+              <span className="versalitas text-xs text-gris-calido-500">Nombre</span>
+              <input
+                type="text"
+                value={nuevo.nombre}
+                onChange={(e) => setNuevo((n) => ({ ...n, nombre: e.target.value }))}
+                placeholder="Ej: Corte + Barba"
+                className="min-h-11 border-b border-gris-calido-200 bg-transparent py-1 text-negro-barbero outline-none transition-colors focus:border-cobre"
+              />
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="versalitas text-xs text-gris-calido-500">Duración (min)</span>
+              <input
+                type="number"
+                min="0"
+                value={nuevo.duracion_minutos}
+                onChange={(e) => setNuevo((n) => ({ ...n, duracion_minutos: e.target.value }))}
+                className="numeros-tabulares min-h-11 border-b border-gris-calido-200 bg-transparent py-1 text-negro-barbero outline-none transition-colors focus:border-cobre"
+              />
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="versalitas text-xs text-gris-calido-500">Precio</span>
+              <input
+                type="number"
+                min="0"
+                value={nuevo.precio_clp}
+                onChange={(e) => setNuevo((n) => ({ ...n, precio_clp: e.target.value }))}
+                placeholder="12000"
+                className="numeros-tabulares min-h-11 border-b border-gris-calido-200 bg-transparent py-1 text-negro-barbero outline-none transition-colors focus:border-cobre"
+              />
+            </label>
+            <Button as="button" type="submit" disabled={crearServicio.isPending} className="h-fit">
+              {crearServicio.isPending ? 'Creando…' : 'Crear servicio'}
+            </Button>
+          </div>
+          {errorEnvio && (
+            <p role="alert" className="mt-3 text-sm text-red-700">
+              {errorEnvio}
+            </p>
+          )}
         </form>
-        {errorEnvio && (
-          <p role="alert" className="mt-3 text-sm text-red-700">
-            {errorEnvio}
-          </p>
-        )}
       </div>
 
       <ToastGuardado estado={estadoToast} />

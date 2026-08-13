@@ -2,15 +2,12 @@ import { useMemo, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useHorariosDisponibles } from '../hooks/useHorariosDisponibles'
 import { useReservasDelDia } from '../hooks/useReservasDelDia'
-import { proximosDiasConHorario, calcularSlotsDisponibles } from '../../../utils/horarios'
+import { useExcepcionesHorario } from '../hooks/useExcepcionesHorario'
+import { proximosDiasConHorario, calcularSlotsDisponibles, fechaISO } from '../../../utils/horarios'
 import { formatoFechaCorta } from '../../../utils/formatos'
 import { BackButton } from '../../../components/common/BackButton'
 import { Loader } from '../../../components/common/Loader'
 import { EASE_ENTRADA } from '../../../components/animations/easing'
-
-function fechaISO(fecha) {
-  return fecha.toISOString().slice(0, 10)
-}
 
 export function PasoHorario({ barbero, servicio, onSeleccionar, onVolver }) {
   const {
@@ -18,9 +15,10 @@ export function PasoHorario({ barbero, servicio, onSeleccionar, onVolver }) {
     isLoading: cargandoHorarios,
     isError: errorHorarios,
   } = useHorariosDisponibles(barbero.id)
+  const { data: excepciones } = useExcepcionesHorario(barbero.id)
   const dias = useMemo(
-    () => (horarios ? proximosDiasConHorario(horarios) : []),
-    [horarios]
+    () => (horarios ? proximosDiasConHorario(horarios, excepciones ?? []) : []),
+    [horarios, excepciones]
   )
   const [fechaSeleccionada, setFechaSeleccionada] = useState(null)
 
@@ -31,15 +29,29 @@ export function PasoHorario({ barbero, servicio, onSeleccionar, onVolver }) {
     isError: errorReservas,
   } = useReservasDelDia(barbero.id, fechaActiva ? fechaISO(fechaActiva) : null)
 
+  const excepcionDelDia = useMemo(() => {
+    if (!fechaActiva || !excepciones) return undefined
+    return excepciones.find((e) => e.fecha === fechaISO(fechaActiva))
+  }, [excepciones, fechaActiva])
+
   const slots = useMemo(() => {
     if (!horarios || !reservasOcupadas || !fechaActiva) return []
     return calcularSlotsDisponibles({
       horarios,
       reservasOcupadas,
       duracionMinutos: servicio.duracion_minutos,
+      intervaloMinutos: barbero.intervalo_reserva_minutos,
       fecha: fechaActiva,
+      excepcionDelDia,
     })
-  }, [horarios, reservasOcupadas, fechaActiva, servicio.duracion_minutos])
+  }, [
+    horarios,
+    reservasOcupadas,
+    fechaActiva,
+    servicio.duracion_minutos,
+    barbero.intervalo_reserva_minutos,
+    excepcionDelDia,
+  ])
 
   if (cargandoHorarios) {
     return (

@@ -2145,3 +2145,383 @@ De paso, se aclaró el texto junto al interruptor en la pestaña "Barberos" del 
 - Ninguno.
 
 ---
+
+## 2026-08-12 - Rediseño de la pantalla de Servicios: tarjetas en vez de filas sueltas, agrupación lógica de campos
+
+**Qué se hizo:**
+Enzo mandó una captura de "Servicios" (panel del dueño) marcando que la interfaz se veía muy desordenada — cada servicio era una fila de campos sueltos con bordes inferiores nomás, sin ninguna agrupación visual, y el interruptor de "Oferta activa" quedaba en una fila aparte, lejos del campo "Precio oferta" al que en realidad corresponde. Pidió que quedara "lo más profesional y ordenada posible", con criterios reales de UX/UI.
+
+Se rediseñaron las tres pantallas que muestran servicios (la del dueño y las dos del barbero — catálogo propio y solo-lectura) con el mismo lenguaje visual nuevo:
+- **Cada servicio es ahora una tarjeta real** (borde redondeado, fondo blanco contra el hueso de la página, separación clara entre una y otra) — antes eran filas indistintas dentro de un bloque continuo con un solo borde arriba.
+- **Encabezado de la tarjeta**: nombre del servicio (el dato principal) a la izquierda, el interruptor de "Publicado/Oculto" arriba a la derecha — como el estado general de la tarjeta, no como un control más perdido abajo.
+- **"Oferta activa" pasó a vivir pegado al campo "Precio oferta"**, no en una fila aparte junto a "Publicado" — ahora la relación entre el interruptor y lo que activa es inmediata, sin tener que adivinarla.
+- **El formulario de "Nuevo servicio"** pasó a ser una tarjeta con borde punteado (para leerse como "agregar", distinto a las tarjetas ya existentes) en vez de un simple formulario debajo de una línea.
+- En el catálogo propio del barbero, además: la tarjeta se resalta con borde color cobre mientras tiene cambios sin guardar, y el botón "Guardar cambios" quedó **fijo abajo (sticky)** mientras hay algo pendiente — para no tener que scrollear de vuelta arriba después de editar el último servicio de una lista larga.
+
+**Cómo se probó (Playwright, instalado y desinstalado como siempre):**
+- Capturas de las tres pantallas con el nuevo diseño — confirmado visualmente el orden y la agrupación (oferta pegada a su precio, publicado arriba junto al nombre).
+- Se editó un precio en la pantalla del dueño y se confirmó que el guardado automático (al perder el foco) sigue funcionando igual que antes — el rediseño es solo visual, no cambió esa pantalla de comportamiento (a diferencia de la del barbero, que ya pedía guardado explícito desde la ronda anterior).
+- Se activó "servicios propios" para un barbero y se confirmó que su catálogo clonado se ve con el mismo diseño de tarjeta, consistente con el resto del sitio.
+- Cero errores de consola/página. Build y lint limpios.
+
+**Por qué:**
+- Tarjetas en vez de filas continuas: es el patrón que ya usa el resto del panel para listas de "algo que se puede editar" (barberos, secciones de Personalización) — servicios era la única pantalla que todavía usaba filas sueltas con solo un borde inferior.
+- Agrupar el interruptor de oferta con su precio: la relación entre "¿está la oferta activa?" y "¿cuál es el precio de oferta?" es directa — tenerlos en extremos distintos de la tarjeta obligaba a leer todo para entender qué controlaba qué.
+- No tocar el guardado automático del dueño en esta ronda: lo pedido fue específicamente sobre el orden visual, no sobre cómo se confirma un cambio — cambiar eso también hubiera sido una decisión de producto aparte, no una corrección de lo que se señaló.
+
+**Archivos afectados:**
+- Modificado: `src/pages/panel/components/FilaServicioAdmin.jsx`, `src/pages/panel/PanelServicios.jsx`, `src/pages/panel/PanelBarberoServicios.jsx`.
+
+**Pendiente / próximos pasos:**
+- Ninguno.
+
+---
+
+## 2026-08-12 - Fix: "Precio oferta" y sus vecinos quedaban desalineados dentro de la tarjeta
+
+**Qué se hizo:**
+Enzo señaló que algo en la tarjeta de servicio (la del rediseño de la ronda anterior) se veía desalineado, en particular por el lado de "Precio oferta". La causa: la fila de "Precio oferta" tiene el interruptor de "oferta activa" pegado a su etiqueta (a propósito, para que se entienda que uno enciende al otro) — pero eso hace que esa etiqueta sea más alta (por el interruptor, de 28px) que las etiquetas de "Duración" y "Precio" (que son solo texto, más bajas). Con las tres columnas en la misma fila de grid pero con etiquetas de distinta altura, el input de "Precio oferta" terminaba empezando más abajo que los otros dos — la fila entera se veía corrida.
+
+Se igualó la altura de las tres etiquetas (`min-h-7`, la altura real del interruptor) para que sin importar si una tiene un interruptor al lado o no, las tres midan lo mismo — ahí los tres inputs (Duración/Precio/Precio oferta) quedan a la altura exacta. El mismo problema y la misma solución aplicaban al par "Nombre" / "Publicado" del encabezado de la tarjeta (antes con un padding calculado a ojo, `pt-5`) — se reemplazó por un espaciador invisible de la misma altura que la etiqueta "Nombre", así el interruptor de "Publicado" alinea con precisión real, no aproximada.
+
+De paso, la columna de "Precio oferta" dejó de estirarse a lo ancho que sobrara de la tarjeta (`1fr`) — tenía un ancho fijo razonable como las otras dos (`12rem`), en vez de un ancho que cambiaba según cuánto espacio quedara libre.
+
+**Cómo se probó (Playwright, instalado y desinstalado como siempre):**
+- Medidos los tres inputs numéricos de cada tarjeta (Duración/Precio/Precio oferta): exactamente la misma coordenada Y en las tres, en las tres tarjetas de prueba (454px, 705px, 956px) — antes había una diferencia de varios píxeles en la fila con la oferta activa.
+- Captura de pantalla confirmando visualmente el resultado: las tres columnas se leen ahora como una fila de tabla genuina.
+- Build y lint limpios.
+
+**Por qué:**
+- Espaciador invisible / alto mínimo en vez de padding a ojo: un padding fijo (`pt-5`) es una aproximación que solo funciona por casualidad para un tamaño de fuente/línea específico — si el texto de la etiqueta cambiara de tamaño en algún momento, ese padding quedaría mal otra vez. Igualar alturas reales (`min-h-7`, o un espaciador con el mismo contenido invisible) se ajusta solo sin importar qué cambie alrededor.
+
+**Archivos afectados:**
+- Modificado: `src/pages/panel/components/FilaServicioAdmin.jsx`, `src/pages/panel/PanelBarberoServicios.jsx`.
+
+**Pendiente / próximos pasos:**
+- Ninguno.
+
+---
+
+## 2026-08-13 - Bloques de horario editables (no solo activar/desactivar) + intervalo entre reservas configurable por barbero
+
+**Qué se hizo:**
+Enzo pidió que Horarios recibiera el mismo tratamiento que Servicios: que dueño y barbero puedan modificar de verdad los bloques de horario, no solo prenderlos/apagarlos. Después de implementar eso, aclaró que en realidad el punto central no era el horario de atención (10:00–19:00, que ya se podía editar sin drama) sino el **intervalo entre horas ofrecidas al reservar**: hoy ese paso salía implícito de la duración del servicio elegido (un corte de 30 min ofrecía horas cada 30 min), y quería que fuera un ajuste propio del barbero — p. ej. dejar más aire entre clientes (cada 45 min) o agendar menos gente por día (cada 1 hora), sin que eso dependa de cuánto dure el servicio.
+
+**1. `FilaHorario.jsx` rediseñado**: pasó de ser una fila con un solo interruptor a una tarjeta completa (mismo patrón visual que `FilaServicioAdmin.jsx` — espaciador invisible para alinear el interruptor "Activo" con el select de "Día", `min-h-7` en las etiquetas de "Desde"/"Hasta"). El día se guarda al cambiar el `<select>`, las horas al perder el foco — igual que el resto del panel. `PanelHorarios.jsx` (dueño) y `PanelBarberoHorarios.jsx` (barbero) se actualizaron a la lista en tarjetas (`flex flex-col gap-4`) y el formulario "Nuevo bloque" pasó a la misma tarjeta punteada que ya usa "Nuevo servicio".
+
+**2. Intervalo entre reservas, desacoplado de la duración del servicio.** Se agregó `intervalo_reserva_minutos` (default 30) a `barberos` — en el seed provisorio, en `COLUMNAS` de `useBarberosAdmin.js`, en el `select` de `useBarberiaPorSlug.js` (flujo público) y en el barbero de la demo (`config/demo.js`). `calcularSlotsDisponibles()` (`src/utils/horarios.js`) ahora recibe un `intervaloMinutos` aparte de `duracionMinutos`: el primero decide cada cuánto se ofrece una hora nueva (el "paso" del for), el segundo sigue siendo el que se usa para chequear que no se superponga con una reserva ya tomada — un corte de 30 min puede seguir ofreciéndose cada 45 min si el barbero así lo configuró, sin arriesgar dobles reservas. `PasoHorario.jsx` (paso del asistente de reserva que ve el cliente) pasa `barbero.intervalo_reserva_minutos` a esa función.
+
+**3. Editable por dueño y por barbero, mismo componente.** `SelectorIntervaloReserva.jsx` (nuevo, reutilizado en ambos paneles) — un `<select>` con opciones fijas (15/20/30/45/60/90 min) dentro de una tarjeta, con el mismo patrón de guardado-al-cambiar + estado "Guardando…/Guardado/No se pudo guardar" que ya usa el resto del panel. En `PanelHorarios.jsx` aparece arriba de los bloques del barbero seleccionado (dueño elige el barbero con las pestañas de siempre); en `PanelBarberoHorarios.jsx` aparece en el mismo lugar relativo (antes de la lista de bloques), leyendo su propio barbero vía `useBarberosAdmin(perfil.barberia_id).find(b => b.id === perfil.barbero_id)` — el mismo patrón que ya usaba `PanelBarberoServicios.jsx` para lo mismo. Ambos reutilizan la mutación genérica `useActualizarBarbero`.
+
+**Cómo se probó (Playwright, instalado y desinstalado como siempre; dev server reiniciado en limpio antes de probar):**
+- Bloques de horario: cambiar el día y la hora de inicio de un bloque desde `/panel/horarios`, recargar la página y confirmar que el cambio persiste en `localStorage` — mismo chequeo repetido en `/panel/barbero/horarios` entrando como barbero vía el selector "Ver como". Crear un bloque nuevo desde el formulario también funcionó.
+- Intervalo: desde `/panel/horarios`, cambiar el intervalo de un barbero a 45 min, recargar y confirmar que persiste; luego abrir el flujo público (`/barberias/don-manuel`), elegir justo ese barbero y un servicio, y confirmar que las horas ofrecidas salen espaciadas exactamente 45 min entre sí (antes salían cada 30, la duración del servicio elegido). Repetido desde `/panel/barbero/horarios` (el barbero editando su propio intervalo a 60 min) con el mismo resultado.
+- Sin errores de consola en ningún caso. `npm run lint` y `npm run build` limpios.
+
+**Por qué:**
+- Intervalo y duración del servicio se guardan como campos separados (`intervalo_reserva_minutos` en `barberos`, `duracion_minutos` en `servicios`) en vez de reutilizar uno para el otro: son decisiones distintas de negocio — cuánto dura el servicio no lo decide el barbero libremente (es una realidad del oficio), pero cuánto margen dejar entre un cliente y el siguiente sí es una preferencia suya.
+- El paso (`intervaloMinutos`) y el chequeo de superposición (`duracionMinutos`) se mantuvieron como dos parámetros distintos dentro de `calcularSlotsDisponibles` en vez de fusionarlos: si se ofrecieran horas cada 45 min pero se chequeara superposición también con 45 min en vez de con los 30 reales del servicio, se estarían bloqueando 15 min de agenda real sin necesidad.
+- `SelectorIntervaloReserva.jsx` como componente compartido (no una copia en cada panel): la lógica de guardado y el estado visual son idénticos en ambos lugares, solo cambia de dónde viene el `barbero` y qué mutación se llama — duplicarlo no aportaba nada.
+
+**Archivos afectados:**
+- Nuevo: `src/pages/panel/components/SelectorIntervaloReserva.jsx`.
+- Modificado: `src/pages/panel/components/FilaHorario.jsx` (rediseño completo), `src/pages/panel/PanelHorarios.jsx`, `src/pages/panel/PanelBarberoHorarios.jsx`, `src/utils/horarios.js` (`calcularSlotsDisponibles` recibe `intervaloMinutos`), `src/pages/barberias/components/PasoHorario.jsx`, `src/pages/panel/hooks/useBarberosAdmin.js` (`COLUMNAS`), `src/pages/barberias/hooks/useBarberiaPorSlug.js` (select de `barberos`), `src/mocks/datosProvisoriosSuperadmin.js` (seed + default al crear barbero), `src/config/demo.js`.
+
+**Pendiente / próximos pasos:**
+- Cuando haya Supabase real: falta la migración que agregue la columna `intervalo_reserva_minutos integer not null default 30` a la tabla `barberos`.
+
+---
+
+## 2026-08-13 (2) - Excepciones puntuales de horario: "mañana llego más tarde" sin tocar el horario de siempre
+
+**Qué se hizo:**
+Tras la entrada anterior, Enzo aclaró qué problema quería resolver en realidad: no el intervalo entre reservas (eso ya quedó bien), sino que si el barbero va a llegar tarde un día puntual (por el motivo que sea), pueda dejar las horas disponibles desde una hora distinta ESE día específico — por ejemplo, entrar a las 12:30 en vez de las 10:00 de siempre — sin alterar su horario semanal recurrente, que sigue igual la semana siguiente.
+
+**1. Nueva tabla `excepciones_horario`**, separada de `horarios_disponibles` (que es semanal, por `dia_semana`). Cada fila es `{barbero_id, fecha (una fecha exacta, no un día de la semana), hora_inicio, hora_fin, cerrado}`. Si `cerrado` es `true`, ese día no se ofrece ninguna hora sin importar el horario de siempre; si es `false`, `hora_inicio`/`hora_fin` reemplazan por completo el bloque semanal solo para esa fecha puntual. Se agregó al seed provisorio, a `useHorariosAdmin.js` (hooks de panel: `useExcepcionesDeBarbero`, `useCrearExcepcion` — hace upsert por `barbero_id`+`fecha`, así editar la excepción de un mismo día la reemplaza en vez de duplicarla —, `useEliminarExcepcion`) y a un hook nuevo del lado público, `src/pages/barberias/hooks/useExcepcionesHorario.js`.
+
+**2. `calcularSlotsDisponibles` y `proximosDiasConHorario` (`src/utils/horarios.js`) ahora consideran la excepción del día.** La función de slots recibe un `excepcionDelDia` opcional (resuelto afuera, por quien llama, buscando en la lista de excepciones la que coincide con la fecha activa): si viene `cerrado`, devuelve cero horas; si no, usa su `hora_inicio`/`hora_fin` en vez de filtrar por `dia_semana`. `proximosDiasConHorario` ahora también incluye en el selector de día cualquier fecha con una excepción abierta, aunque su día de la semana no tenga horario recurrente (p. ej. el barbero abre especialmente un domingo que normalmente tiene cero bloques). `PasoHorario.jsx` (el paso del asistente de reserva que ve el cliente) es quien cruza ambas listas y le pasa a `calcularSlotsDisponibles` solo la excepción de la fecha que el cliente tiene seleccionada.
+
+**3. `ExcepcionesHorario.jsx` (nuevo, compartido)**: una tarjeta con la lista de excepciones ya cargadas (fecha en español, y si está cerrada o desde/hasta qué hora, con botón "Quitar") y un formulario para agregar una nueva — fecha (mínimo hoy), un interruptor "Cerrado todo el día" que oculta los campos Desde/Hasta cuando está activo, y un botón "Agregar". Aparece en `PanelHorarios.jsx` (dueño, para el barbero seleccionado en las pestañas) y en `PanelBarberoHorarios.jsx` (el propio barbero), justo debajo del selector de intervalo de la entrada anterior.
+
+Primera versión del formulario probó estar apretada (el texto "Cerrado todo el día" se cortaba en 3 líneas) porque forzaba 5 columnas de grid de ancho fijo en una tarjeta que no tenía espacio para todas a la vez — se rehizo como filas `flex flex-wrap` con anchos fijos razonables por campo (`w-40`/`w-28`) en vez de columnas de grid rígidas, así cada fila se ajusta a su contenido real y se pliega con gracia en vez de comprimir el texto.
+
+**Cómo se probó (Playwright, instalado y desinstalado como siempre; dev server reiniciado en limpio antes de probar):**
+- Desde `/panel/horarios`, se agregó una excepción para la fecha de mañana (12:30–19:00) sobre un barbero cuyo horario normal ese día empieza a las 10:00; recargar la página mantuvo la excepción guardada y listada en español ("viernes, 14 ago — desde las 12:30 hasta las 19:00").
+- En el flujo público (`/barberias/don-manuel`), eligiendo ese mismo barbero y el día de mañana, las horas ofrecidas empezaron exactamente a las 12:30 (antes hubieran empezado a las 10:00) — confirmando que la excepción efectivamente reemplaza el horario semanal solo para esa fecha.
+- Captura de pantalla del formulario tras el arreglo de layout: fecha, interruptor y desde/hasta en una fila legible, sin texto cortado.
+- Sin errores de consola. `npm run lint` y `npm run build` limpios.
+
+**Por qué:**
+- Excepción por fecha exacta en una tabla separada de `horarios_disponibles` (que sigue siendo por `dia_semana`), en vez de mutar temporalmente el horario semanal y luego tener que revertirlo: mezclar ambos conceptos en una sola tabla habría requerido lógica extra para "restaurar" el horario de siempre después de esa fecha — con tablas separadas, el horario semanal nunca se toca, solo se consulta primero si hay una excepción para el día exacto.
+- Upsert por `barbero_id`+`fecha` en vez de permitir varias excepciones para el mismo día: no tiene sentido tener dos reglas distintas para la misma fecha puntual — la última que se guarda es la que aplica, sin acumular filas obsoletas.
+- Layout en filas `flex flex-wrap` en vez de grid de columnas fijas: un grid con demasiadas columnas de ancho fijo dentro de un contenedor angosto fuerza a los tracks a compartir el espacio sobrante entre sí sin importar cuánto necesite cada uno — con filas flexibles, cada campo pide solo el ancho que realmente necesita y el conjunto se pliega en vez de aplastarse.
+
+**Archivos afectados:**
+- Nuevo: `src/pages/panel/components/ExcepcionesHorario.jsx`, `src/pages/barberias/hooks/useExcepcionesHorario.js`.
+- Modificado: `src/mocks/datosProvisoriosSuperadmin.js` (tabla `excepciones_horario` + CRUD provisorio), `src/pages/panel/hooks/useHorariosAdmin.js` (hooks de panel), `src/utils/horarios.js` (`calcularSlotsDisponibles` recibe `excepcionDelDia`, `proximosDiasConHorario` recibe `excepciones`, nuevo `fechaISO` exportado), `src/pages/barberias/components/PasoHorario.jsx` (cruza horarios + excepciones, usa el `fechaISO` compartido en vez de uno local duplicado), `src/pages/panel/PanelHorarios.jsx`, `src/pages/panel/PanelBarberoHorarios.jsx`.
+
+**Pendiente / próximos pasos:**
+- Cuando haya Supabase real: falta la migración de la tabla `excepciones_horario` (`id, barbero_id, fecha date, hora_inicio time null, hora_fin time null, cerrado boolean default false`) con una restricción única sobre `(barbero_id, fecha)` para que el `upsert` con `onConflict` funcione tal cual está escrito.
+- No hay una vista de "excepciones pasadas" ni limpieza automática — las excepciones de fechas ya pasadas se acumulan en la tabla sin afectar nada (no se consultan para fechas que ya no aparecen en el selector de días), pero si en algún momento se quiere una pantalla de historial o un borrado automático, hoy no existe.
+
+---
+
+## 2026-08-13 (3) - Orden y alineación en Barberos, y auditoría de responsividad mobile de todo lo tocado esta sesión
+
+**Qué se hizo:**
+Enzo mandó una captura del panel "Barberos" señalando que le gusta la interfaz (lista plana, no tarjetas) pero que necesitaba quedar alineada, y pidió que todo lo hecho en esta sesión (Servicios, Horarios, Barberos) se viera igual de profesional en teléfono.
+
+**1. `TarjetaBarbero` (`PanelBarberos.jsx`) reordenada, sin cambiar el estilo de lista plana que a Enzo le gustaba.** La causa del desorden: la fila usaba `items-start` con tres columnas de alturas distintas (avatar+nombre+botón de foto ocupa 2 líneas; el input de especialidad y el interruptor "Activo" ocupan 1), así que nada quedaba a la misma altura visual — y el interruptor de "servicios propios" vivía forzado con `sm:w-full` dentro de la misma fila flex (sin `flex-wrap`), lo que producía un ancho impredecible. Se separó en dos filas: la de arriba (avatar/nombre/botón — especialidad — Activo) ahora con `items-center` para que las tres columnas compartan la misma línea base; la de abajo, "Servicios propios" con su descripción, pasó a su propia fila de ancho completo debajo de un separador (`border-t border-gris-calido-100 pt-4`) — el mismo patrón de "fila de ajustes debajo de un divisor" que ya usan las tarjetas de Servicios y Horarios, aplicado acá sin convertir todo a tarjetas con borde (se mantuvo la lista con `border-b` que a Enzo le gustaba).
+
+**2. Bug real de mobile encontrado y corregido: el estado "Publicado/Oculto" se salía de la tarjeta en pantallas angostas.** Medido con Playwright a 375px de ancho: el texto "Publicado" terminaba ~20px afuera del borde derecho de la tarjeta de servicio. Causa clásica de flexbox: el `<input>` del nombre (con `flex-1`, para ocupar el espacio sobrante) tiene por default `min-width: auto`, que el navegador resuelve como el ancho de su contenido — no como cero — así que en vez de encogerse para dejarle espacio al bloque "Publicado" (que es `shrink-0`), empujaba a toda la fila más ancha que la tarjeta. Se agregó `min-w-0` a los cuatro lugares con este mismo patrón (`<label>`/`<input>` `flex-1` junto a un hermano `shrink-0`, sin permiso explícito para encogerse por debajo de su contenido): `FilaServicioAdmin.jsx` (Nombre), `FilaHorario.jsx` (Día), `PanelBarberoServicios.jsx` → `FilaServicioPropioBorrador` (Nombre), y dos spots más en `PanelBarberos.jsx` (especialidad, nombre del nuevo barbero) que tenían el mismo riesgo aunque no se manifestara todavía a 375px.
+
+**Cómo se probó (Playwright, instalado y desinstalado como siempre; dev server reiniciado en limpio):**
+- Medición exacta antes/después: `scrollWidth` vs `clientWidth` de la tarjeta y bounding box del texto "Publicado" — antes desbordaba (353px de contenido en 333px de ancho visible, "Publicado" terminando 20px afuera del borde), después coincide exactamente (333px = 333px, ningún desborde).
+- Auditoría completa a 375px de ancho sobre las 4 pantallas tocadas esta sesión, dueño y barbero: `/panel/servicios` (4 tarjetas), `/panel/horarios` (9 tarjetas: intervalo, excepciones, 6 bloques de día, + la de "nuevo bloque"), `/panel/barbero/servicios` y `/panel/barbero/horarios` (usando el selector "Ver como" para entrar como barbero) — cero tarjetas con `scrollWidth > clientWidth` en cualquiera de las cinco pantallas.
+- Capturas de pantalla completas (mobile y desktop) confirmando visualmente: en Barberos, avatar/nombre, especialidad y "Activo" quedan en una misma línea en desktop y se apilan limpio en mobile; en Servicios, "Publicado" ya cabe dentro de la tarjeta en 375px.
+- `npm run lint` y `npm run build` limpios.
+
+**Por qué:**
+- Reordenar sin convertir a tarjetas con borde: Enzo dijo explícitamente que le gustaba esta interfaz — el problema era la alineación, no el estilo de lista. Cambiarla a tarjetas habría sido un rediseño no pedido.
+- `min-w-0` en vez de, por ejemplo, achicar el texto o el interruptor: el input/select es el único elemento de la fila que genuinamente puede (y debe) ceder espacio cuando la pantalla es angosta — el interruptor y su etiqueta son de tamaño fijo por diseño (son controles, no texto de relleno), así que forzarlos a encogerse habría sido peor UX que dejar que el campo de texto se comprima.
+- Auditoría con medición real (`scrollWidth`/`clientWidth`) en vez de solo mirar capturas: un desborde de unos pocos píxeles en un elemento interno (no en `document.documentElement`) no se detecta con el chequeo de overflow a nivel de página que se usaba en rondas anteriores — hacía falta medir cada tarjeta individualmente para encontrar este bug específico.
+
+**Archivos afectados:**
+- Modificado: `src/pages/panel/PanelBarberos.jsx` (reordenamiento de `TarjetaBarbero` + `min-w-0`), `src/pages/panel/components/FilaServicioAdmin.jsx`, `src/pages/panel/components/FilaHorario.jsx`, `src/pages/panel/PanelBarberoServicios.jsx` (los tres con `min-w-0` agregado al campo `flex-1` de su encabezado).
+
+**Pendiente / próximos pasos:**
+- Ninguno.
+
+---
+
+## 2026-08-13 (4) - Barberos: tarjetas de verdad en mobile, eliminar barbero, y login real simulado con usuario+contraseña
+
+**Qué se hizo:**
+Enzo dijo que en mobile "Barberos" seguía sin entenderse bien ("todo colapsado encima de otro"), pidió poder eliminar barberos, y pidió que cada barbero tenga un usuario derivado de su nombre (ej. Juan Riquelme → jriquelme) y una contraseña real para entrar a su propio panel — no el selector "Ver como" que era solo un atajo de desarrollo.
+
+**1. Causa real de "colapsado" en mobile, encontrada y corregida.** Dos problemas concretos: el campo "especialidad" no tenía ninguna etiqueta encima (a diferencia de cada input del resto del panel, que sí la tiene) — en mobile, sin las columnas de escritorio para darle contexto, se leía como texto suelto sin explicar qué era. Y cada barbero solo tenía un `border-b` fino como separador, sin tarjeta propia — a diferencia de Servicios/Horarios (que ya son tarjetas con borde completo desde una ronda anterior). Se agregó la etiqueta "Especialidad" y se convirtió `TarjetaBarbero` a la misma tarjeta con borde redondeado que usan Servicios y Horarios, para que las tres pantallas se sientan la misma interfaz.
+
+**2. Eliminar barbero.** Botón "Eliminar" con confirmación (`window.confirm`, explicando qué se borra) en cada tarjeta. Al eliminar se borra en cascada solo lo que era exclusivamente suyo: sus bloques de horario (`horarios_disponibles`), sus excepciones puntuales (`excepciones_horario`) y su catálogo propio de servicios si tenía uno (`servicios` con ese `barbero_id`) — las reservas ya tomadas NO se tocan, quedan como registro histórico. Nuevo `eliminarBarberoProvisorio` en el mock + `useEliminarBarbero` (real: `DELETE` directo en `barberos`, sin cascada explícita porque ahí dependería de que el esquema real tenga `ON DELETE CASCADE`, que todavía no existe).
+
+**3. Login real simulado, con usuario derivado del nombre y contraseña autogenerada.** Esto era lo más grande del pedido. Investigado primero: el login por usuario+contraseña YA está escrito en el código (`authService.js` resuelve `usuario → email técnico` vía una RPC y llama a Supabase Auth de verdad) — el problema es que hoy corre TODO en modo provisorio (sin Supabase conectado), y `AuthContext` autenticaba a cualquiera automáticamente como el dueño, así que `/login` nunca se llegaba a usar de verdad. Se le preguntó a Enzo cómo quería avanzar dado eso, y eligió simular el login completo ahora (en vez de solo mostrar el usuario) con contraseña autogenerada mostrada una sola vez.
+
+- `src/utils/usuarios.js` (nuevo): `generarUsuarioDesdeNombre` (inicial del primer nombre + último apellido, ej. "Juan Riquelme" → `jriquelme`; si ya existe, agrega un número: `jriquelme2`) y `generarContrasenaTemporal` (8 caracteres al azar vía `crypto.getRandomValues`, sin 0/o/1/l/i para que se pueda dictar de palabra sin ambigüedad, con un guión al medio para que se lea más fácil: `x7k2-m9pl`).
+- Cada barbero (seed y los que se crean nuevos) tiene ahora `usuario` y `password_provisoria` en el mock. El dueño tiene una credencial fija `demo` / `demo1234` (`ADMIN_PROVISORIO`) para no depender de mirar el `localStorage` para poder probar.
+- `AuthContext.jsx` reescrito: en vez de autenticar automáticamente, ahora guarda una sesión provisoria real en `localStorage` (`booking_barber_sesion_provisoria_v1`) que se llena recién cuando `iniciarSesion({usuario, password})` valida contra `validarCredencialesProvisorias` (nueva función del mock) y encuentra una coincidencia — si no hay sesión guardada, `RutaProtegida` redirige a `/login` como corresponde. El selector "Ver como" se mantiene, pero ahora está restringido a cuando la sesión real es la del dueño (`sesionProvisoria.tipo === 'dueno'`) — un barbero que entra con su propio usuario ya no ve ese selector, no tiene por qué poder mirar el panel de otro.
+- "Restablecer contraseña" por barbero (`resetearContrasenaBarberoProvisoria` + `useResetearContrasenaBarbero`): genera una contraseña nueva, la vieja deja de servir de inmediato.
+- Al crear un barbero o resetear su contraseña, `PanelBarberos.jsx` muestra una caja fija ("Anota estos datos... la contraseña no se vuelve a mostrar") con el usuario y la contraseña en texto — se cierra a mano cuando ya se anotó.
+- `FormularioAcceso.jsx` (login) muestra un aviso chico "Modo de prueba — dueño: demo / demo1234" debajo del botón, solo mientras `!HAY_BACKEND_REAL` — para no tener que ir a buscar la credencial en el código cada vez que se quiere probar.
+- **Lo que queda pendiente para cuando haya Supabase real**: crear la cuenta de verdad (fila en `auth.users` + `usuarios`) requiere la clave de servicio de Supabase, que nunca puede vivir en código de navegador — hace falta una función de servidor (Edge Function) todavía no escrita. `useResetearContrasenaBarbero` ya tira un error explícito avisando esto si algún día corre con `HAY_BACKEND_REAL` en `true` sin que esa función exista.
+
+**Cómo se probó (Playwright, instalado y desinstalado como siempre; dev server reiniciado en limpio):**
+- Sin sesión guardada, ir a `/panel/barberos` redirige a `/login`. Con usuario/contraseña incorrectos, se muestra el error "Usuario o contraseña incorrectos." Con `demo`/`demo1234`, entra como dueño.
+- Crear "Juan Riquelme" generó el usuario `jriquelme` y una contraseña al azar, mostrados en la caja de credenciales.
+- Cerrar sesión y loguearse con exactamente esas credenciales entra directo a `/panel/barbero/reservas` (el panel del barbero) — y el selector "Ver como" NO aparece (confirmado ausente), a diferencia de cuando se está logueado como dueño (confirmado presente).
+- "Restablecer contraseña" sobre Juan Riquelme generó una contraseña distinta a la anterior; la vieja quedó rechazada de inmediato, la nueva funcionó.
+- "Eliminar" sobre Juan Riquelme (con el diálogo de confirmación aceptado) lo sacó de la lista y confirmó 0 horarios suyos restantes en `localStorage`.
+- Captura de pantalla a 375px de ancho: cada barbero es ahora una tarjeta clara con su usuario visible, "Especialidad" etiquetada, y las acciones "Restablecer contraseña"/"Eliminar" legibles — sin overflow horizontal.
+- Cero errores de consola en todo el recorrido. `npm run lint` y `npm run build` limpios.
+
+**Por qué:**
+- Convertir a tarjeta con borde en vez de solo agregar más espaciado: el problema de fondo no era falta de aire entre filas, era falta de un límite visual claro por barbero — exactamente lo mismo que ya se había resuelto para Servicios/Horarios en una ronda anterior; reusar el mismo patrón es tanto la solución más simple como la más consistente.
+- Contraseña autogenerada (no elegida por el dueño) y mostrada una sola vez: es el patrón estándar de paneles reales (Supabase, GitHub, etc.) — evita contraseñas débiles/reutilizadas, y no depender de que el dueño piense una contraseña por cada barbero.
+- Simular el login completo (en vez de solo mostrar el usuario) fue una decisión que se le devolvió a Enzo antes de avanzar, porque cambiar cómo arranca la sesión provisoria (de "todos entran automático" a "hay que loguearse de verdad") es una decisión de alcance/arquitectura, no un detalle de implementación — normalmente eso también le devolvería una pérdida de la comodidad de "entrar directo" para seguir probando el resto del panel sin loguearse cada vez, así que se agregó la credencial fija `demo`/`demo1234` y el aviso en el login precisamente para no perder esa comodidad mientras se gana el login real.
+- No se intentó fingir la creación de la cuenta real del lado de Supabase: eso requiere la clave de servicio (nunca en el navegador) y una función de servidor que no existe todavía — documentarlo como pendiente es más honesto que dejar un código que aparente funcionar y en realidad no pueda.
+
+**Archivos afectados:**
+- Nuevo: `src/utils/usuarios.js`.
+- Modificado: `src/mocks/datosProvisoriosSuperadmin.js` (`ADMIN_PROVISORIO`, `usuario`/`password_provisoria` en el seed y en `crearBarberoProvisorio`, `eliminarBarberoProvisorio`, `resetearContrasenaBarberoProvisoria`, `validarCredencialesProvisorias`, `perfilProvisorioParaBarbero` usa el `usuario` real), `src/context/AuthContext.jsx` (sesión provisoria real persistida, login/logout de verdad en modo provisorio, "Ver como" restringido al dueño), `src/services/authService.js` (sin cambios de lógica, solo se reexporta `ErrorLogin` para el nuevo uso), `src/pages/panel/hooks/useBarberosAdmin.js` (`useEliminarBarbero`, `useResetearContrasenaBarbero`), `src/pages/panel/PanelBarberos.jsx` (tarjetas, caja de credenciales, botones Eliminar/Restablecer), `src/pages/Login/shared/FormularioAcceso.jsx` (aviso de modo de prueba).
+
+**Pendiente / próximos pasos:**
+- Cuando haya Supabase real: falta la Edge Function que cree la cuenta real (auth.users + fila en `usuarios` con el `usuario` generado) al crear un barbero, y otra para resetear su contraseña — ninguna de las dos puede hacerse con una simple llamada desde el cliente.
+- El `DELETE` de barbero del lado real no borra en cascada sus horarios/servicios/excepciones — depende de que la migración real tenga `ON DELETE CASCADE` en esas foreign keys, o habrá que replicar la limpieza a mano como se hizo en el mock.
+
+---
+
+## 2026-08-13 (5) - Fix: la fila de "servicios propios" + Eliminar/Restablecer se apretaba contra el borde de la tarjeta
+
+**Qué se hizo:**
+Enzo mandó una captura mostrando que, en ciertos anchos de pantalla, la fila del interruptor "servicios propios" (con su descripción larga) y los botones "Restablecer contraseña"/"Eliminar" (empujados a la derecha con `ml-auto`, todo en la misma fila) terminaban apretados o cortados contra el borde de la tarjeta. Pidió simplificar el texto de esa descripción.
+
+Se acortó el texto ("Puede crear y editar sus propios servicios y precios" → "Tiene su propio catálogo"; "Solo puede ver el catálogo compartido — no puede modificarlo" → "Ve el catálogo compartido") y, más importante, se separaron los "Restablecer contraseña"/"Eliminar" a su PROPIA fila, debajo de la del interruptor — antes competían por el mismo espacio horizontal que el texto descriptivo, y en anchos intermedios (ni mobile completo, ni desktop completo) no siempre alcanzaba.
+
+**Cómo se probó (Playwright, instalado y desinstalado como siempre):**
+Capturas a 7 anchos distintos (375, 500, 640, 768, 900, 1033 — el ancho exacto de la captura de Enzo —, 1280), con el interruptor de "servicios propios" activado en un barbero para ver también el texto más largo ("Tiene su propio catálogo"): ninguna tarjeta desbordó (`scrollWidth`/`clientWidth` medidos en las 7 anchos) y las dos filas se leen separadas y completas en todos los casos.
+
+**Por qué:**
+- Separar en dos filas en vez de solo acortar el texto: acortar el texto retrasa el problema (con un nombre de barbero más largo, o si se agrega otra acción a futuro, volvería a apretarse) — separando las filas, la descripción y las acciones nunca vuelven a competir por el mismo ancho, sin importar qué tan largo sea cualquiera de los dos.
+
+**Archivos afectados:**
+- Modificado: `src/pages/panel/PanelBarberos.jsx`.
+
+**Pendiente / próximos pasos:**
+- Ninguno.
+
+---
+
+## 2026-08-13 (6) - Contraseña de barbero: la escribe el dueño, no autogenerada
+
+**Qué se hizo:**
+Enzo dijo que no le gustaban las contraseñas autogeneradas de la ronda anterior — necesita que la contraseña sea accesible al momento (algo que él elige y le puede decir al barbero ahí mismo, no una cadena al azar que hay que anotar y pasar después). Se cambió el flujo: ahora el dueño escribe la contraseña a mano, tanto al crear un barbero como al cambiarla después. El usuario (`jriquelme`, derivado del nombre) se sigue generando solo, eso no se cuestionó.
+
+- **Crear barbero**: el formulario "Nuevo barbero" ahora tiene un segundo campo, "Contraseña" (además de "Nombre"), y ambos son obligatorios para poder crear. `crearBarberoProvisorio` ya no llama a `generarContrasenaTemporal()` — usa la que llega del formulario.
+- **Cambiar contraseña de un barbero existente**: el botón "Restablecer contraseña" (que antes generaba una al azar) se reemplazó por "Cambiar contraseña", que al hacer clic despliega un campo de texto + "Guardar"/"Cancelar" ahí mismo en la tarjeta — el dueño escribe la que quiera, sin que el sistema le imponga ninguna.
+- Ya no tiene sentido mostrar una "contraseña revelada una sola vez" (el dueño la escribió él mismo, ya la sabe) — se reemplazó por un aviso simple confirmando que el barbero puede entrar con su usuario (sin repetir la contraseña, que no tiene nada de sensible mostrar dos veces si el dueño ya la escribió).
+- Se sacó `generarContrasenaTemporal()` de `src/utils/usuarios.js` (quedaba sin ningún uso).
+
+**Cómo se probó (Playwright, instalado y desinstalado como siempre; dev server reiniciado en limpio):**
+- Crear "Juan Riquelme" con la contraseña `micontrasena123` escrita a mano: el barbero quedó guardado con exactamente esa contraseña (confirmado en `localStorage`), el aviso mostró el usuario `jriquelme` pero NO la contraseña, y loguearse con `jriquelme` / `micontrasena123` entró directo a `/panel/barbero/reservas`.
+- "Cambiar contraseña" sobre ese mismo barbero, escribiendo `nuevaclave456`: la contraseña vieja quedó rechazada de inmediato ("Usuario o contraseña incorrectos"), la nueva funcionó.
+- Cero errores de consola. `npm run lint` y `npm run build` limpios.
+
+**Por qué:**
+- El dueño elige la contraseña en vez de que el sistema la genere: se lo pidió explícitamente porque necesita que sea "accesible al momento" — una contraseña al azar (aunque más segura en teoría) no sirve si el barbero está ahí mismo esperando para entrar a su panel y hay que dictarle/anotarle una cadena sin sentido.
+- El cambio de contraseña quedó como un control colapsado dentro de la misma tarjeta (no una pantalla aparte ni un `window.prompt`) para mantener la misma consistencia visual del resto del panel — expandir/colapsar en el lugar, con su propio estado de guardado, es el mismo patrón que ya usa el resto de los campos editables de este panel.
+
+**Archivos afectados:**
+- Modificado: `src/mocks/datosProvisoriosSuperadmin.js` (`crearBarberoProvisorio`/`establecerContrasenaBarberoProvisoria` reciben la contraseña en vez de generarla), `src/utils/usuarios.js` (se quitó `generarContrasenaTemporal`, sin uso), `src/pages/panel/hooks/useBarberosAdmin.js` (`useCrearBarbero` recibe `{nombre, password}`, `useEstablecerContrasenaBarbero` reemplaza a `useResetearContrasenaBarbero`), `src/pages/panel/PanelBarberos.jsx` (campo de contraseña en "Nuevo barbero", control "Cambiar contraseña" inline, aviso sin la contraseña).
+
+**Pendiente / próximos pasos:**
+- Ninguno.
+
+---
+
+## 2026-08-13 (7) - Fix: el cursor propio quedaba pegado en la última posición al salir de la ventana
+
+**Qué se hizo:**
+Enzo reportó que al sacar el mouse fuera del margen de la página, el cursor personalizado se quedaba congelado en la última posición en vez de desaparecer. La causa: el único mecanismo para ocultarlo al salir era un listener de `pointerleave` en `window` — pero `pointerleave` (a diferencia de `pointerout`) no burbujea y su disparo en el borde exacto de la ventana no es confiable en todos los navegadores, así que en la práctica muchas veces no llegaba a dispararse.
+
+Se agregó el mecanismo estándar y confiable para esto: en el `pointerout` que ya se escuchaba (usado hasta ahora solo para el caso del iframe), se chequea si `evento.relatedTarget` es nulo — eso significa que el puntero no entró a NINGÚN otro elemento del documento, es decir, se fue de la ventana por completo (a otra pestaña, la barra de direcciones, otra aplicación). Como `pointerout` sí burbujea hasta `window`, alcanza con este único listener para cubrir toda la página, sin depender del borde exacto donde se dispare `pointerleave`.
+
+**Cómo se probó (Playwright, instalado y desinstalado como siempre; dev server reiniciado en limpio):**
+Simulado un `PointerEvent('pointerout', { relatedTarget: null })` (la señal exacta que el navegador dispara al salir de la ventana) sobre el elemento bajo el mouse: las tres capas del cursor (flecha, mano, barra de texto) pasaron de opacidad 1/0 a 0/0/0, confirmando que se ocultan por completo. Sin errores de consola. `npm run lint` y `npm run build` limpios.
+
+**Por qué:**
+- `pointerout` + `relatedTarget === null` en vez de confiar solo en `pointerleave`: es el mecanismo cross-browser documentado para detectar "el mouse se fue de la ventana" — `pointerleave`/`mouseleave` no burbujean y su comportamiento en el borde exacto del viewport es inconsistente entre navegadores, mientras que `pointerout`/`mouseout` sí burbujean y llevan la información necesaria (`relatedTarget` nulo) para saber que no hay ningún elemento de destino dentro del documento.
+
+**Archivos afectados:**
+- Modificado: `src/components/common/Cursor.jsx`.
+
+**Pendiente / próximos pasos:**
+- Ninguno.
+
+---
+
+## 2026-08-13 (8) - Fix: el logo "booking.barber.cl" no tenía el subrayado al pasar el mouse, en ningún panel
+
+**Qué se hizo:**
+Enzo notó que el logo del header ya no se subrayaba al pasar el mouse por encima, y pidió que funcionara desde el inicio hasta el panel del dueño. Investigado: el componente `HoverLink.jsx` que hace ese efecto (usado en el logo de las pantallas de Login, en el footer, etc.) seguía intacto y funcionando en todos esos lugares — el logo del header público (`Header.jsx`) y el del encabezado de panel (`PanelShell.jsx`, compartido por dueño, barbero Y superadmin) directamente nunca lo usaban: eran un `<span>` suelto, sin link ni animación, en ningún momento de esta sesión ni antes.
+
+Se envolvió el texto del logo en `HoverLink` (con `href="/"`) en ambos archivos, igual que ya se hacía en Login/Footer — ahora también es clickeable (vuelve al inicio) además de subrayarse al pasar el mouse. Como `PanelShell.jsx` es el cascarón compartido por los tres paneles, este único cambio cubre dueño, barbero y superadmin a la vez.
+
+**Cómo se probó (Playwright, instalado y desinstalado como siempre; dev server reiniciado en limpio):** Al medir el efecto la primera vez con `getComputedStyle(...).transform` dio "none" antes y después del hover en TODOS los `HoverLink` del sitio, incluidos los que ya andaban bien de antes (como "Planes") — pista de que la medición estaba mal, no el efecto: revisando el CSS compilado, la utilidad `scale-x-0` de Tailwind v4 no usa la propiedad `transform` clásica, usa la propiedad CSS moderna `scale` (`--tw-scale-x:0%; scale: var(--tw-scale-x) var(--tw-scale-y)`). Repitiendo la medición sobre `getComputedStyle(...).scale`: `0 1` (invisible) antes del hover, `1` (visible) después, tanto en el logo de la home como en el del panel del dueño — confirmado que el efecto sí corre. También se confirmó que el clic navega a `/`. Sin errores de consola. `npm run lint` y `npm run build` limpios.
+
+**Por qué:**
+- El logo nunca tuvo el link/animación en ninguno de los dos headers principales (no es una regresión de una ronda anterior de esta sesión) — se agregó ahora reusando el componente ya existente (`HoverLink`) en vez de reimplementar el efecto, para que los cinco lugares del sitio que ya lo usan y este sigan siendo exactamente la misma interfaz.
+
+**Archivos afectados:**
+- Modificado: `src/components/layout/Header.jsx`, `src/components/panel/PanelShell.jsx`.
+
+**Pendiente / próximos pasos:**
+- Ninguno.
+
+---
+
+## 2026-08-13 (9) - Home: hero a pantalla completa con flecha de scroll, y nueva sección sobre el panel propio de cada barbero
+
+**Qué se hizo:**
+Enzo pidió adaptar la home (sin tocar el 3D) para que refleje todo lo construido esta sesión, que el hero (con el logo 3D) ocupe toda la pantalla al entrar, y que tenga una flecha indicando que se puede scrollear.
+
+**1. Hero a pantalla completa, sin tocar ningún archivo del 3D.** `HeroScene3D`/`Scene3DCanvas`/`BarberPoleModel`/`StaticBarberPoleIllustration` quedaron exactamente iguales — el modelo 3D se autocentra en la caja que le da su contenedor (`CAJA` en `HeroScene3D.jsx`), así que agrandar la sección que lo envuelve no requería tocarlo. El cambio fue en `Home.jsx`/`Hero.jsx`: `Header` y `Hero` ahora viven juntos dentro de un `flex min-h-screen flex-col`, con el `<section>` del hero en `flex-1` (ocupa lo que sobra debajo del header) en vez de un `min-h-screen` puesto directo en el hero — eso último se probó primero y dejaba la flecha de scroll fuera de vista, porque header + hero juntos sumaban más que una pantalla. Con `flex-1`, los dos siempre suman exactamente 100vh sin depender de la altura exacta del header (que cambia entre mobile y desktop).
+
+**2. Flecha de scroll.** Un ícono de flecha de trazo a mano (mismo estilo que los íconos del oficio en `Marquee.jsx` — `stroke: currentColor`, sin relleno, nunca un ícono genérico de librería) con un rebote continuo sutil (Framer Motion, loop infinito), anclada abajo del hero y enlazada a `#como-funciona` — la misma ancla que ya usaba el link de texto "Ver cómo funciona ↓" que seguía existiendo, ahora con un refuerzo visual más notorio.
+
+**3. Nueva sección: "El panel de cada barbero".** Después de investigar toda la home existente (ya bastante completa: Cómo funciona, Demo en vivo, Beneficios, Calculadora de citas perdidas, Vista previa del panel del dueño, comparación con cuaderno, Planes, Cupos fundadores, FAQ), se detectó que ninguna sección mostraba lo más nuevo construido esta sesión: que cada barbero tiene su PROPIO panel (no solo aparece en el del dueño). Se agregó `BarberPanelPreview.jsx`, inmediatamente después de `PanelPreview.jsx` (la vista previa del panel del dueño) — mismo patrón visual (mockup + anotaciones flotando al lado), como continuación directa, no una pantalla desconectada. Muestra un mockup compacto del panel de barbero (pestañas Reservas/Horarios/Servicios, un bloque de horario, una excepción puntual, el intervalo entre reservas) con 3 anotaciones: login propio, excepciones puntuales sin tocar el horario de siempre, e intervalo propio.
+
+**Cómo se probó (Playwright, instalado y desinstalado como siempre; dev server reiniciado en limpio):**
+- Medida la altura real: hero + header suman exactamente 900px en un viewport de 900px (antes de la corrección con `flex-1`, el hero solo daba 900px de alto ÉL MISMO, sumando 992px junto al header — la flecha quedaba fuera de la pantalla inicial).
+- La flecha de scroll existe, es clickeable, y al hacer clic el scroll avanza exactamente hasta el borde de la siguiente sección.
+- Capturas de pantalla del hero (modelo 3D renderizado correctamente, nada roto) y de la nueva sección — corregido en el camino un texto ("Panel de barbero") que se cortaba en 2 líneas en el mockup por un sidebar más angosto que el de `PanelPreview.jsx` (se igualó el ancho y se agregó `whitespace-nowrap`).
+- Captura de la página completa confirmando que el orden claro/oscuro de las secciones no se rompió (la nueva sección, clara, queda junto a `PanelPreview` — igual patrón de "dos claras seguidas" que ya existe entre "Cómo funciona" y "Demo en vivo").
+- Sin errores de consola. `npm run lint` y `npm run build` limpios.
+
+**Por qué:**
+- `flex-1` en vez de `min-h-screen` directo en el hero: un cálculo de píxeles fijo (`calc(100vh - Npx)`) se habría roto apenas cambiara el padding del header entre mobile/desktop — dejar que flexbox reparta el espacio automáticamente entre header y hero es la única forma de que "juntos ocupen 100vh" siga siendo cierto sin mantenimiento futuro.
+- Sección nueva en vez de reescribir `PanelPreview.jsx`: esa sección ya cumple su propósito (vista del dueño) y su título ("Los barberos también quieren saber qué van a usar ellos") ya insinuaba que faltaba la otra mitad — se completó la idea con una sección propia en vez de forzar dos temas distintos en una sola pantalla.
+- Mismo patrón visual (mockup + anotaciones) que `PanelPreview.jsx` en vez de uno nuevo: se lee como continuación directa de la sección anterior, reforzando que es el mismo panel de barbería visto desde otro rol — no una idea aislada.
+
+**Archivos afectados:**
+- Nuevo: `src/pages/Home/components/BarberPanelPreview.jsx`.
+- Modificado: `src/pages/Home/Home.jsx` (Header+Hero en `flex min-h-screen flex-col`, se agregó `<BarberPanelPreview />`), `src/pages/Home/components/Hero.jsx` (`flex-1` en vez de `min-h-screen`, flecha de scroll animada).
+
+**Pendiente / próximos pasos:**
+- Ninguno.
+
+---
+
+## 2026-08-13 (10) - Home: los mockups pasan a copiar la UI real, no una versión inventada
+
+**Qué se hizo:**
+Enzo señaló que los ejemplos de la home (la demo del teléfono y las vistas previas de panel) estaban "vendiendo algo que no es" — no se parecían a como la app se ve de verdad. Se investigó primero la UI real punto por punto (`AsistenteReserva.jsx` y cada paso, `PanelReservas.jsx`, `PanelBarberoLayout.jsx`, `FilaHorario.jsx`/`SelectorIntervaloReserva.jsx`/`ExcepcionesHorario.jsx`, `Interruptor.jsx`) y se comparó contra lo que mostraban los mockups, para corregir cada diferencia concreta encontrada — no solo "mejorar el look".
+
+**1. `LiveDemo.jsx` (demo del teléfono) — se mantuvo el mecanismo tal cual pidió Enzo** (las 5 pantallas montadas, el crossfade, el `setInterval`, el link "Prueba la reserva de verdad"), solo se corrigió el contenido:
+- **Orden**: mostraba servicio→barbero→horario→datos; el asistente real (cuando hay más de un barbero) es barbero→servicio→horario→datos desde que se agregó esa elección — se reordenó.
+- **Estilo de las pantallas de barbero/servicio**: eran tarjetas con borde; los pasos reales (`PasoBarbero.jsx`/`PasoServicio.jsx`) son listas simples de filas con una barra de acento a la izquierda en la fila resaltada, sin tarjetas ni fotos — se rehicieron para copiar exactamente ese patrón.
+- **Precios y duraciones**: se alinearon con los mismos valores que usa el resto de la app en sus datos de ejemplo (Corte clásico 30 min $8.000, Corte + Barba 45 min $13.000 — antes decía $9.000/$12.000 sin duración).
+- Se agregó la fila de chips de fecha (Hoy/Mañana/Vie 15) que sí existe en el paso real de horario y que la demo no mostraba.
+
+**2. `PanelPreview.jsx` (vista previa del panel del dueño)** — corregido contra `PanelReservas.jsx` real: encabezado "Reservas de hoy" (con contador de "nuevas", que no existe) → "Reservas" + la bajada real ("Todas las reservas de tu barbería, ordenadas por fecha."); cada fila pasó de mostrar solo cliente/servicio/hora a mostrar también el barbero, el precio y un botón "Cancelar" — los mismos campos que `FilaReserva` muestra de verdad. Nav lateral: le faltaba la pestaña "Personalización" (la real tiene 5 pestañas, esta mostraba 4) — agregada.
+
+**3. `BarberPanelPreview.jsx` (la sección nueva de la ronda anterior)** — el mockup se reconstruyó para usar directamente el componente real `Interruptor` (no una imitación) en el toggle de "activo", y las tres tarjetas (bloque de horario, excepción puntual, intervalo entre reservas) se rehicieron para copiar exactamente el estilo de `FilaHorario.jsx`/`ExcepcionesHorario.jsx`/`SelectorIntervaloReserva.jsx` — mismos bordes, mismas etiquetas versalitas, mismo divisor interno — en vez de las filas genéricas que tenía antes.
+
+**Cómo se probó (Playwright, instalado y desinstalado como siempre; dev server reiniciado en limpio):**
+- Confirmado que el primer paso mostrado por la demo del teléfono ahora es "Elige un barbero" (antes era "Elige un servicio"), en desktop y mobile.
+- Auditoría de overflow horizontal en las 4 zonas tocadas (hero, demo del teléfono, vista del dueño, vista del barbero) en 1280px y 375px: cero desbordes en ambos anchos.
+- Capturas de pantalla confirmando visualmente: la demo del teléfono con las filas tipo lista (no tarjetas) y el orden correcto; el panel del dueño con fila completa (hora, cliente, servicio·barbero·precio, cancelar) y las 5 pestañas reales; el panel del barbero con el interruptor real renderizando correctamente (píldora cobre con el punto deslizante) y las tres tarjetas con el mismo lenguaje visual que sus componentes reales, tanto en desktop como en mobile (sidebar oculto, tarjetas apiladas a ancho completo).
+- Sin errores de consola. `npm run lint` y `npm run build` limpios.
+
+**Por qué:**
+- Investigar la UI real antes de tocar nada, en vez de "hacerlo más lindo": el pedido específico era corregir afirmaciones visuales inexactas, no un rediseño estético — cada cambio de esta ronda tiene una comparación 1:1 contra un archivo real que lo respalda.
+- Reusar el componente real `Interruptor` en vez de dibujar una imitación en el mockup: es la única forma de garantizar que ese control se vea exactamente como se ve de verdad, sin mantenimiento doble si el componente cambia de estilo más adelante.
+- No tocar el mecanismo de `LiveDemo.jsx` (el crossfade, el intervalo, el link a la demo real): Enzo pidió explícitamente conservarlo — el problema nunca fue cómo se anima, sino qué contenido muestra.
+
+**Archivos afectados:**
+- Modificado: `src/pages/Home/components/LiveDemo.jsx`, `src/pages/Home/components/PanelPreview.jsx`, `src/pages/Home/components/BarberPanelPreview.jsx`.
+
+**Pendiente / próximos pasos:**
+- Ninguno.
+
+---
+
+## 2026-08-13 (11) - Home: verificación con capturas reales + nueva sección interactiva de personalización (color y tipografía en vivo)
+
+**Qué se hizo:**
+Enzo insistió en que los ejemplos seguían sin mostrar cómo es la página de verdad, y pidió expresamente "haz las pruebas, mira el código" antes de seguir — y agregar una sección sobre que la página es 100% personalizable, con un ejemplo real de qué se puede cambiar (color, tipografía, etc.).
+
+**1. Verificación contra capturas reales, no solo contra el código.** Se levantó el dev server y se sacaron capturas de la página pública real (`/barberias/don-manuel`) y del panel de Personalización real (`/panel/personalizacion`, logueado como dueño) — la ronda anterior ya había corregido los mockups leyendo el código, pero esta vez se confirmó visualmente contra la app corriendo de verdad. Esto confirmó que los ajustes de la ronda anterior (orden del asistente, filas de reserva, tarjetas del panel de barbero) ya coincidían con lo real, y reveló lo que faltaba: **ninguna sección de la home mostraba la página pública de la barbería en sí** (el encabezado con logo, nombre, eslogan, dirección y WhatsApp) — solo se mostraban los pasos de reserva y los paneles de administración, nunca la página que ve el cliente antes de reservar.
+
+**2. Nueva sección: "Tu página, a tu manera" — interactiva, no una captura estática.** En vez de simular con texto que "se puede personalizar", se construyó un mockup del encabezado real (mismo layout que `VistaBarberia.jsx`: círculo con inicial, nombre en la tipografía de título, eslogan, dirección + WhatsApp) que **cambia de verdad** al hacer clic:
+- **Color de marca**: 4 colores de ejemplo + un selector de color nativo (`<input type="color">`) para "cualquier otro" — igual que el picker real, que tampoco limita a una paleta fija.
+- **Tipografía de títulos**: se reutilizó literalmente `FUENTES_DISPONIBLES` y `asegurarFuenteCargada` de `src/utils/fuentes.js` (las mismas 4 fuentes curadas del panel real: Fraunces, Playfair Display, Libre Baskerville, Bricolage Grotesque) — al elegir una, se carga de verdad desde Google Fonts y se aplica, el mismo mecanismo exacto que usa el panel real.
+- El color se aplica como variable CSS (`--color-cobre`/`--color-cobre-oscuro`, usando también `oscurecerHex` real) sobre el contenedor, consumida por las clases `cobre`/`cobre-oscuro` de Tailwind — el mismo mecanismo que `VistaBarberia.jsx` usa de verdad, no una reimplementación aparte.
+- **Ajuste de contraste encontrado en el camino**: la primera versión ataba el color también al eslogan y al link de WhatsApp (clase `text-cobre-claro`) — pero esa clase es un tono FIJO en la app real (no cambia con el color elegido, justamente porque un color arbitrario podría no tener buen contraste como texto chico sobre fondo oscuro; es una limitación real y documentada, no un error de esta sesión). Medido con la fórmula de contraste WCAG: los colores de ejemplo más oscuros daban ~1.6:1 de contraste como texto (ilegible). Se corrigió agregando un botón "Reservar hora →" (mismo estilo que el botón real "Confirmar reserva", relleno `cobre-oscuro` + texto `hueso`) — ahí el color sí se ve reflejado en vivo, con contraste verificado entre 6:1 y 11:1 para los 4 colores de ejemplo.
+
+**Cómo se probó (Playwright, instalado y desinstalado como siempre; dev server reiniciado en limpio):**
+- Capturas de la página pública real y del panel de Personalización real, usadas como referencia directa para construir el mockup.
+- Clic en cada color de ejemplo y lectura del `--color-cobre` computado del contenedor: coincide exactamente con el hex del swatch clickeado.
+- Clic en "Playfair Display" y lectura de `font-family` computado del título: cambia de `Fraunces` a `"Playfair Display"` de verdad (la fuente se cargó y aplicó, no solo cambió una etiqueta).
+- Verificado que el botón "Reservar hora" sí cambia de color visualmente (antes solo el borde del círculo del logo lo hacía, casi imperceptible) — confirmado con capturas de pantalla antes/después.
+- Auditoría de overflow horizontal en 1280px y 375px: sin desbordes. Capturas mobile confirmando que el mockup y los controles se apilan limpio (mockup arriba, selector de color, selector de tipografía debajo).
+- Sin errores de consola. `npm run lint` y `npm run build` limpios.
+
+**Por qué:**
+- Reutilizar `FUENTES_DISPONIBLES`/`asegurarFuenteCargada`/`oscurecerHex` reales en vez de reimplementar una versión de marketing: es la única forma de que la demo haga EXACTAMENTE lo mismo que el feature real, palabra por palabra — si mañana se agrega o saca una fuente de la lista real, esta sección se actualiza sola.
+- Botón en vez de forzar el color en el texto chico: el problema no era estético, era de contraste real (medido, no supuesto) — la solución correcta era encontrar UN lugar donde mostrar el color con seguridad, no ignorar el riesgo de legibilidad para que "se viera más el cambio".
+- Verificar con capturas de la app corriendo, no solo releer el código: la ronda anterior ya había leído los componentes reales a fondo, pero solo viendo la página y el panel renderizados de verdad se hizo evidente que la página pública EN SÍ (no los pasos de reserva, no los paneles) nunca había aparecido en la home — ese hueco no se veía en el código, se veía en la pantalla.
+
+**Archivos afectados:**
+- Nuevo: `src/pages/Home/components/CustomizationDemo.jsx`.
+- Modificado: `src/pages/Home/Home.jsx` (se agregó `<CustomizationDemo />` entre `BarberPanelPreview` y `NotebookVsApp`).
+
+**Pendiente / próximos pasos:**
+- Ninguno.

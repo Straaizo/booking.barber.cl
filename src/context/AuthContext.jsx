@@ -1,24 +1,27 @@
 import { createContext, useEffect, useState } from 'react'
 import { supabase } from '../services/supabaseClient'
-import { obtenerPerfil, iniciarSesion, cerrarSesion } from '../services/authService'
+import { obtenerPerfil, iniciarSesion, cerrarSesion, ErrorLogin } from '../services/authService'
 import {
   HAY_BACKEND_REAL,
   ID_BARBERIA_PROVISORIA,
   ID_USUARIO_PROVISORIO,
+  ADMIN_PROVISORIO,
   listarBarberosParaSelectorProvisorio,
   perfilProvisorioParaBarbero,
+  validarCredencialesProvisorias,
 } from '../mocks/datosProvisoriosSuperadmin'
 import { ROL_ADMIN } from '../utils/roles'
 import { ESTADO_ACTIVO } from '../utils/estados'
 
 export const AuthContext = createContext(null)
 
-// TEMPORAL: sin Supabase real conectado, se entra directo como admin de la
-// barbería provisoria — no hay login que resolver todavía. Se autodesactiva
-// sola en cuanto HAY_BACKEND_REAL sea true (ver mocks/datosProvisoriosSuperadmin.js).
+// TEMPORAL: sin Supabase real conectado, el login (`/login`) valida usuario+
+// contraseña contra los datos provisorios en vez de contra Supabase Auth —
+// ver `validarCredencialesProvisorias`. Se autodesactiva sola en cuanto
+// HAY_BACKEND_REAL sea true (ver mocks/datosProvisoriosSuperadmin.js).
 const PERFIL_PROVISORIO = {
   id: ID_USUARIO_PROVISORIO,
-  usuario: 'demo',
+  usuario: ADMIN_PROVISORIO.usuario,
   nombre: 'Demo (modo provisorio)',
   rol_id: ROL_ADMIN,
   barberia_id: ID_BARBERIA_PROVISORIA,
@@ -26,11 +29,23 @@ const PERFIL_PROVISORIO = {
   barberias: { estado_id: ESTADO_ACTIVO },
 }
 
-// También TEMPORAL, y solo tiene sentido junto con lo anterior: sin login
-// real no hay forma de entrar como barbero para probar su panel — esto le
-// da al panel (ver PanelShell.jsx) un selector "Ver como" que alterna entre
-// el perfil de dueño de arriba y el de alguno de los barberos ya cargados,
-// guardado en localStorage para que sobreviva a un refresh.
+// La sesión provisoria en sí (quién quedó logueado) sobrevive a un refresh
+// guardada acá — separada de "Ver como" (abajo), que es solo una vista previa
+// que el DUEÑO puede activar sobre su propia sesión, no un cambio de sesión.
+const CLAVE_SESION_PROVISORIA = 'booking_barber_sesion_provisoria_v1'
+
+function leerSesionProvisoriaGuardada() {
+  try {
+    const crudo = localStorage.getItem(CLAVE_SESION_PROVISORIA)
+    return crudo ? JSON.parse(crudo) : null
+  } catch {
+    return null
+  }
+}
+
+// "Ver como" solo tiene sentido para el dueño (mirar el panel como lo vería
+// tal barbero, sin saber su contraseña) — un barbero que entró con su propio
+// usuario no tiene por qué poder mirar el panel de otro.
 const CLAVE_VER_COMO = 'booking_barber_ver_como_v1'
 
 function leerVerComoGuardado() {
@@ -47,6 +62,9 @@ export function AuthProvider({ children }) {
   const [cargando, setCargando] = useState(true)
   const [errorPerfil, setErrorPerfil] = useState(null)
   const [verComo, setVerComo] = useState(leerVerComoGuardado)
+  const [sesionProvisoria, setSesionProvisoria] = useState(() =>
+    HAY_BACKEND_REAL ? null : leerSesionProvisoriaGuardada()
+  )
 
   function cambiarVerComo(valor) {
     try {
@@ -57,11 +75,34 @@ export function AuthProvider({ children }) {
     setVerComo(valor)
   }
 
+  function guardarSesionProvisoria(valor) {
+    try {
+      if (valor) localStorage.setItem(CLAVE_SESION_PROVISORIA, JSON.stringify(valor))
+      else localStorage.removeItem(CLAVE_SESION_PROVISORIA)
+    } catch {
+      /* localStorage no disponible — la sesión simplemente no persiste entre refrescos */
+    }
+    setSesionProvisoria(valor)
+  }
+
   useEffect(() => {
     if (!HAY_BACKEND_REAL) {
-      setSesion({ user: { id: ID_USUARIO_PROVISORIO } })
-      const perfilBarbero = verComo !== 'dueno' ? perfilProvisorioParaBarbero(verComo) : null
-      setPerfil(perfilBarbero ?? PERFIL_PROVISORIO)
+      if (!sesionProvisoria) {
+        setSesion(null)
+        setPerfil(null)
+        setCargando(false)
+        return
+      }
+      setSesion({
+        user: { id: sesionProvisoria.tipo === 'dueno' ? ID_USUARIO_PROVISORIO : sesionProvisoria.barberoId },
+      })
+      if (sesionProvisoria.tipo === 'dueno') {
+        const idVista = verComo !== 'dueno' ? verComo : null
+        const perfilVista = idVista ? perfilProvisorioParaBarbero(idVista) : null
+        setPerfil(perfilVista ?? PERFIL_PROVISORIO)
+      } else {
+        setPerfil(perfilProvisorioParaBarbero(sesionProvisoria.barberoId))
+      }
       setCargando(false)
       return
     }
@@ -107,16 +148,32 @@ export function AuthProvider({ children }) {
       activo = false
       suscripcion.subscription.unsubscribe()
     }
-  }, [verComo])
+  }, [verComo, sesionProvisoria])
 
   async function iniciarSesionUsuario(credenciales) {
+    if (!HAY_BACKEND_REAL) {
+      const resultado = validarCredencialesProvisorias(credenciales.usuario ?? '', credenciales.password ?? '')
+      if (!resultado) {
+        throw new ErrorLogin('credenciales', 'Usuario o contraseña incorrectos.')
+      }
+      guardarSesionProvisoria(resultado)
+      return
+    }
     await iniciarSesion(credenciales)
     // onAuthStateChange se dispara solo y carga el perfil.
   }
 
   async function cerrarSesionUsuario() {
+    if (!HAY_BACKEND_REAL) {
+      guardarSesionProvisoria(null)
+      return
+    }
     await cerrarSesion()
   }
+
+  // "Ver como" es una vista previa que solo el dueño puede activar sobre su
+  // propia sesión — un barbero que entró con su propio usuario no lo ve.
+  const puedeVerComo = !HAY_BACKEND_REAL && sesionProvisoria?.tipo === 'dueno'
 
   const valor = {
     sesion,
@@ -126,11 +183,9 @@ export function AuthProvider({ children }) {
     autenticado: Boolean(sesion && perfil),
     iniciarSesion: iniciarSesionUsuario,
     cerrarSesion: cerrarSesionUsuario,
-    // Solo tiene sentido sin backend real — con Supabase conectado, el rol
-    // lo decide de verdad la sesión, no un selector.
-    verComo: !HAY_BACKEND_REAL ? verComo : null,
-    cambiarVerComo: !HAY_BACKEND_REAL ? cambiarVerComo : null,
-    barberosParaSelector: !HAY_BACKEND_REAL ? listarBarberosParaSelectorProvisorio() : [],
+    verComo: puedeVerComo ? verComo : null,
+    cambiarVerComo: puedeVerComo ? cambiarVerComo : null,
+    barberosParaSelector: puedeVerComo ? listarBarberosParaSelectorProvisorio() : [],
   }
 
   return <AuthContext.Provider value={valor}>{children}</AuthContext.Provider>

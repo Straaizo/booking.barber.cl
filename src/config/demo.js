@@ -52,7 +52,7 @@ export const BARBERIA_DEMO = {
       activo: true,
     },
   ],
-  barberos: [{ id: DEMO_BARBERO_ID, nombre: 'Javier Muñoz', activo: true }],
+  barberos: [{ id: DEMO_BARBERO_ID, nombre: 'Javier Muñoz', activo: true, intervalo_reserva_minutos: 30 }],
 }
 
 // Lunes a sábado, 10:00–19:00 — igual para todos los días de la demo.

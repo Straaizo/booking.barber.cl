@@ -8,39 +8,31 @@ import { usePrefersReducedMotion } from '../../../hooks/usePrefersReducedMotion'
 
 const INTERVALO_MS = 2400
 
+// Mismo orden que el asistente real (AsistenteReserva.jsx): primero el
+// barbero (solo se salta si la barbería tiene uno solo), después el
+// servicio, la hora y los datos — antes esta demo mostraba servicio primero,
+// lo que ya no es cierto desde que se agregó la elección de barbero.
 const PASOS = [
+  { titulo: 'Elige un barbero', texto: 'Si hay más de uno, el cliente elige primero con quién quiere ir.' },
   { titulo: 'Elige un servicio', texto: 'Ve los servicios, precios y ofertas de un vistazo.' },
-  { titulo: 'Elige un barbero', texto: 'Si hay más de uno, el cliente elige con quién quiere ir.' },
   { titulo: 'Elige un horario', texto: 'Solo se muestran las horas realmente disponibles.' },
   { titulo: 'Ingresa sus datos', texto: 'Nombre y celular. Nada más — sin crear cuenta.' },
   { titulo: '¡Listo!', texto: 'La reserva queda confirmada y tú te enteras al instante.' },
 ]
 
-function PantallaServicio() {
+// El paso real (PasoBarbero.jsx) es una lista simple de nombres, sin tarjetas
+// ni foto — una barra angosta a la izquierda marca la fila resaltada. Se
+// reproduce esa misma fila acá en vez de la tarjeta con borde que había
+// antes (que no existe en ningún lado de la app de verdad).
+function FilaLista({ children, activo }) {
   return (
-    <div className="p-5">
-      <h4 className="font-display text-base font-light text-negro-barbero">Elige un servicio</h4>
-      <div className="mt-4 flex flex-col gap-3">
-        {[
-          { nombre: 'Corte clásico', precio: '$9.000' },
-          { nombre: 'Corte + Barba', precio: '$12.000' },
-        ].map((servicio, indice) => (
-          <motion.div
-            key={servicio.nombre}
-            initial={{ scale: 1 }}
-            animate={indice === 1 ? { scale: [1, 0.97, 1] } : {}}
-            transition={{ delay: 0.9, duration: 0.4 }}
-            className={`flex items-center justify-between rounded-lg border px-3 py-3 text-sm ${
-              indice === 1 ? 'border-cobre bg-cobre/5' : 'border-gris-calido-200'
-            }`}
-          >
-            <span className="text-negro-barbero">{servicio.nombre}</span>
-            <span className="numeros-tabulares font-semibold text-negro-barbero">
-              {servicio.precio}
-            </span>
-          </motion.div>
-        ))}
-      </div>
+    <div
+      className={`relative border-b border-gris-calido-100 py-3 pl-3 text-sm last:border-b-0 ${
+        activo ? 'bg-cobre/5' : ''
+      }`}
+    >
+      {activo && <span className="absolute left-0 top-0 h-full w-0.5 bg-cobre" />}
+      {children}
     </div>
   )
 }
@@ -49,16 +41,37 @@ function PantallaBarbero() {
   return (
     <div className="p-5">
       <h4 className="font-display text-base font-light text-negro-barbero">Elige un barbero</h4>
-      <div className="mt-4 flex flex-col gap-3">
+      <div className="mt-4 flex flex-col">
         {['Javier Muñoz', 'Cristóbal Díaz'].map((nombre, indice) => (
-          <div
-            key={nombre}
-            className={`rounded-lg border px-3 py-3 text-sm text-negro-barbero ${
-              indice === 0 ? 'border-cobre bg-cobre/5' : 'border-gris-calido-200'
-            }`}
-          >
-            {nombre}
-          </div>
+          <FilaLista key={nombre} activo={indice === 0}>
+            <span className="text-negro-barbero">{nombre}</span>
+          </FilaLista>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function PantallaServicio() {
+  return (
+    <div className="p-5">
+      <h4 className="font-display text-base font-light text-negro-barbero">Elige un servicio</h4>
+      <div className="mt-4 flex flex-col">
+        {[
+          { nombre: 'Corte clásico', duracion: '30 min', precio: '$8.000' },
+          { nombre: 'Corte + Barba', duracion: '45 min', precio: '$13.000' },
+        ].map((servicio, indice) => (
+          <FilaLista key={servicio.nombre} activo={indice === 1}>
+            <div className="flex items-center justify-between">
+              <span className="text-negro-barbero">
+                {servicio.nombre}{' '}
+                <span className="versalitas text-[10px] text-gris-calido-500">{servicio.duracion}</span>
+              </span>
+              <span className="numeros-tabulares font-semibold text-negro-barbero">
+                {servicio.precio}
+              </span>
+            </div>
+          </FilaLista>
         ))}
       </div>
     </div>
@@ -66,11 +79,26 @@ function PantallaBarbero() {
 }
 
 function PantallaHorario() {
+  const dias = ['Hoy', 'Mañana', 'Vie 15']
   const horas = ['10:00', '10:30', '11:00', '11:30', '12:00', '12:30']
   return (
     <div className="p-5">
       <h4 className="font-display text-base font-light text-negro-barbero">Elige día y hora</h4>
-      <div className="mt-4 grid grid-cols-3 gap-2">
+      <div className="mt-4 flex gap-2">
+        {dias.map((dia, indice) => (
+          <span
+            key={dia}
+            className={`versalitas rounded-full border px-3 py-1 text-[10px] ${
+              indice === 0
+                ? 'border-cobre bg-cobre text-hueso'
+                : 'border-gris-calido-200 text-gris-calido-700'
+            }`}
+          >
+            {dia}
+          </span>
+        ))}
+      </div>
+      <div className="mt-3 grid grid-cols-3 gap-2">
         {horas.map((hora, indice) => (
           <div
             key={hora}
@@ -127,12 +155,12 @@ function PantallaConfirmado() {
       <p className="font-display text-base font-light text-negro-barbero">
         ¡Reserva confirmada!
       </p>
-      <p className="text-xs text-gris-calido-500">Corte + Barba · Javier Muñoz · 11:00</p>
+      <p className="text-xs text-gris-calido-500">Javier Muñoz · Corte + Barba · Hoy 11:00</p>
     </div>
   )
 }
 
-const PANTALLAS = [PantallaServicio, PantallaBarbero, PantallaHorario, PantallaDatos, PantallaConfirmado]
+const PANTALLAS = [PantallaBarbero, PantallaServicio, PantallaHorario, PantallaDatos, PantallaConfirmado]
 
 export function LiveDemo() {
   const [paso, setPaso] = useState(0)

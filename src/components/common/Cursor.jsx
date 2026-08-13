@@ -102,6 +102,17 @@ export function Cursor() {
       if (evento.target.tagName === 'IFRAME') {
         sobreIframe.current = false
         evento.target.contentWindow?.postMessage({ tipo: 'cursor-propio-fuera-de-vista' }, '*')
+        return
+      }
+      // `relatedTarget` nulo en un `pointerout` significa que el puntero no
+      // entró a NINGÚN otro elemento del documento — se fue de la ventana
+      // por completo (una pestaña, la barra de direcciones, otra app). A
+      // diferencia de `pointerleave`, `pointerout` sí burbujea hasta acá, así
+      // que este único listener alcanza para cubrir toda la página sin
+      // depender de que `pointerleave` dispare de forma confiable en el
+      // borde exacto de la ventana (no lo hace siempre en todos los navegadores).
+      if (!evento.relatedTarget) {
+        ocultar()
       }
     }
 

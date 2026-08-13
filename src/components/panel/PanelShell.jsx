@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
 import { rutaPorRol, ROL_ADMIN, ROL_BARBERO } from '../../utils/roles'
+import { HoverLink } from '../common/HoverLink'
 
 const NOMBRES_ROL = { 1: 'Superadmin', 2: 'Administrador', 3: 'Barbero' }
 
@@ -29,9 +30,9 @@ export function PanelShell({ titulo, nav, children }) {
     <div className="min-h-screen bg-hueso">
       <header className="flex items-center justify-between border-b border-gris-calido-200 bg-negro-barbero px-5 py-4 text-hueso md:px-8">
         <div className="flex items-center gap-4">
-          <span className="font-display text-base italic tracking-tight">
+          <HoverLink href="/" className="font-display text-base italic tracking-tight">
             booking<span className="text-cobre">.</span>barber.cl
-          </span>
+          </HoverLink>
           <span className="versalitas hidden text-xs text-gris-calido-400 md:inline">
             {titulo}
           </span>

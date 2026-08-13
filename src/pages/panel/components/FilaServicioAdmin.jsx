@@ -59,21 +59,67 @@ export function FilaServicioAdmin({ servicio, onGuardar }) {
   }
 
   return (
-    <div className="border-b border-gris-calido-200 py-5">
-      <div className="grid grid-cols-2 gap-x-4 gap-y-3 md:grid-cols-[1.4fr_6rem_8rem_8rem]">
-        <label className="col-span-2 flex flex-col gap-1 md:col-span-1">
+    <div className="rounded-lg border border-gris-calido-200 bg-white p-5 transition-colors hover:border-gris-calido-300">
+      {/* Encabezado de la tarjeta: nombre (lo principal) + estado de
+          publicación — el mismo tipo de fila que ya usan otras tarjetas del
+          panel (barbero, sección), para que "publicado/oculto" se lea como
+          el estado general del servicio, no como un control más perdido
+          entre los demás. */}
+      <div className="flex items-start justify-between gap-4">
+        <label className="flex min-w-0 flex-1 flex-col gap-1">
           <span className="versalitas text-xs text-gris-calido-500">Nombre</span>
           <input
             type="text"
             value={campos.nombre}
             onChange={(e) => setCampos((c) => ({ ...c, nombre: e.target.value }))}
             onBlur={commitTexto}
-            className="min-h-11 border-b border-gris-calido-200 bg-transparent py-1 font-medium text-negro-barbero outline-none transition-colors focus:border-cobre"
+            className="min-h-11 border-b border-gris-calido-200 bg-transparent py-1 text-base font-medium text-negro-barbero outline-none transition-colors focus:border-cobre"
           />
         </label>
 
+        {/* Un espaciador invisible de la misma altura que la etiqueta
+            "Nombre" (texto + separación) hace que el interruptor quede
+            exactamente a la altura del input de al lado, en vez de calcular
+            un padding a ojo — si el tamaño de la etiqueta cambia alguna vez,
+            esto se sigue ajustando solo. */}
+        <div className="flex shrink-0 flex-col items-end gap-1">
+          <span aria-hidden="true" className="versalitas invisible text-xs">
+            Nombre
+          </span>
+          <div className="flex min-h-11 items-center gap-2">
+            <Interruptor
+              activo={servicio.activo}
+              etiqueta={`Publicado: ${servicio.nombre}`}
+              onCambiar={(valor) => guardar({ activo: valor })}
+            />
+            <span className="versalitas text-xs text-gris-calido-500">
+              {servicio.activo ? 'Publicado' : 'Oculto'}
+            </span>
+          </div>
+          <div className="h-4">
+            <AnimatePresence mode="wait">
+              {estado && (
+                <motion.span
+                  key={estado}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  role={estado === 'error' ? 'alert' : undefined}
+                  className={`versalitas text-xs ${estado === 'error' ? 'text-red-700' : 'text-verde-barberia'}`}
+                >
+                  {ESTADOS[estado]}
+                </motion.span>
+              )}
+            </AnimatePresence>
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-4 border-t border-gris-calido-100 pt-4 md:grid-cols-[8rem_10rem_12rem]">
         <label className="flex flex-col gap-1">
-          <span className="versalitas text-xs text-gris-calido-500">Duración (min)</span>
+          <span className="versalitas flex min-h-7 items-center text-xs text-gris-calido-500">
+            Duración (min)
+          </span>
           <input
             type="number"
             min="0"
@@ -88,7 +134,9 @@ export function FilaServicioAdmin({ servicio, onGuardar }) {
         </label>
 
         <label className="flex flex-col gap-1">
-          <span className="versalitas text-xs text-gris-calido-500">Precio</span>
+          <span className="versalitas flex min-h-7 items-center text-xs text-gris-calido-500">
+            Precio
+          </span>
           <input
             type="number"
             min="0"
@@ -100,8 +148,22 @@ export function FilaServicioAdmin({ servicio, onGuardar }) {
           />
         </label>
 
-        <label className="flex flex-col gap-1">
-          <span className="versalitas text-xs text-gris-calido-500">Precio oferta</span>
+        {/* El interruptor de "oferta activa" vive pegado al campo que
+            enciende — antes estaba en una fila aparte, lejos del precio de
+            oferta, sin ninguna relación visual con él. `min-h-7` en las tres
+            etiquetas (esta y las dos de arriba) es lo que las deja a la
+            misma altura — sin eso, esta fila queda más alta que las otras
+            dos (por el interruptor) y el input de acá abajo termina más
+            abajo que "Duración"/"Precio", desalineando toda la fila. */}
+        <div className="col-span-2 flex flex-col gap-1 md:col-span-1">
+          <div className="flex min-h-7 items-center justify-between">
+            <span className="versalitas text-xs text-gris-calido-500">Precio oferta</span>
+            <Interruptor
+              activo={servicio.oferta_activa}
+              etiqueta={`Oferta activa de ${servicio.nombre}`}
+              onCambiar={(valor) => guardar({ oferta_activa: valor })}
+            />
+          </div>
           <input
             type="number"
             min="0"
@@ -112,47 +174,8 @@ export function FilaServicioAdmin({ servicio, onGuardar }) {
             onBlur={() =>
               commitNumero('precio_oferta', campos.precio_oferta, servicio.precio_oferta, true)
             }
-            className="numeros-tabulares min-h-11 border-b border-gris-calido-200 bg-transparent py-1 text-negro-barbero outline-none transition-colors focus:border-cobre"
+            className="numeros-tabulares min-h-11 border-b border-gris-calido-200 bg-transparent py-1 text-negro-barbero outline-none transition-colors focus:border-cobre disabled:text-gris-calido-400"
           />
-        </label>
-      </div>
-
-      <div className="mt-4 flex flex-wrap items-center gap-x-8 gap-y-3">
-        <div className="flex items-center gap-3">
-          <Interruptor
-            activo={servicio.oferta_activa}
-            etiqueta={`Oferta activa de ${servicio.nombre}`}
-            onCambiar={(valor) => guardar({ oferta_activa: valor })}
-          />
-          <span className="versalitas text-xs text-gris-calido-500">Oferta activa</span>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <Interruptor
-            activo={servicio.activo}
-            etiqueta={`Publicado: ${servicio.nombre}`}
-            onCambiar={(valor) => guardar({ activo: valor })}
-          />
-          <span className="versalitas text-xs text-gris-calido-500">
-            {servicio.activo ? 'Publicado' : 'Oculto'}
-          </span>
-        </div>
-
-        <div className="min-w-26">
-          <AnimatePresence mode="wait">
-            {estado && (
-              <motion.span
-                key={estado}
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                role={estado === 'error' ? 'alert' : undefined}
-                className={`versalitas text-xs ${estado === 'error' ? 'text-red-700' : 'text-verde-barberia'}`}
-              >
-                {ESTADOS[estado]}
-              </motion.span>
-            )}
-          </AnimatePresence>
         </div>
       </div>
     </div>
