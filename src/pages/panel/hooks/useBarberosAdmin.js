@@ -5,11 +5,23 @@ import {
   listarBarberosProvisorios,
   crearBarberoProvisorio,
   actualizarBarberoProvisorio,
-  eliminarBarberoProvisorio,
+  darDeBajaBarberoProvisorio,
   establecerContrasenaBarberoProvisoria,
+  eliminarCuentaBarberoProvisoria,
   activarCatalogoPropioProvisorio,
   desactivarCatalogoPropioProvisorio,
 } from '../../../mocks/datosProvisoriosSuperadmin'
+import { crearCuentaBarbero, resetearPasswordUsuario, eliminarCuentaUsuario } from '../../../services/usuariosService'
+import { comoColumnasReales } from '../../../utils/booleanosReales'
+
+// Busca el id de la cuenta (`usuarios.id`) ligada a un barbero — hace falta
+// para resetear la contraseña o borrar la cuenta, porque la Edge Function
+// trabaja sobre `usuarios.id`, no sobre `barberos.id`.
+async function idDeCuentaDelBarbero(barberoId) {
+  const { data, error } = await supabase.from('usuarios').select('id').eq('barbero_id', barberoId).single()
+  if (error) throw error
+  return data.id
+}
 
 const COLUMNAS = 'id, nombre, activo, foto_url, especialidad, usa_catalogo_propio, intervalo_reserva_minutos'
 
@@ -18,14 +30,16 @@ function clave(barberiaId) {
 }
 
 async function obtenerBarberos(barberiaId) {
+  // `usuarios` es 1:1 con `barberos` (barbero_id es unique) — PostgREST
+  // devuelve el embed como objeto, no como arreglo, gracias a esa unicidad.
   const { data, error } = await supabase
     .from('barberos')
-    .select(COLUMNAS)
+    .select(`${COLUMNAS}, usuarios (usuario)`)
     .eq('barberia_id', barberiaId)
     .order('nombre')
 
   if (error) throw error
-  return data
+  return data.map(({ usuarios, ...barbero }) => ({ ...barbero, usuario: usuarios?.usuario ?? null }))
 }
 
 export function useBarberosAdmin(barberiaId) {
@@ -42,13 +56,23 @@ export function useCrearBarbero(barberiaId) {
   return useMutation({
     mutationFn: async ({ nombre, password }) => {
       if (!HAY_BACKEND_REAL) return crearBarberoProvisorio(barberiaId, nombre, password)
+
       const { data, error } = await supabase
         .from('barberos')
-        .insert({ barberia_id: barberiaId, nombre, activo: true })
+        .insert({ barberia_id: barberiaId, nombre, activo: 1 })
         .select(COLUMNAS)
         .single()
       if (error) throw error
-      return data
+
+      try {
+        const cuenta = await crearCuentaBarbero({ barberiaId, barberoId: data.id, nombre, password })
+        return { ...data, usuario: cuenta.usuario }
+      } catch (errorCuenta) {
+        // Si la cuenta no se pudo crear, no dejar un barbero sin forma de
+        // entrar — se borra el registro recién creado y se avisa del error.
+        await supabase.from('barberos').delete().eq('id', data.id)
+        throw errorCuenta
+      }
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: clave(barberiaId) }),
   })
@@ -61,7 +85,7 @@ export function useActualizarBarbero(barberiaId) {
       if (!HAY_BACKEND_REAL) return actualizarBarberoProvisorio(barberiaId, id, cambios)
       const { data, error } = await supabase
         .from('barberos')
-        .update(cambios)
+        .update(comoColumnasReales(cambios))
         .eq('id', id)
         .select(COLUMNAS)
         .single()
@@ -72,31 +96,50 @@ export function useActualizarBarbero(barberiaId) {
   })
 }
 
-export function useEliminarBarbero(barberiaId) {
+// "Dar de baja" es una baja LÓGICA — nunca un `.delete()` físico. Un barbero
+// que se va se queda en la tabla (con `activo: 0` y sin cuenta), porque
+// `reservas` referencia a `barberos` con una FK que ahora es `on delete
+// restrict` (ver supabase/sql/000_schema.sql): borrarlo de verdad rompería
+// (con toda razón) apenas tuviera una sola reserva en su historial. Sus
+// horarios/excepciones/catálogo propio tampoco se tocan — quedan ahí, sin
+// nadie mirándolos, por si el dueño lo reactiva más adelante.
+export function useDarDeBajaBarbero(barberiaId) {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: async (barberoId) => {
-      if (!HAY_BACKEND_REAL) return eliminarBarberoProvisorio(barberiaId, barberoId)
-      const { error } = await supabase.from('barberos').delete().eq('id', barberoId)
+      if (!HAY_BACKEND_REAL) return darDeBajaBarberoProvisorio(barberiaId, barberoId)
+      const { data: cuenta } = await supabase.from('usuarios').select('id').eq('barbero_id', barberoId).maybeSingle()
+      if (cuenta) await eliminarCuentaUsuario({ usuarioId: cuenta.id })
+      const { error } = await supabase.from('barberos').update({ activo: 0 }).eq('id', barberoId)
       if (error) throw error
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: clave(barberiaId) }),
   })
 }
 
-// El dueño escribe la contraseña nueva a mano. Del lado real todavía no hay
-// forma de hacer esto: cambiar la contraseña de una cuenta de verdad
-// necesita la clave de servicio de Supabase, que nunca puede vivir en código
-// de navegador — requiere una función de servidor (Edge Function) que hoy
-// no existe.
+// El dueño escribe la contraseña nueva a mano — nunca se la genera el sistema.
 export function useEstablecerContrasenaBarbero(barberiaId) {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: async ({ barberoId, password }) => {
       if (!HAY_BACKEND_REAL) return establecerContrasenaBarberoProvisoria(barberiaId, barberoId, password)
-      throw new Error(
-        'Cambiar la contraseña todavía no está disponible con el backend real conectado — falta la función de servidor que actualice la cuenta.'
-      )
+      const usuarioId = await idDeCuentaDelBarbero(barberoId)
+      return resetearPasswordUsuario({ usuarioId, password })
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: clave(barberiaId) }),
+  })
+}
+
+// Borra solo el LOGIN del barbero (queda sin cuenta, pero sigue existiendo
+// como barbero) — distinto de `useEliminarBarbero`, que borra todo. Pensado
+// para el panel de superadmin.
+export function useEliminarCuentaBarbero(barberiaId) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (barberoId) => {
+      if (!HAY_BACKEND_REAL) return eliminarCuentaBarberoProvisoria(barberiaId, barberoId)
+      const usuarioId = await idDeCuentaDelBarbero(barberoId)
+      return eliminarCuentaUsuario({ usuarioId })
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: clave(barberiaId) }),
   })
@@ -138,7 +181,7 @@ export function useActivarCatalogoPropio(barberiaId) {
 
       const { data, error } = await supabase
         .from('barberos')
-        .update({ usa_catalogo_propio: true })
+        .update({ usa_catalogo_propio: 1 })
         .eq('id', barberoId)
         .select(COLUMNAS)
         .single()
@@ -156,7 +199,7 @@ export function useDesactivarCatalogoPropio(barberiaId) {
       if (!HAY_BACKEND_REAL) return desactivarCatalogoPropioProvisorio(barberiaId, barberoId)
       const { data, error } = await supabase
         .from('barberos')
-        .update({ usa_catalogo_propio: false })
+        .update({ usa_catalogo_propio: 0 })
         .eq('id', barberoId)
         .select(COLUMNAS)
         .single()

@@ -57,9 +57,8 @@ export function Hero() {
             transition={{ duration: 0.6, delay: 0.5, ease: EASE_ENTRADA }}
             className="mx-auto mt-6 max-w-lg text-gris-calido-200 md:mx-0 md:text-lg"
           >
-            Cada barbería tiene su propia página, sus servicios, sus horarios y sus
-            barberos — sin apps que tus clientes tengan que descargar, sin agenda de
-            WhatsApp que se pierde.
+            Tu propia página, tus servicios, tus horarios, tus barberos. Sin apps que
+            instalar. Sin que la hora se te pierda en el chat de WhatsApp.
           </motion.p>
 
           <motion.div

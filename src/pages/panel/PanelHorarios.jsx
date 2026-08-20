@@ -140,6 +140,7 @@ export function PanelHorarios() {
                 <label className="col-span-2 flex flex-col gap-1 md:col-span-1">
                   <span className="versalitas text-xs text-gris-calido-500">Día</span>
                   <select
+                    name="dia_semana"
                     value={nuevo.dia_semana}
                     onChange={(e) => setNuevo((n) => ({ ...n, dia_semana: e.target.value }))}
                     className="min-h-11 border-b border-gris-calido-200 bg-transparent py-1 text-negro-barbero outline-none transition-colors focus:border-cobre"
@@ -155,6 +156,7 @@ export function PanelHorarios() {
                   <span className="versalitas text-xs text-gris-calido-500">Desde</span>
                   <input
                     type="time"
+                    name="hora_inicio"
                     value={nuevo.hora_inicio}
                     onChange={(e) => setNuevo((n) => ({ ...n, hora_inicio: e.target.value }))}
                     className="numeros-tabulares min-h-11 border-b border-gris-calido-200 bg-transparent py-1 text-negro-barbero outline-none transition-colors focus:border-cobre"
@@ -164,6 +166,7 @@ export function PanelHorarios() {
                   <span className="versalitas text-xs text-gris-calido-500">Hasta</span>
                   <input
                     type="time"
+                    name="hora_fin"
                     value={nuevo.hora_fin}
                     onChange={(e) => setNuevo((n) => ({ ...n, hora_fin: e.target.value }))}
                     className="numeros-tabulares min-h-11 border-b border-gris-calido-200 bg-transparent py-1 text-negro-barbero outline-none transition-colors focus:border-cobre"

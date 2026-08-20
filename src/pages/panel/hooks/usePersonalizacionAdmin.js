@@ -14,7 +14,7 @@ async function obtenerBarberiaParaPersonalizacionReal(barberiaId) {
     .from('barberias')
     .select(
       `
-      id, nombre, slug, logo_url, direccion, telefono_whatsapp,
+      id, nombre, slug, logo_url, direccion, telefono_whatsapp, plan_id,
       personalizacion (color_primario, color_header, fuente_display, eslogan, descripcion, banner_url, secciones, orden_equipo, estilo_whatsapp, whatsapp_color, whatsapp_tamano),
       servicios (id, nombre, duracion_minutos, precio_clp, precio_oferta, oferta_activa, oferta_vence, activo, barbero_id),
       barberos (id, nombre, activo, foto_url, especialidad, usa_catalogo_propio)

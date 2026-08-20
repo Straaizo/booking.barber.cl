@@ -11,6 +11,7 @@ import { oscurecerHex, esColorClaro } from '../../../utils/color'
 import { linkWhatsApp } from '../../../utils/formatos'
 import { asegurarFuenteCargada, pilaFuente } from '../../../utils/fuentes'
 import { ordenarEquipo } from '../../../utils/personalizacion'
+import { puedePersonalizarSecciones } from '../../../utils/planes'
 
 // Grilla editorial, no una fila de fotos del mismo tamaño: las fotos
 // marcadas "grande" ocupan el doble de espacio (2 columnas × 2 filas), como
@@ -185,7 +186,12 @@ function SeccionImagenTexto({ seccion }) {
 export function VistaBarberia({ barberia }) {
   const personalizacion = barberia.personalizacion ?? {}
   const inicial = barberia.nombre.trim().charAt(0).toUpperCase()
-  const secciones = personalizacion.secciones ?? []
+  // Galería, imagen+texto y equipo son una función del plan Equipo hacia
+  // arriba (ver PanelPersonalizacion.jsx) — se vuelve a chequear acá, no solo
+  // en el panel de edición: si una barbería baja de plan, sus secciones ya
+  // guardadas dejan de mostrarse en la página pública de inmediato, sin
+  // depender de que alguien vuelva a guardar el formulario.
+  const secciones = puedePersonalizarSecciones(barberia.plan_id) ? personalizacion.secciones ?? [] : []
   const fuenteElegida = personalizacion.fuente_display || 'fraunces'
 
   useEffect(() => {

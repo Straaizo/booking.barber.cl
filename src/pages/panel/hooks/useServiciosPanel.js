@@ -7,6 +7,7 @@ import {
   crearServicioDeBarberoProvisorio,
   actualizarServicioProvisorio,
 } from '../../../mocks/datosProvisoriosSuperadmin'
+import { comoColumnasReales } from '../../../utils/booleanosReales'
 
 const COLUMNAS = 'id, nombre, duracion_minutos, precio_clp, precio_oferta, oferta_activa, activo, barbero_id'
 
@@ -74,7 +75,7 @@ export function useCrearServicioPropio(barberiaId, barberoId) {
       if (!HAY_BACKEND_REAL) return crearServicioDeBarberoProvisorio(barberiaId, barberoId, servicio)
       const { data, error } = await supabase
         .from('servicios')
-        .insert({ ...servicio, barberia_id: barberiaId, barbero_id: barberoId, activo: true })
+        .insert({ ...comoColumnasReales(servicio), barberia_id: barberiaId, barbero_id: barberoId, activo: 1 })
         .select(COLUMNAS)
         .single()
       if (error) throw error
@@ -91,7 +92,7 @@ export function useActualizarServicioPropio(barberiaId, barberoId) {
       if (!HAY_BACKEND_REAL) return actualizarServicioProvisorio(barberiaId, id, cambios)
       const { data, error } = await supabase
         .from('servicios')
-        .update(cambios)
+        .update(comoColumnasReales(cambios))
         .eq('id', id)
         .select(COLUMNAS)
         .single()

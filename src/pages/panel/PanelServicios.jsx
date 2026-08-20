@@ -91,6 +91,7 @@ export function PanelServicios() {
               <span className="versalitas text-xs text-gris-calido-500">Nombre</span>
               <input
                 type="text"
+                name="nombre"
                 value={nuevo.nombre}
                 onChange={(e) => setNuevo((n) => ({ ...n, nombre: e.target.value }))}
                 placeholder="Ej: Corte + Barba"
@@ -102,6 +103,7 @@ export function PanelServicios() {
               <input
                 type="number"
                 min="0"
+                name="duracion_minutos"
                 value={nuevo.duracion_minutos}
                 onChange={(e) => setNuevo((n) => ({ ...n, duracion_minutos: e.target.value }))}
                 className="numeros-tabulares min-h-11 border-b border-gris-calido-200 bg-transparent py-1 text-negro-barbero outline-none transition-colors focus:border-cobre"
@@ -112,6 +114,7 @@ export function PanelServicios() {
               <input
                 type="number"
                 min="0"
+                name="precio_clp"
                 value={nuevo.precio_clp}
                 onChange={(e) => setNuevo((n) => ({ ...n, precio_clp: e.target.value }))}
                 placeholder="12000"

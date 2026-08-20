@@ -16,7 +16,7 @@ const CLAVE = ['barberias_superadmin']
 async function obtenerBarberias() {
   const { data, error } = await supabase
     .from('barberias')
-    .select('id, nombre, slug, estado_id, plan_id, planes (nombre)')
+    .select('id, nombre, slug, estado_id, plan_id, fecha_activacion, planes (nombre)')
     .order('nombre')
 
   if (error) throw error
@@ -31,7 +31,7 @@ async function obtenerBarberiaDetalle(id) {
   const { data, error } = await supabase
     .from('barberias')
     .select(
-      'id, nombre, slug, estado_id, plan_id, telefono_whatsapp, email_contacto, direccion, planes (nombre, max_barberos)'
+      'id, nombre, slug, estado_id, plan_id, telefono_whatsapp, email_contacto, direccion, fecha_activacion, planes (nombre, max_barberos)'
     )
     .eq('id', id)
     .single()
@@ -89,7 +89,7 @@ export function useCambiarPlanBarberia() {
 
 // Cambia el estado de una barbería Y deja el registro en `historial_estados`
 // como una sola operación atómica del lado del servidor (ver
-// supabase/sql/002_cambiar_estado_barberia.sql) — evita que el estado cambie
+// supabase/sql/001_cambiar_estado_barberia.sql) — evita que el estado cambie
 // sin quedar auditado si algo falla a mitad de camino.
 export function useCambiarEstadoBarberia() {
   const queryClient = useQueryClient()

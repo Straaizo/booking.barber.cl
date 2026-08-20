@@ -53,6 +53,7 @@ export function FilaPlan({ plan, onGuardar }) {
         <span className="versalitas text-xs text-gris-calido-500">Nombre</span>
         <input
           type="text"
+          name="nombre"
           value={campos.nombre}
           onChange={(e) => setCampos((c) => ({ ...c, nombre: e.target.value }))}
           onBlur={commitTexto}
@@ -65,6 +66,7 @@ export function FilaPlan({ plan, onGuardar }) {
         <input
           type="number"
           min="0"
+          name="precio_clp"
           value={campos.precio_clp}
           onChange={(e) => setCampos((c) => ({ ...c, precio_clp: e.target.value }))}
           onBlur={() => commitNumero('precio_clp', campos.precio_clp, plan.precio_clp)}
@@ -77,6 +79,7 @@ export function FilaPlan({ plan, onGuardar }) {
         <input
           type="number"
           min="1"
+          name="max_barberos"
           value={campos.max_barberos}
           onChange={(e) => setCampos((c) => ({ ...c, max_barberos: e.target.value }))}
           onBlur={() => commitNumero('max_barberos', campos.max_barberos, plan.max_barberos)}
@@ -89,6 +92,7 @@ export function FilaPlan({ plan, onGuardar }) {
         <input
           type="number"
           min="0"
+          name="orden"
           value={campos.orden}
           onChange={(e) => setCampos((c) => ({ ...c, orden: e.target.value }))}
           onBlur={() => commitNumero('orden', campos.orden, plan.orden)}

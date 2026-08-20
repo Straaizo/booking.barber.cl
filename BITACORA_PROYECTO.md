@@ -2525,3 +2525,524 @@ Enzo insistió en que los ejemplos seguían sin mostrar cómo es la página de v
 
 **Pendiente / próximos pasos:**
 - Ninguno.
+
+---
+
+## 2026-08-14 - Home: de 13 secciones a 9, con investigación de competencia real, y copy menos genérico
+
+**Qué se hizo:**
+Enzo pidió tres cosas a la vez: (1) que la demo de personalización de la ronda anterior viviera dentro de "Todo lo que tu barbería necesita" (Benefits) y se reprodujera sola, tipo video, como la demo del teléfono; (2) una inspección honesta de qué sobra en la home, porque mucha información abruma y la idea es enganchar rápido; (3) investigar páginas de competencia reales para comparar, y reescribir los textos para que no suenen a IA.
+
+**1. Investigación de competencia (agente con WebSearch/WebFetch, en paralelo).** Se revisaron las páginas reales de Booksy, Vagaro, Acuity Scheduling y Calendly (Fresha y Square no cargaron el contenido completo por ser SPAs). Hallazgo clave: las páginas mejor consideradas (Vagaro, Acuity, Calendly) convergen en **7-8 secciones de contenido**; Booksy es la excepción con 13-14 — casualmente el mismo largo que tenía esta home — y aun ahí, lo que sobra son cosas de bajo valor (vista previa de blog, una segunda tanda de testimonios). También confirmó el patrón "una idea, una captura" (nunca varias funciones amontonadas en una sola sección) y que ninguna de las cuatro lidera con humor o cleverness — todas van directo al beneficio + a quién está dirigido.
+
+**2. Recorte de 13 a 9 secciones de contenido:**
+- **Se cortó "Cómo funciona"** (3 pasos de texto plano) — quedaba redundante con la demo del teléfono de al lado, que ya cuenta la misma historia con pantallas de verdad en vez de solo texto. El ancla `#como-funciona` (usada por la flecha de scroll del hero) se movió a la sección de la demo del teléfono.
+- **Se cortó "El oficio"** (el carrusel de íconos dibujados a mano de navaja/peine/tijera/etc.) — su propio texto admitía ser un relleno ("Todavía no tenemos fotos de barberías clientes... por ahora, el detalle del oficio"), cero valor de conversión, el candidato más débil sin duda.
+- **Se fusionaron "Tu panel" (dueño) y "El panel de cada barbero" en una sola sección nueva, `TeamPanels.jsx`**, con un selector de dos pestañas ("Tu vista" / "La de cada barbero") que cambia la maqueta y las anotaciones — la misma información en un scroll menos.
+- **La demo de personalización (`CustomizationDemo.jsx`, de la ronda anterior) se fusionó dentro de `Benefits.jsx`** como el punto 05 de la lista, y se convirtió de interactiva-por-clic a **reproducción automática** (mismo mecanismo que `LiveDemo.jsx`: un intervalo que avanza mientras la sección está a la vista, en pausa si sale de foco o hay `prefers-reduced-motion`) — 4 combinaciones de color + tipografía que se van mostrando solas, con una leyenda que va cambiando también ("Azul petróleo · Playfair Display", etc.).
+- Se renumeraron los índices de sección (— 01 a — 07) para que queden secuenciales con el nuevo orden.
+
+Resultado: **Hero, demo del teléfono, beneficios (+ demo de personalización), calculadora de citas perdidas, panel del equipo, comparación con el cuaderno, planes, cupos fundadores, preguntas frecuentes** — 9 secciones de contenido, dentro del rango que arrojó la investigación.
+
+**3. Pasada de copy.** Se aplicaron los tips reales encontrados en la investigación (evitar superlativos sin respaldo, una idea por oración, un detalle concreto que "solo tú sabrías" en vez de una afirmación genérica): la bajada del hero pasó de una oración larga a fragmentos cortos ("Sin apps que instalar. Sin que la hora se te pierda en el chat de WhatsApp."); los beneficios 02 y 04 ganaron un detalle concreto ("mientras sigues cortando", "a las 9 de la mañana... ya está publicada a las 9:01"); el título de `TeamPanels` pasó de una frase más explicativa a una más directa ("Tú ves todo. Cada barbero, solo lo suyo.").
+
+**Cómo se probó (Playwright, instalado y desinstalado como siempre; dev server reiniciado en limpio):**
+- Conteo de `<section>` reales en la página: exactamente 9, en desktop y mobile.
+- La flecha de scroll del hero sigue llevando al lugar correcto (ahora la demo del teléfono, no la sección eliminada).
+- Confirmado que la demo de personalización dentro de Benefits cambia de color SOLA, sin ningún clic — se leyó el color computado antes y después de esperar el intervalo, y cambió.
+- Confirmado que el selector "Tu vista" / "La de cada barbero" de `TeamPanels` cambia la maqueta mostrada.
+- Auditoría de overflow horizontal en 1280px y 375px: sin desbordes. Capturas de página completa confirmando que el mobile quedó notablemente más corto que antes.
+- Sin errores de consola. `npm run lint` y `npm run build` limpios (además, menos módulos transformados y bundle más liviano, confirmando que los archivos realmente se eliminaron).
+
+**Por qué:**
+- Cortar en vez de solo resumir: la investigación mostró que el problema no era la extensión de cada sección individual (la mayoría ya eran concisas) sino la CANTIDAD de secciones — ningún competidor bien considerado tiene 13 paradas de scroll antes del footer.
+- Selector de pestañas para fusionar los dos paneles en vez de mostrar ambos apilados: mantiene "una idea, una captura por pantalla" (el patrón que se repite en los cuatro competidores revisados) sin perder ninguna de las dos historias.
+- Autoplay en vez de clics para la demo de personalización: fue un pedido explícito, y además es coherente — la demo del teléfono (la otra pieza "interactiva" de la home) tampoco pide clics, se mira y ya.
+
+**Archivos afectados:**
+- Nuevo: `src/pages/Home/components/TeamPanels.jsx`.
+- Eliminado: `src/pages/Home/components/HowItWorks.jsx`, `src/pages/Home/components/Marquee.jsx`, `src/pages/Home/components/PanelPreview.jsx`, `src/pages/Home/components/BarberPanelPreview.jsx`, `src/pages/Home/components/CustomizationDemo.jsx`, `src/config/oficio.js`.
+- Modificado: `src/pages/Home/Home.jsx` (nuevo orden y lista de secciones), `src/pages/Home/components/Benefits.jsx` (demo de personalización fusionada, autoplay), `src/pages/Home/components/Hero.jsx` (bajada reescrita), `src/pages/Home/components/LiveDemo.jsx` (recibe `id="como-funciona"`, índice renumerado a 01), `src/pages/Home/components/CalculadoraCitasPerdidas.jsx` (índice a 02), `src/pages/Home/components/NotebookVsApp.jsx` (índice a 04), `src/pages/Home/components/Pricing.jsx` (índice a 05).
+
+**Pendiente / próximos pasos:**
+- Ninguno.
+
+---
+
+## 2026-08-14 (2) - Home: se corta "Lo que ya estás perdiendo" (la calculadora)
+
+**Qué se hizo:**
+Enzo pidió sacar la calculadora interactiva de citas perdidas — su razonamiento: el cliente real (dueño de barbería mirando la landing) no la va a usar, mira sobre todo que la página se vea bien y que explique lo justo y necesario; demasiada información abruma y esas partes normalmente se saltan. Se cortó la sección completa: `CalculadoraCitasPerdidas.jsx` y su dependencia exclusiva `LiveNumber.jsx` (el contador animado que solo ella usaba), más el CSS del slider a medida (`.slider-editorial`, en `index.css`) que quedaba sin ningún uso.
+
+De paso, se encontró y limpió un resto de la ronda anterior: el CSS del marquee de íconos (`.marquee-fila`, `.marquee-pista`, etc.) había quedado huérfano en `index.css` desde que se cortó esa sección, sin que nadie lo notara — se eliminó junto con el del slider.
+
+**Cómo se probó (Playwright, instalado y desinstalado como siempre; dev server reiniciado en limpio):**
+- Confirmado que el texto de la calculadora ya no aparece en la página, en desktop y mobile.
+- Conteo de secciones: 8 (antes 9). Sin overflow horizontal en ninguno de los dos anchos. Sin errores de consola.
+- `npm run lint` y `npm run build` limpios — con menos módulos transformados y el CSS del build ~1.6KB más liviano, confirmando que tanto el componente como el CSS muerto se eliminaron de verdad.
+
+**Por qué:**
+- La secuencia clara/oscura de fondos quedó perfectamente alternada de nuevo tras el corte (oscuro-claro-oscuro-claro-oscuro-claro-oscuro-claro-oscuro) — una casualidad favorable, no algo que haya que forzar.
+- Se aprovechó de limpiar el CSS huérfano del marquee en vez de dejarlo: código muerto que nadie iba a notar hasta que alguien lo tropezara buscando algo no relacionado.
+
+**Archivos afectados:**
+- Eliminado: `src/pages/Home/components/CalculadoraCitasPerdidas.jsx`, `src/components/animations/LiveNumber.jsx`.
+- Modificado: `src/pages/Home/Home.jsx` (se quita la sección), `src/index.css` (se quita el CSS del slider y el del marquee, ambos ya sin uso), `src/pages/Home/components/TeamPanels.jsx`/`NotebookVsApp.jsx`/`Pricing.jsx`/`FounderSpots.jsx`/`FAQ.jsx` (índices renumerados 02-06).
+
+**Pendiente / próximos pasos:**
+- Ninguno.
+
+---
+
+## 2026-08-14 (3) - Auditoría completa pre-Supabase: QA, seguridad, UX, y el esquema real de base de datos
+
+**Qué se hizo:**
+Enzo preguntó si el proyecto ya está listo para conectar Supabase de verdad, pidiendo una evaluación completa (QA, UX/UI, rol fullstack) y, como entregable final, el diagrama de la base de datos para crearla en Supabase.
+
+**1. Investigación en tres frentes, en paralelo:**
+- **Esquema real reconstruido desde el código** (no diseñado desde cero): se leyeron todas las ramas "reales" de Supabase de cada hook (`src/pages/panel/hooks/`, `src/pages/barberias/hooks/`, `src/services/`), cruzadas contra `src/mocks/datosProvisoriosSuperadmin.js` (cuyas formas ya estaban pensadas para reflejar el esquema real) y las dos funciones SQL ya existentes. Resultado: 12 tablas confirmadas columna por columna, con sus relaciones — ninguna inventada, todas con evidencia directa en el código.
+- **Auditoría de QA/seguridad para producción**: reveló 3 bloqueadores reales — (1) crear un barbero hoy solo inserta la fila en `barberos`, nunca crea su cuenta de login real (falta una Edge Function con la clave de servicio); (2) no existe ninguna política RLS en ningún lado del proyecto — cada hook confía en que el `barberia_id`/`barbero_id` que manda el navegador es el correcto, sin que la base de datos lo verifique, lo que permitiría a un barbero de una barbería leer o escribir los datos de otra con solo cambiar un ID en la consulta; (3) el aviso de reserva nueva sigue siendo un `console.info`, ningún dueño real se entera de una reserva sin mirar la bandeja.
+- **Auditoría UX/UI de pantallas menos revisadas** (Reservas, Superadmin, Personalización, Login, la página pública, los últimos pasos de la reserva): la mayoría ya cumple bien el sistema de diseño establecido; se encontró un checkbox nativo (en vez del `Interruptor` real) en el editor de galería de Personalización, varios botones de solo ícono (↑ ↓ ✕) sin `aria-label`, y un posible desborde horizontal por un truco de sangrado a `100vw` en esa misma pantalla.
+
+**2. Correcciones de UX aplicadas de inmediato** (las que no dependían de tener Supabase real): el checkbox "Destacar" de una foto de galería pasó a usar el componente real `Interruptor`; se agregaron `aria-label` a los 8 botones de ícono sin etiqueta (reordenar secciones, fotos y barberos del equipo; quitar cada color elegido). Se verificó el desborde horizontal reportado — no se manifestó en la prueba (sin overflow a 1280px), se deja como algo a revisar en un navegador real con scrollbar visible, no se fuerza un cambio sin poder confirmar el problema primero.
+
+**3. Esquema SQL completo, listo para correr en Supabase.** Nuevo `supabase/sql/000_schema.sql` (se numera antes de los dos archivos ya existentes porque ambos dependen de tablas que este archivo crea): las 12 tablas con sus tipos, valores por defecto y relaciones exactas, más políticas RLS completas usando un patrón `mi_perfil()` (función `security definer` que resuelve rol/barbería/barbero de quien consulta, evitando que las políticas sobre `usuarios` se evalúen recursivamente a sí mismas), una función `horas_ocupadas()` para que un visitante sin sesión pueda calcular disponibilidad sin poder leer el nombre/teléfono de otros clientes, y un trigger que impide que un dueño reactive su propia barbería suspendida con un `UPDATE` común (eso solo lo puede hacer la función `cambiar_estado_barberia` ya existente).
+
+**4. Diagrama ERD publicado como Artifact** (con la identidad visual del propio proyecto — cobre/negro-barbero/hueso, tipografía serif para los títulos): el diagrama completo de las 12 tablas y sus relaciones, el veredicto de los 3 bloqueadores, y los 7 pasos exactos para conectar Supabase de verdad en el orden correcto.
+
+**Cómo se probó:** `npm run lint`/`npm run build` limpios tras las correcciones de UX. El SQL no se pudo probar contra un Supabase real (no hay ninguno conectado todavía) — su corrección se apoya en que cada tabla/columna/relación tiene evidencia directa en el código ya escrito y probado durante toda la sesión, no en una ejecución real.
+
+**Por qué:**
+- Reconstruir el esquema desde el código en vez de diseñarlo de cero: las ramas "reales" de cada hook ya fueron pensadas con cuidado a lo largo de toda la sesión — ignorarlas y diseñar un esquema nuevo habría arriesgado inventar columnas que el código no espera, o no espera con el nombre correcto.
+- RLS con una función `mi_perfil()` reutilizada en vez de repetir el mismo `select ... from usuarios where id = auth.uid()` en cada política: además de evitar la recursión de RLS sobre la propia tabla `usuarios`, centraliza la lógica de "quién sos" en un solo lugar.
+- Veredicto honesto ("NO-GO todavía") en vez de solo entregar el esquema: activar `HAY_BACKEND_REAL` sin resolver los 3 bloqueadores dejaría a los barberos sin poder entrar a su panel y abriría un hueco real de seguridad entre barberías — entregar el esquema sin decir esto habría sido incompleto.
+
+**Archivos afectados:**
+- Nuevo: `supabase/sql/000_schema.sql`.
+- Modificado: `src/pages/panel/PanelPersonalizacion.jsx` (checkbox → `Interruptor` real, `aria-label` en 8 botones de ícono).
+
+**Pendiente / próximos pasos:**
+- Antes de activar `HAY_BACKEND_REAL`: escribir las dos Edge Functions (crear cuenta de barbero, resetear su contraseña), correr `000_schema.sql` + los dos SQL ya existentes en el proyecto real de Supabase, crear el primer superadmin a mano, ajustar `useReservasDelDia.js` para usar la función `horas_ocupadas()` en vez de leer `reservas` directo, decidir qué hacer con el aviso de reserva nueva (Edge Function real o aceptar la limitación por ahora), y probar con dos barberías de prueba en paralelo antes de invitar al primer cliente real.
+- Verificar el posible desborde horizontal de Personalización (el truco de `100vw`) en un navegador real con scrollbar visible — no se logró reproducir en la prueba automatizada.
+
+---
+
+## 2026-08-18 - Gestión real de usuarios/dueños desde el panel de superadmin (bloqueador #1 resuelto)
+
+**Qué se hizo:**
+Enzo pidió resolver el primer bloqueador de la auditoría anterior: hoy crear un barbero no crea ninguna cuenta de acceso real. Aclaró además cómo quiere manejar la creación de cuentas hacia adelante — no insertando nada a mano en Supabase, sino desde el mismo panel de superadmin, con cuentas administradas por barbería (agregar/quitar solo las de esa barbería en particular).
+
+**1. Edge Function `gestionar-usuario`** (`supabase/functions/gestionar-usuario/index.ts`): las cuatro acciones que necesitan la clave de servicio de Supabase (crear cuenta de dueño, crear cuenta de barbero, resetear contraseña, eliminar cuenta), todas verificando quién llama por su propio JWT (nunca por lo que el body diga) — superadmin puede todo, un dueño solo sobre barberos de su propia barbería. El `usuario` (nombre de login) no lo manda el cliente: la función lo genera del lado del servidor a partir del nombre completo (inicial + apellido, igual que `generarUsuarioDesdeNombre` de siempre, duplicado acá porque una Edge Function no puede importar código de React), revisando colisiones contra la tabla real en vez de contra lo que el navegador cree que existe.
+
+**2. `src/services/usuariosService.js`**: wrapper delgado que invoca esa función vía `supabase.functions.invoke`.
+
+**3. Multi-tenencia real en el modo de prueba** (`src/mocks/datosProvisoriosSuperadmin.js`, `src/context/AuthContext.jsx`): el sistema de login provisorio asumía una única barbería fija (`ID_BARBERIA_PROVISORIA`) — se generalizó para que cada barbería tenga su propia cuenta de dueño independiente (`usuario_dueno`/`password_dueno`/`nombre_dueno`), y `validarCredencialesProvisorias` ahora revisa TODAS las barberías (dueños y barberos) en vez de solo la original. De paso se corrigió un bug latente: `perfilProvisorioParaBarbero` siempre devolvía el `estado_id` y el `id` de la barbería original sin importar de cuál barbería fuera realmente el barbero.
+
+**4. Esquema ajustado**: `usuarios.barbero_id` pasó a ser `unique` (un barbero no puede tener más de una cuenta) — esto permite que `useBarberosAdmin` traiga el `usuario` de cada barbero con un solo embed (`barberos → usuarios`) en vez de una consulta aparte por barbero. Se agregó la política RLS que faltaba para que esto funcione: el dueño puede ver las cuentas de su propia barbería (antes solo podía ver la suya propia).
+
+**5. Hooks reales conectados** (`useBarberosAdmin.js`, nuevo `useUsuariosSuperadmin.js`): crear un barbero ahora crea también su cuenta (con rollback del barbero si la cuenta falla); cambiar su contraseña y eliminar su cuenta (sin borrar al barbero) quedaron conectados a la Edge Function; borrar un barbero entero borra primero su cuenta para no dejar un usuario de Auth huérfano. Mismo patrón para la cuenta del dueño, ahora administrable por barbería desde superadmin.
+
+**6. Nueva sección "Usuarios" en `PanelSuperadminBarberiaDetalle.jsx`**: cuenta del dueño (crear si no existe, cambiar contraseña, eliminar) y lista de barberos con su estado de cuenta (crear/cambiar/eliminar por barbero) — todo con el control de contraseña extraído a un componente compartido (`src/components/panel/CambiarPassword.jsx`, antes vivía duplicado dentro de `PanelBarberos.jsx`).
+
+**Cómo se probó (Playwright, instalado y desinstalado como siempre; dev server reiniciado en limpio):**
+- Flujo completo en modo provisorio: superadmin crea una barbería nueva → le crea cuenta de dueño (usuario generado correctamente: "Dueño Playwright" → `dplaywright`) → cierra sesión → entra como ese dueño y el panel muestra SU barbería, no "Don Manuel" → crea un barbero con cuenta propia → vuelve a entrar como superadmin, ve la cuenta del barbero en la ficha de la barbería, la elimina (queda "Crear cuenta" de nuevo, el barbero sigue existiendo) → confirma que `demo`/`demo1234` (Don Manuel) sigue funcionando exactamente igual que antes.
+- Sin errores de consola en ningún paso. `npm run lint` y `npm run build` limpios.
+- El branch real (Edge Function + RLS) no se pudo probar contra un Supabase real todavía — no hay ningún proyecto conectado (sigue en `HAY_BACKEND_REAL = false`); su corrección se apoya en la revisión del código y en que ya viene validado por la sesión anterior el esquema sobre el que corre.
+
+**Por qué:**
+- El `usuario` se genera en el servidor y no en el cliente: en el modo de prueba alcanza con revisar contra `localStorage`, pero contra una base real dos superadmins (o un superadmin y un dueño) creando cuentas al mismo tiempo podrían generar el mismo usuario si la unicidad se revisara solo del lado del navegador.
+- Borrar la cuenta antes que el barbero (no al revés) en `useEliminarBarbero`: al revés dejaría un usuario de Supabase Auth vivo sin ninguna fila en `usuarios` que lo referencie, sin nadie que lo vuelva a limpiar después.
+- `usuarios.barbero_id unique`: sin esto, el embed `barberos → usuarios` en PostgREST devuelve un arreglo en vez de un objeto, y mostrar "Usuario: ..." en cada tarjeta de barbero habría necesitado una consulta aparte por barbero en vez de una sola con el resto de la lista.
+
+**Archivos afectados:**
+- Nuevo: `supabase/functions/gestionar-usuario/index.ts`, `src/services/usuariosService.js`, `src/pages/panel/hooks/useUsuariosSuperadmin.js`, `src/components/panel/CambiarPassword.jsx`.
+- Modificado: `src/mocks/datosProvisoriosSuperadmin.js` (multi-tenencia de dueños), `src/context/AuthContext.jsx` (perfil de dueño ya no hardcodeado a una sola barbería), `src/pages/panel/hooks/useBarberosAdmin.js` (ramas reales conectadas a la Edge Function, embed de `usuario`), `src/pages/panel/PanelSuperadminBarberiaDetalle.jsx` (nueva sección "Usuarios"), `src/pages/panel/PanelBarberos.jsx` (usa el `CambiarPassword` compartido), `supabase/sql/000_schema.sql` (`usuarios.barbero_id unique` + policy nueva de RLS).
+
+**Pendiente / próximos pasos:**
+- Probar el branch real (Edge Function + RLS) contra un proyecto de Supabase de verdad en cuanto exista uno — desplegar la función, correr el SQL actualizado, y repetir el mismo flujo de prueba pero con `HAY_BACKEND_REAL = true`.
+- Los otros dos bloqueadores de la auditoría anterior siguen abiertos: RLS sin probar contra datos reales, y el aviso de reserva nueva sigue siendo un `console.info`.
+
+---
+
+## 2026-08-18 (2) - Bug de login + cierre del hueco de seguridad en `/admin`
+
+**Qué se hizo:**
+Enzo reportó que no podía entrar al panel administrativo, y pidió además que cualquier intento de entrar por URL directa a una zona protegida redirija, con una revisión general de seguridad para que nada quede expuesto o accesible de más para alguien malintencionado.
+
+**1. El bug del login (causa raíz, no "credenciales incorrectas"):** el modo de prueba guarda su "base de datos falsa" en `localStorage`, y `leerEstado()` solo la inicializa desde cero la PRIMERA vez — si ya había datos guardados de antes de esta sesión (cuando `usuario_dueno`/`password_dueno`/`nombre_dueno` todavía no existían por barbería), la barbería semilla se quedaba sin esos campos y `demo`/`demo1234` dejaba de encontrar coincidencia. Se agregó una migración suave en `leerEstado()`: si una barbería no tiene `usuario_dueno` (distinto de tenerlo en `null`, que sí es un estado válido — cuenta borrada a propósito desde "Usuarios"), se le asigna `demo`/`demo1234` si es la barbería semilla, o se la deja sin cuenta si es cualquier otra — y se persiste de una para no tener que re-migrar en cada lectura.
+
+**2. El hueco real de seguridad — `/admin` sin ninguna protección:** desde que se armó el panel superadmin, la ruta `/admin` estaba deliberadamente SIN `<RutaProtegida>` (comentario "TEMPORAL" en el código) porque el modo de prueba no tenía ninguna forma de loguearse como superadmin — protegerla habría dejado el panel imposible de probar. Se agregó un login de superadmin en modo de prueba (`SUPERADMIN_PROVISORIO`, usuario `superadmin`/`super1234`, sin barbería asociada) y se reactivó `<RutaProtegida rolesPermitidos={[ROL_SUPERADMIN]}>` alrededor de `/admin` — ahora cualquiera que entre por esa URL sin sesión de superadmin rebota a su propio panel (si tiene sesión con otro rol) o al login (si no tiene ninguna).
+
+**3. Ruta de captura (`*`) para URLs inexistentes:** cualquier URL que no matchee nada ahora redirige a `/` en vez de quedar en blanco.
+
+**4. Revisión general de seguridad** (client-side, ya que RLS/Edge Function reales siguen sin poder probarse sin un Supabase conectado):
+   - CORS de la Edge Function `gestionar-usuario` pasó de `Access-Control-Allow-Origin: *` a una lista blanca configurable (`ORIGENES_PERMITIDOS`, por defecto el dominio real + localhost de desarrollo) — la función hace cambios reales (crea/borra cuentas), no tiene sentido que cualquier origen pueda completar el preflight.
+   - Los dos `postMessage` que la app escucha (`Cursor.jsx`, `PreviewBarberia.jsx`) no validaban `evento.origin` — cualquier página podría haber incrustado esas rutas en un iframe propio y mandarles mensajes falsos. Se agregó el chequeo de origen a ambos.
+   - Confirmado (sin cambios necesarios, ya estaba bien): `.env` real está en `.gitignore` y nunca se subió; `supabaseClient.js` solo usa la clave anónima, nunca la de servicio; `authService.js` ya usa un mensaje genérico de "Usuario o contraseña incorrectos" tanto si el usuario no existe como si la contraseña está mal (evita que el formulario sirva para adivinar qué usuarios existen); la Edge Function ya impedía que un dueño tocara cuentas de otra barbería, otro dueño, o la suya propia vía `resetear_password`/`eliminar_cuenta`.
+   - Pendiente, fuera del alcance de este repo: cabeceras anti-clickjacking (`X-Frame-Options`/CSP `frame-ancestors`) — no hay ningún archivo de configuración de hosting todavía (ni `firebase.json` ni equivalente), así que no hay dónde declararlas sin adivinar el proveedor final; queda anotado para cuando se decida dónde se despliega de verdad.
+
+**Cómo se probó (Playwright, instalado y desinstalado como siempre; dev server reiniciado en limpio):**
+- Simulación de datos viejos en `localStorage` (sin `usuario_dueno`) → login `demo`/`demo1234` funciona y la migración queda persistida.
+- Acceso directo por URL a `/admin/barberias/...` sin sesión → redirige a `/login`.
+- URL inexistente → redirige a `/`.
+- Dueño (`demo`/`demo1234`) intentando `/admin` por URL → rebota a su propio `/panel`, nunca ve el panel de superadmin.
+- Superadmin (`superadmin`/`super1234`) entra a `/admin` normalmente; intentando `/panel` por URL rebota de vuelta a `/admin`.
+- Barbero (`mrojas`/`barbero123`) intentando `/admin` por URL → rebota a su propio `/panel/barbero`.
+- Sin errores de consola en ningún escenario. `npm run lint` y `npm run build` limpios.
+
+**Por qué:**
+- Migrar en vez de solo documentar el bug: cualquier navegador que haya probado la app en una sesión anterior a esta ronda se habría quedado bloqueado de la misma forma — un dato viejo en `localStorage` no debería poder tumbar el login.
+- Reactivar la protección de `/admin` en vez de dejarla "temporal" para siempre: era exactamente el hueco que Enzo pidió cerrar (acceso por URL sin pasar por sesión) — y quedaba, además, en el checklist de la auditoría anterior como algo por resolver antes de ir a producción.
+- CORS restrictivo y chequeo de origen en `postMessage`: ninguno de los dos era explotable de forma grave hoy (la Edge Function igual verifica el JWT de quien llama; los postMessage solo afectan una vista previa/un cursor cosmético), pero "que no se filtre nada" pidió cerrar también los huecos de bajo impacto, no solo los críticos.
+
+**Archivos afectados:**
+- Modificado: `src/mocks/datosProvisoriosSuperadmin.js` (migración suave + `SUPERADMIN_PROVISORIO`), `src/context/AuthContext.jsx` (perfil de superadmin en modo de prueba), `src/routes/AppRouter.jsx` (`/admin` protegida de nuevo + ruta `*`), `src/pages/Login/shared/FormularioAcceso.jsx` (hint con la credencial de superadmin), `supabase/functions/gestionar-usuario/index.ts` (CORS con lista blanca), `src/pages/panel/PreviewBarberia.jsx` y `src/components/common/Cursor.jsx` (chequeo de origen en `postMessage`).
+
+**Pendiente / próximos pasos:**
+- Definir dónde se despliega de verdad (Firebase Hosting, Vercel, etc.) y agregar ahí las cabeceras `X-Frame-Options`/CSP `frame-ancestors` para cerrar clickjacking a nivel de hosting.
+- Los mismos pendientes de siempre: probar RLS y la Edge Function contra un Supabase real, y resolver el aviso de reserva nueva (`console.info`).
+
+---
+
+## 2026-08-18 (3) - Bug real: no se podía cargar el primer barbero de una barbería nueva + rediseño de "Usuarios" a modales
+
+**Qué se hizo:**
+Enzo reportó que no lo dejaba crear usuarios ni al dueño cuando arrancaba una barbería nueva desde cero, y pidió además que editar un dueño o sus barberos se haga con un lápiz que abra un formulario tipo card encima de la página, con el fondo difuminado — en vez de los formularios siempre visibles que había quedado la ronda anterior.
+
+**1. El bug real, encontrado al reproducirlo paso a paso:** crear la cuenta del dueño de una barbería nueva SÍ funcionaba. El problema real era otro: la sección "Usuarios" del superadmin solo sabía administrar la cuenta de un barbero que YA existía como ficha de negocio — no había ninguna forma de cargar el PRIMER barbero de una barbería recién creada desde ahí (la lista aparecía vacía, sin ningún botón para agregar uno). Para eso había que loguearse como el dueño y entrar a su panel — un salto de sesión nada obvio, y probablemente lo que Enzo interpretó como "no me deja crear". Se agregó un botón "+ Nuevo barbero" a esa sección, reusando la misma mutación que ya usa el panel del dueño (`useCrearBarbero`, que crea la ficha del barbero y su cuenta de acceso de una sola vez).
+
+**2. Rediseño a modales:** nuevo componente compartido `ModalFormulario` (card centrada, fondo `bg-negro-barbero/50` + `backdrop-blur-sm`, cierra con clic afuera o Esc) y un ícono `IconoLapiz` (mismo estilo de trazo que `IconoOjo` del login). Se reemplazaron los formularios siempre visibles de la ronda anterior: la cuenta del dueño y cada barbero ahora muestran un lápiz (si ya tienen cuenta) que abre un modal con cambiar-contraseña + eliminar-cuenta juntos, o un botón "+ Crear cuenta" (si no tienen) que abre el modal de creación — mismo patrón para el nuevo "+ Nuevo barbero".
+
+**Cómo se probó (Playwright, instalado y desinstalado como siempre; dev server reiniciado en limpio):**
+- Flujo completo con `localStorage` completamente vacío (barbería "desde 0" tal como la reportó Enzo): login superadmin → crear barbería → modal "+ Crear cuenta" para el dueño (usuario generado correctamente) → modal "+ Nuevo barbero" para cargar el primer barbero de esa barbería (antes imposible desde acá) → lápiz de ese barbero → cambiar su contraseña (confirmación visible) → eliminar la cuenta desde el mismo modal → vuelve a mostrar "+ Crear cuenta" para ese barbero (sigue existiendo como barbero, sin login).
+- Sin errores de consola en ningún paso. `npm run lint` y `npm run build` limpios.
+
+**Por qué:**
+- Reusar `useCrearBarbero` en vez de escribir una mutación nueva para el superadmin: ya hace exactamente lo necesario (ficha + cuenta, con rollback si la cuenta falla) y ya está probado — duplicarla habría sido el mismo código dos veces.
+- Un solo `ModalEditarCuenta` para dueño y barbero: el formulario es idéntico (contraseña nueva + eliminar), lo único que cambia es el título y a qué mutación apunta cada botón — separarlos en dos componentes solo habría duplicado el JSX.
+
+**Archivos afectados:**
+- Nuevo: `src/components/panel/ModalFormulario.jsx`, `src/components/panel/IconoLapiz.jsx`.
+- Modificado: `src/pages/panel/PanelSuperadminBarberiaDetalle.jsx` (sección "Usuarios" reescrita a modales + botón "+ Nuevo barbero").
+
+**Pendiente / próximos pasos:**
+- Los mismos de siempre: probar el branch real (Edge Function + RLS) contra un Supabase de verdad en cuanto exista uno, resolver el aviso de reserva nueva, y definir hosting para las cabeceras anti-clickjacking.
+
+---
+
+## 2026-08-18 (4) - Motivo opcional al activar + aviso de "Próximos a pagar" por fecha de activación
+
+**Qué se hizo:**
+Enzo pidió dos cosas sobre "Cambiar estado": que el motivo (obligatorio hoy siempre) no se pida cuando lo que se está haciendo es ACTIVAR una barbería — no hay nada que explicar ahí, a diferencia de suspenderla o desactivarla —, y que la fecha de activación quede guardada para poder avisarle en su panel qué barberías tienen el pago próximo, calculado sobre esa fecha.
+
+**1. Motivo condicional:** el formulario de "Cambiar estado" ahora oculta el campo "Motivo" por completo cuando el estado destino es Activo (antes era obligatorio siempre). Al activar se guarda igual un motivo fijo ("Activación") en `historial_estados` — la columna es `not null`, y de todas formas sigue siendo información útil para la auditoría, solo que ya no hay que escribirla a mano.
+
+**2. `fecha_activacion` por barbería:** columna nueva en `barberias` (`supabase/sql/000_schema.sql`), que la función `cambiar_estado_barberia` (`002_cambiar_estado_barberia.sql`) pisa con `now()` cada vez que el estado nuevo es Activo — primera activación O reactivación tras una suspensión, a propósito: si estuvo suspendida por pago, el próximo cobro se cuenta desde que volvió a pagar, no desde el alta original de hace meses. Mismo comportamiento espejado en el modo de prueba (`cambiarEstadoProvisorio`), con migración suave para barberías ya guardadas en `localStorage` de antes de que este campo existiera.
+
+**3. Cálculo del próximo pago** (`src/utils/facturacion.js`, nuevo): el "día de pago" es el día del mes de `fecha_activacion` — cada mes vence ese mismo día, corriéndose al último día del mes si ese mes no lo tiene (activó un 31, el mes siguiente tiene 30). `proximoPago()`/`diasHastaProximoPago()`.
+
+**4. Recordatorio en el panel:** nueva sección "— Próximos a pagar" al principio de `PanelSuperadminBarberias.jsx` (la lista de barberías) — lista, ordenada por cercanía, cualquier barbería Activa cuyo próximo pago caiga dentro de los próximos 7 días, con un link directo a su ficha. En la ficha individual (`PanelSuperadminBarberiaDetalle.jsx`) se agregó también una línea "Próximo pago en X días (fecha)" justo debajo del nombre, para verlo sin tener que volver a la lista.
+
+**Cómo se probó (Playwright, instalado y desinstalado como siempre; dev server reiniciado en limpio):**
+- Con `localStorage` vacío (barbería semilla "Don Manuel" sembrada con `fecha_activacion` de "hace 25 días" a propósito, para tener un caso real sin esperar un mes): el panel de superadmin muestra "Próximos a pagar" con Don Manuel, "en 6 días".
+- Crear una barbería nueva y activarla: el formulario no pide motivo, y tras confirmar aparece "Próximo pago hoy" en su ficha (se activó en el momento).
+- La misma barbería, cambiada a "Suspendido por pago": el formulario SÍ vuelve a pedir motivo.
+- Sin errores de consola en ningún paso. `npm run lint` y `npm run build` limpios.
+
+**Por qué:**
+- Motivo fijo "Activación" en vez de dejar la columna nullable: cambiar el `not null` de `historial_estados.motivo` habría sido tocar una restricción ya pensada a propósito (que CADA cambio de estado quede con una razón registrada, aunque sea implícita) — más simple guardar un valor fijo que aflojar la restricción.
+- Reactivación resetea `fecha_activacion` en vez de conservar la original: una barbería suspendida por pago que vuelve a pagar debería tener su próximo cobro un mes después de ESE pago, no seguir arrastrando el día del mes de su alta de hace tiempo — de lo contrario el aviso podría mostrarla "atrasada" el mismo día que acaba de ponerse al día.
+- Ventana de 7 días para el aviso: suficiente margen para escribirle al dueño antes de que corra el riesgo de quedar suspendida por falta de pago, sin llenar el panel de avisos de barberías que recién pagaron.
+
+**Archivos afectados:**
+- Nuevo: `src/utils/facturacion.js`.
+- Modificado: `supabase/sql/000_schema.sql` (`barberias.fecha_activacion`), `supabase/sql/002_cambiar_estado_barberia.sql` (la pisa al activar), `src/mocks/datosProvisoriosSuperadmin.js` (mismo campo + migración suave), `src/pages/panel/hooks/useBarberiasSuperadmin.js` (lo selecciona en las queries reales), `src/pages/panel/PanelSuperadminBarberiaDetalle.jsx` (motivo condicional + línea de próximo pago), `src/pages/panel/PanelSuperadminBarberias.jsx` (sección "Próximos a pagar").
+
+**Pendiente / próximos pasos:**
+- Los mismos de siempre: probar el branch real (Edge Function + RLS + esta migración de columna) contra un Supabase de verdad en cuanto exista uno, resolver el aviso de reserva nueva, y definir hosting para las cabeceras anti-clickjacking.
+
+---
+
+## 2026-08-18 (5) - Esquema simplificado a un solo tipo numérico (`integer`) y texto (`text`)
+
+**Qué se hizo:**
+Enzo pidió simplificar los tipos de columna en todo el esquema: nada de `smallint`, quería manejar las tablas con "atributos simples" — en su cabeza, VARCHAR2/NUMBER (vocabulario de Oracle). Se le explicó que VARCHAR2 no existe en Postgres (el real equivalente ya era `text`, que el esquema ya usaba) y que `usuarios.id` no puede dejar de ser `uuid` porque es una referencia directa a `auth.users.id` — Supabase Auth siempre genera ahí un UUID. Con eso aclarado, se le preguntó qué tan lejos quería llegar con la simplificación (con una vista previa de ambas opciones) y eligió la versión recomendada: solo los identificadores propios y los booleanos cambian de tipo; fechas/horas se quedan como están porque ya son el tipo correcto.
+
+**1. IDs: de `uuid`/`smallint` a `integer` autoincremental.** Todo `id` propio (`barberias`, `barberos`, `servicios`, `horarios_disponibles`, `excepciones_horario`, `reservas`, `historial_estados`) y cada FK que apunta a esas tablas pasó de `uuid default gen_random_uuid()` a `integer generated always as identity`. Los catálogos (`roles`, `estados_barberia`, `planes`) pasaron de `smallint` a `integer` (siguen con ids fijos insertados a mano, sin autoincremento). Se eligió `integer` y no `bigint` a propósito: Supabase devuelve las columnas `bigint` como texto en el JSON (para no perder precisión en un entero de 64 bits), mientras que `integer` sí llega como un número de JavaScript normal — más simple, y de sobra para el volumen real de esta app. Única excepción, no negociable: `usuarios.id` sigue siendo `uuid`.
+
+**2. Booleanos: de `boolean` a `integer` con `check (columna in (0, 1))`.** `barberos.activo`/`usa_catalogo_propio`, `servicios.oferta_activa`/`activo`, `horarios_disponibles.activo`, `excepciones_horario.cerrado` — todos pasaron a `integer`, con un `check` que impide guardar cualquier valor que no sea 0 o 1 (Postgres no tiene un `NUMBER(1)` literal como Oracle, esto es lo más parecido).
+
+**3. Todo lo que dependía de esos tipos, actualizado en cascada:** `mi_perfil()` y `horas_ocupadas()` (`000_schema.sql`), `cambiar_estado_barberia()` (`002_cambiar_estado_barberia.sql`), y las policies de RLS que comparaban `activo`/`oferta_activa` como boolean (`using (activo and ...)` → `using (activo = 1 and ...)`). El código de React no necesitó casi ningún cambio porque ya trataba los IDs como valores opacos en todos lados (nunca se armó nada asumiendo forma de UUID) — el único ajuste real fue en la escritura: cada lugar que mandaba `true`/`false` de JavaScript directo a una columna que ahora es `integer` (crear/editar barbero, servicio, horario, excepción, activar/desactivar catálogo propio) se corrigió para mandar `1`/`0`, y un filtro de lectura (`useHorariosDisponibles.js`) que hacía `.eq('activo', true)` pasó a `.eq('activo', 1)`.
+
+**4. Nuevo `src/utils/booleanosReales.js`** (`comoColumnasReales`): en vez de arreglar cada mutación a mano una por una, los formularios que pasan un objeto genérico de cambios (servicios, horarios, excepciones, barberos) ahora lo hacen pasar por esta función antes de escribirlo — convierte cualquier valor `boolean` a `0`/`1` automáticamente, así el resto del código sigue pensando en `true`/`false` (como piensa un `<Interruptor>` de React) sin tener que acordarse de la conversión en cada callsite.
+
+**Cómo se probó:**
+- Se recorrió cada archivo real (`000_schema.sql`, `001`, `002`, la Edge Function, y los seis hooks que escriben en modo real: `useBarberosAdmin.js`, `useServiciosAdmin.js`, `useServiciosPanel.js`, `useHorariosAdmin.js`) confirmando columna por columna que ningún `smallint`/`boolean`/`uuid` quedó suelto (búsqueda case-insensitive final sin resultados fuera de los comentarios que documentan la convención).
+- `npm run lint` y `npm run build` limpios tras todos los cambios.
+- No se pudo probar contra un Postgres real (no hay `psql`/Docker en este entorno, y sigue sin existir un proyecto Supabase conectado — `HAY_BACKEND_REAL` sigue en `false`) — la corrección se apoya en la revisión exhaustiva del código, no en una ejecución real. El modo de prueba (`localStorage`) no se tocó: es un sistema aparte que nunca necesitó reflejar los tipos exactos de columna, solo qué columnas existen.
+
+**Por qué:**
+- `integer` y no `bigint` para los IDs: es la elección que evita el problema práctico de recibir los ids como string desde Supabase, sin sacrificar nada — ninguna tabla de esta app se va a acercar jamás al límite de `integer` (2.100 millones de filas).
+- `comoColumnasReales` como función compartida en vez de arreglar cada mutación distinto: todas seguían el mismo patrón (`cambios` genérico desde un formulario, con algún campo booleano mezclado) — una sola función en el borde de cada escritura real es más fácil de auditar que seis conversiones manuales distintas.
+
+**Archivos afectados:**
+- Nuevo: `src/utils/booleanosReales.js`.
+- Modificado: `supabase/sql/000_schema.sql`, `supabase/sql/002_cambiar_estado_barberia.sql`, `src/pages/panel/hooks/useBarberosAdmin.js`, `src/pages/panel/hooks/useServiciosAdmin.js`, `src/pages/panel/hooks/useServiciosPanel.js`, `src/pages/panel/hooks/useHorariosAdmin.js`, `src/pages/barberias/hooks/useHorariosDisponibles.js`.
+
+**Pendiente / próximos pasos:**
+- El diagrama ERD publicado como Artifact en una ronda anterior todavía muestra los tipos viejos (uuid/smallint/boolean) — no se actualizó en esta ronda porque no fue parte de lo pedido; avisar si se quiere republicado con los tipos nuevos.
+
+---
+
+## 2026-08-18 (6) - Revisión externa de arquitectura: 6 bloqueantes aplicados al esquema
+
+**Qué se hizo:**
+Enzo armó, con el prompt de arquitecto entregado la ronda anterior, una sesión aparte en claude.ai que devolvió una revisión completa del esquema (bloqueantes/importantes/recomendados). La pidió revisar contra el proyecto real antes de tocar nada. Se verificaron las 7 afirmaciones más relevantes contra el código real (no solo contra el SQL) con un sub-agente de exploración — las 7 se confirmaron ciertas, incluyendo dos que chocaban directo con código construido en rondas anteriores de esta misma sesión: `useEliminarBarbero` hacía un `.delete()` físico ("no se puede deshacer" en el propio diálogo de confirmación), y la Edge Function `eliminar_cuenta` no restringía a un superadmin de borrarse a sí mismo. Con eso confirmado, se preguntó a Enzo las dos decisiones de producto que la revisión dejaba abiertas y el alcance de esta ronda — eligió: convertir "Eliminar barbero" en una baja lógica, bloquear el cambio de plan si excede el límite nuevo (decisión anotada, no implementada aún — ver pendientes), aplicar solo los 6 bloqueantes por ahora, y dejar pendiente el estado "completada/no_asistio" de una reserva (es una funcionalidad nueva, no una corrección).
+
+**B1 — `reservas` sin coherencia de tenant:** `barbero_id`/`servicio_id` eran FK independientes de `barberia_id`, sin nada que garantizara que las tres apuntaran al mismo tenant — grave porque el `INSERT` en `reservas` es público. Se agregaron claves candidatas compuestas `unique (id, barberia_id)` en `barberos`/`servicios`, y las FK de `reservas` pasaron a ser compuestas contra esas claves. Además, un trigger nuevo (`validar_servicio_barbero`) cubre la regla condicional que una FK no puede expresar: si el servicio reservado es del catálogo PROPIO de un barbero, la reserva tiene que ser justo para ese barbero.
+
+**B2 — sin protección de doble reserva:** el bug más grave posible en un sistema de citas, y nada en el esquema lo impedía (ni un `unique(barbero_id, fecha_hora)` alcanza, por los solapes parciales entre servicios de distinta duración). Se agregó `duracion_minutos`/`fecha_hora_fin` a `reservas` (llenadas siempre por un trigger a partir del servicio real, nunca confiando en lo que mande el cliente — así nadie puede mentir sobre la duración para colarse entre dos horas ya tomadas), y una restricción de exclusión (`exclude using gist`, extensión `btree_gist`) que hace literalmente imposible insertar dos reservas confirmadas que se solapen para el mismo barbero.
+
+**B3 — reserva pública sin validar disponibilidad real:** el cálculo de horarios solo vivía en el frontend (`calcularSlotsDisponibles`) — una validación que solo vive en el cliente no es una validación cuando el `INSERT` es público. Nuevo trigger `validar_disponibilidad_reserva`: revisa la excepción puntual del día si existe (o el horario semanal si no), rechaza fechas en el pasado, y aplica un límite básico contra spam (máximo 5 reservas por teléfono por hora — no es una defensa completa, queda anotado que la real necesita rate limiting en una Edge Function o captcha). Zona horaria fijada a `America/Santiago` de forma explícita y documentada (todas las barberías son chilenas hoy).
+
+**B4 — `usuarios` sin coherencia de rol:** el check anterior solo exigía "si hay barbero_id, hay barberia_id", pero dejaba pasar un superadmin con barbería asignada, o un dueño con barbero_id. Nuevo check exhaustivo (`usuarios_coherencia_rol`) con la combinación exacta válida para cada rol, más la misma técnica de FK compuesta que B1 para blindar que `barbero_id` y `barberia_id` sean siempre del mismo tenant.
+
+**B5 — cascadas que destruían historial:** `reservas.barbero_id`/`servicio_id` tenían `on delete cascade` — combinado con que `useEliminarBarbero` hacía un `.delete()` físico, dar de baja a un barbero borraba en silencio toda su historia de reservas. Se resolvió en dos capas: las FK de `reservas` ahora son `on delete restrict` (bloquean el borrado si tiene alguna reserva), y — más importante — el frontend ya no intenta borrar: `useEliminarBarbero` se reemplazó por `useDarDeBajaBarbero`, que borra la cuenta de acceso y pone `activo: 0`, sin tocar la ficha del barbero ni sus horarios/excepciones/catálogo propio. El botón "Eliminar" del panel pasó a "Dar de baja", con el diálogo de confirmación reescrito para reflejar que ya no es irreversible.
+
+**B6 — conflicto de FK al borrar un usuario:** `historial_estados.usuario_id` era `not null` sin `on delete`, mientras que `usuarios.id` sí tiene `on delete cascade` desde `auth.users` — borrar la cuenta de un superadmin que alguna vez cambió el estado de una barbería fallaba con un error de FK confuso. Pasó a ser nullable con `on delete set null`, más una columna `usuario_nombre_snapshot` (la llena `cambiar_estado_barberia()` al mismo tiempo que `usuario_id`) para que la auditoría siga diciendo quién hizo el cambio aunque la cuenta desaparezca. De paso, se encontró y cerró un hueco relacionado que la revisión no había visto: la Edge Function `eliminar_cuenta` no impedía que un superadmin se borrara a sí mismo.
+
+**Cómo se probó:**
+- Verificación cruzada de las 7 afirmaciones más relevantes de la revisión contra el código real (no solo el SQL) con un sub-agente — las 7 confirmadas, con referencias de archivo/línea concretas.
+- Playwright (instalado y desinstalado como siempre; dev server reiniciado en limpio): dar de baja a un barbero con reservas seed — el botón dice "Dar de baja", el barbero sigue en la lista (no se borra), ya no tiene usuario, y sus horarios (6 bloques) quedan intactos en `localStorage`.
+- `npm run lint` y `npm run build` limpios.
+- El SQL en sí (FK compuestas, exclusion constraint, triggers) no se pudo probar contra un Postgres real — mismo motivo de siempre, no hay proyecto Supabase ni Docker/psql en este entorno. La corrección se apoya en la revisión exhaustiva del arquitecto externo más la verificación cruzada contra el código real.
+
+**Por qué:**
+- Recalcular `duracion_minutos` SIEMPRE desde el servicio real (no solo cuando el cliente no lo manda): si el trigger confiara en un valor explícito del cliente, alguien podría mandar una duración corta a propósito para que la restricción de exclusión no detecte un solape real.
+- "Dar de baja" en vez de bloquear el borrado y dejar el botón "Eliminar" tal cual: con `on delete restrict`, ese botón habría empezado a fallar con un error de base de datos sin aviso apenas el barbero tuviera una sola reserva — confuso para Enzo y sin ningún mensaje claro de por qué. Cambiar el verbo en la UI (y lo que hace de verdad) es más honesto que dejar un botón que un día deja de funcionar sin explicación.
+- Corregir el auto-borrado del superadmin aunque la revisión externa no lo haya visto: es la misma clase de bug que B6 (falta de restricción sobre a quién se puede apuntar una acción destructiva), encontrado en el mismo lugar mientras se revisaba esa parte del código.
+
+**Archivos afectados:**
+- Modificado: `supabase/sql/000_schema.sql` (extensión `btree_gist`, claves candidatas compuestas, FK compuestas, 3 triggers nuevos, restricción de exclusión, `historial_estados` nullable), `supabase/sql/002_cambiar_estado_barberia.sql` (`usuario_nombre_snapshot`), `supabase/functions/gestionar-usuario/index.ts` (bloqueo de auto-borrado de superadmin), `src/mocks/datosProvisoriosSuperadmin.js` (`darDeBajaBarberoProvisorio` reemplaza a `eliminarBarberoProvisorio`), `src/pages/panel/hooks/useBarberosAdmin.js` (`useDarDeBajaBarbero`), `src/pages/panel/PanelBarberos.jsx` (botón y copy).
+
+**Pendiente / próximos pasos (resuelto en la siguiente entrada — ver abajo):**
+- ~~Decisión ya tomada pero SIN implementar: bloquear el cambio de plan...~~
+- ~~El resto de la revisión (Importantes I1-I9, Recomendados R1-R4)...~~
+- Los mismos de siempre: probar todo esto contra un Supabase real en cuanto exista uno, resolver el aviso de reserva nueva, y definir hosting para las cabeceras anti-clickjacking.
+
+---
+
+## 2026-08-19 - Resto de la revisión de arquitectura: Importantes I1-I8 y Recomendados R1-R4
+
+**Qué se hizo:**
+Enzo pidió implementar todo lo pendiente de la revisión externa, "incluyendo todo lo relacionado con la próxima creación de tablas" — se interpretó como: dejar el esquema completamente listo para el momento en que se cree el proyecto Supabase real, sin tener que volver a tocarlo por partes. Se implementaron los 8 Importantes y los 4 Recomendados que aplican a nivel de esquema, dejando fuera solo lo que Enzo ya había elegido posponer explícitamente en la ronda anterior: I9 (estados 'completada'/'no_asistio' — necesita UI nueva) y la entidad completa de `clientes` de R2 (el propio arquitecto recomendó esperar).
+
+**I1 — índices sobre FK:** Postgres no los crea solo (a diferencia de MySQL). Se agregaron/mejoraron los índices sobre cada FK, varios con filtro parcial para no indexar filas irrelevantes: `reservas` por `(barbero_id, fecha_hora) where estado='confirmada'` y por `(barberia_id, fecha_hora desc)`, `servicios_barbero_id_idx`/`usuarios_barberia_id_idx` con `where ... is not null`, `historial_estados`/`pagos` por `(barberia_id, fecha desc)`, y uno nuevo que faltaba del todo: `barberias_estado_idx`.
+
+**I2 — límite de plan sin aplicar:** `max_barberos` era pura decoración. Dos triggers nuevos: `validar_limite_barberos` (bloquea activar un barbero, por INSERT o por UPDATE del interruptor "Activo", más allá del límite) y `validar_baja_de_plan` (bloquea bajar de plan si la barbería ya tiene más barberos activos que el límite nuevo — la decisión que Enzo ya había tomado: bloquear, no auto-desactivar). Aplicado también en el modo de prueba (`cambiarPlanProvisorio`/`actualizarBarberoProvisorio`) para paridad, y se agregó manejo de error real en `PanelSuperadminBarberiaDetalle.jsx` (antes la mutación de plan era "mandar y olvidar", sin ningún mensaje si fallaba) y en `PanelBarberos.jsx` (el interruptor "Activo" tampoco mostraba nada si el rechazo pasaba). De paso se encontró y corrigió un bug nuevo, causado por la ronda de "dar de baja" anterior: el contador "X / máximo" del panel de barberos contaba TODOS los barberos históricos, no solo los activos — antes daba lo mismo (un barbero "eliminado" desaparecía del arreglo), pero desde que "dar de baja" los deja en la lista como inactivos, ese conteo se habría ido poniendo cada vez más engañoso con el tiempo.
+
+**I3 — reservas sin snapshot de precio:** si el precio de un servicio cambia, antes se reescribía retroactivamente cuánto "costó" cada reserva pasada. Nuevas columnas `precio_cobrado_clp`/`servicio_nombre_snapshot`, llenadas por el mismo trigger que ya calculaba `fecha_hora_fin` (B2, ronda anterior).
+
+**I4 — oferta sin coherencia:** era válido `oferta_activa = 1` con `precio_oferta` nulo o mayor al precio normal. Checks nuevos en `servicios` (`servicios_oferta_coherente`, `servicios_precios_positivos`) más una función `precio_vigente()` (único lugar que decide "cuánto cuesta esto ahora", en vez de que el frontend replique la lógica oferta/vencimiento en JavaScript). Se agregó también la validación del lado del cliente que no existía (confirmado por la verificación cruzada de la ronda anterior): `FilaServicioAdmin.jsx` (dueño) y `PanelBarberoServicios.jsx` (catálogo propio del barbero) ahora bloquean activar una oferta sin precio puesto o con un precio mayor al normal, con el mensaje puntual en la tarjeta — nuevo `src/utils/ofertas.js` compartido entre las dos pantallas para no duplicar la regla.
+
+**I5 — horarios sin coherencia:** `horarios_rango_valido`/`excepciones_coherentes` (una excepción con `cerrado=0` y horas nulas no tenía ningún significado, y confundía al trigger de disponibilidad de `reservas`), más una restricción de exclusión (`horarios_sin_solape`, con un tipo `timerange` nuevo ya que Postgres no trae uno de fábrica) que impide que un barbero tenga dos bloques del mismo día que se pisen.
+
+**I6 — `email_tecnico` sin unique:** agregado — es el email real en `auth.users`, donde sí es único.
+
+**I7 — personalización no se crea sola:** confirmado en la ronda anterior que `useCrearBarberia` (rama real) solo inserta en `barberias`, nunca en `personalizacion` — una barbería nueva real se habría quedado sin nada que mostrar en su página pública ni en el panel de Personalización. Trigger `crear_personalizacion_default` (after insert on barberias) lo resuelve sin depender de que ningún código cliente se acuerde de hacerlo — cero cambios necesarios en `useCrearBarberia`.
+
+**I8 — sin `updated_at`:** agregado a `barberias`/`barberos`/`servicios`/`personalizacion`/`reservas`, con un trigger genérico (`tocar_updated_at`) compartido.
+
+**R1 — tabla `pagos`:** estructura lista (barbería, plan, monto, período, estado, método) para cuando exista un flujo de pago real conectado — a propósito, sin ningún cron ni trigger que genere filas solo: inventar registros de cobro sin un pago real detrás sería peor que no tener la tabla. RLS: superadmin administra todo, el dueño lee (no escribe) las suyas.
+
+**R2 — normalización de teléfono (parcial, a propósito):** trigger `normalizar_telefono` (deja solo dígitos, agrega el 56 si vino como celular chileno de 9 dígitos sin código de país) — para que el mismo cliente no quede repetido en reportes futuros por escribir su número de tres formas distintas. NO se construyó la tabla `clientes` completa, seguía la recomendación explícita del arquitecto de esperar.
+
+**R3 — `personalizacion.secciones`/`orden_equipo` sin validar:** checks nuevos (`jsonb_typeof(...) = 'array'`) — un objeto mal formado desde el panel ya no puede llegar a romper la página pública sin que nadie se entere.
+
+**R4 — `fecha_activacion` se pisa y pierde el historial:** nueva columna `fecha_alta` que se llena una sola vez (la primera activación) y nunca se vuelve a tocar — `fecha_activacion` sigue reiniciándose en cada reactivación como hasta ahora, pero ahora la fecha de alta real no se pierde.
+
+**Cómo se probó (Playwright, instalado y desinstalado como siempre; dev server reiniciado en limpio):**
+- Flujo de reserva pública completo de punta a punta (elegir barbero → servicio → horario → datos → confirmar), con un teléfono escrito "sucio" (`+56 987654321`) a propósito: la reserva se guardó con `duracion_minutos: 30`, `fecha_hora_fin` calculada correctamente, `precio_cobrado_clp: 8000`, `servicio_nombre_snapshot: "Corte clásico"`, y el teléfono normalizado a `56987654321`.
+- Activar una oferta sin precio de oferta puesto, desde el panel de servicios del dueño: bloqueado con el mensaje puntual en la tarjeta, sin llegar a mandar nada al backend.
+- Secuencia completa de I2: desactivar un barbero (queda 1 activo) → bajar el plan a "Solo" (máx. 1, pasa porque 1 ≤ 1) → intentar reactivar al barbero desactivado (bloqueado, 2 > 1) — los tres pasos se comportaron como se esperaba.
+- Intentar bajar el plan de Don Manuel (2 barberos activos, plan Equipo) directo a "Solo" (máx. 1): bloqueado, el `<select>` y el "Máximo X barberos" mostrado se confirmaron sin cambiar (no quedó en un estado a medias).
+- Sin errores de consola en ningún escenario. `npm run lint` y `npm run build` limpios.
+- El SQL en sí (triggers, exclusion constraints, checks) no se pudo correr contra un Postgres real — mismo motivo de siempre, sigue sin existir un proyecto Supabase conectado.
+
+**Por qué:**
+- `precio_vigente()` como función SQL y no un cálculo replicado en el frontend: la duplicación de "cuánto cuesta esto ahora" en dos lugares (JS y SQL) se desincroniza tarde o temprano — cuando se conecte el backend real, el frontend debería llamar a esta función en vez de reimplementar la lógica de oferta/vencimiento.
+- `src/utils/ofertas.js` compartido entre `FilaServicioAdmin.jsx` y `PanelBarberoServicios.jsx` en vez de duplicar la validación: son las dos únicas pantallas que tocan `oferta_activa`/`precio_oferta`, y la regla es idéntica en ambas.
+- Arreglar el contador "X / máximo" de `PanelBarberos.jsx` aunque no estaba en la lista de la revisión externa: es un bug real que mi propio cambio anterior (B5, "dar de baja") introdujo — no tenía sentido dejarlo pasar solo porque no lo mencionó el arquitecto.
+
+**Archivos afectados:**
+- Nuevo: `src/utils/ofertas.js`.
+- Modificado: `supabase/sql/000_schema.sql` (extenso — ver el detalle de cada punto arriba), `supabase/sql/002_cambiar_estado_barberia.sql` (`fecha_alta`), `src/mocks/datosProvisoriosSuperadmin.js` (paridad de todos los checks nuevos + `fecha_alta` + migración suave + snapshot de reservas), `src/pages/panel/components/FilaServicioAdmin.jsx`, `src/pages/panel/PanelBarberoServicios.jsx`, `src/pages/panel/PanelSuperadminBarberiaDetalle.jsx` (error de plan), `src/pages/panel/PanelBarberos.jsx` (error de activo + contador corregido), `src/pages/barberias/hooks/useCrearReserva.js` (sin cambios de código, pero ahora depende del trigger para los campos nuevos).
+
+**Pendiente / próximos pasos:**
+- I9 (estados 'completada'/'no_asistio') y la tabla `clientes` completa de R2 siguen pendientes, pospuestos a propósito por decisión de Enzo — no son bugs, son features futuras.
+- Los mismos de siempre: probar todo esto contra un Supabase real en cuanto exista uno, resolver el aviso de reserva nueva, y definir hosting para las cabeceras anti-clickjacking.
+
+---
+
+## 2026-08-19 (2) - Tercera revisión de arquitectura: agujero cross-tenant en `servicios`, RPC de login eliminada, rejilla de reservas, `pagos` sin duplicados
+
+**Qué se hizo:**
+Con el prompt actualizado (que ya incluía el esquema completo + la sección de autenticación), la sesión de claude.ai devolvió una tercera revisión. Se verificaron los puntos más importantes contra el código real antes de aplicar nada — esta vez encontré que uno de los "Altos" del arquitecto (punto 2, colisión de rutas) partía de una premisa incorrecta sobre CÓMO enruta esta app, así que se corrigió el diagnóstico en vez de aplicarlo tal cual.
+
+**Alta 1 — `servicios.barbero_id` seguía con FK simple:** el mismo agujero cross-tenant que se cerró en `reservas`/`usuarios` la ronda pasada (B1) se había quedado abierto acá — nada impedía un servicio con `barberia_id = 3` y un `barbero_id` de la barbería 7. Se aplicó la misma FK compuesta contra `barberos(id, barberia_id)`.
+
+**Alta 2 — slug: se aplicó la mitad, no las dos.** Confirmado con el código real (`src/routes/AppRouter.jsx`): las páginas de barbería viven SIEMPRE bajo `/barberias/:slug`, nunca en la raíz — un slug "admin" produce `/barberias/admin`, que no choca con la ruta `/admin` del superadmin (son niveles distintos). La preocupación por colisión de rutas no aplica hoy. Sí se aplicó la parte real: `barberias_slug_formato` (minúsculas, números y guiones, 3 a 60 caracteres) — sin eso, "Mi Barbería / Ñuñoa" era un slug válido y rompía la URL pública. Se agregó también la validación del lado del cliente (`PanelSuperadminBarberias.jsx`) para no dejar que un nombre de una sola letra llegue a mandarse y vuelva con un error crudo de la base.
+
+**Alta 3 — caminos cascade/restrict contradictorios hacia `reservas`:** `reservas.barberia_id` seguía en `cascade` mientras sus FK compuestas (`barbero_id`/`servicio_id`, agregadas la ronda pasada) ya eran `restrict` — una mezcla que deja el resultado de borrar una barbería dependiendo del orden interno en que Postgres resuelve las FK, no de nada controlable. Se uniformó todo a `restrict`, coherente con `historial_estados`/`pagos`.
+
+**Alta 4 — la RPC de login era un enumerador de cuentas, y sobraba:** `obtener_email_por_usuario()` era `security definer`, invocable sin sesión, y respondía distinto (un email real vs. `null`) según si el usuario existía — con nombres generados de forma predecible (`jriquelme`), alguien con acceso directo a la API (sin pasar por el formulario) podía enumerar cuentas reales con un diccionario de apellidos. Se confirmó que `email_tecnico` es 100% determinístico (`emailTecnicoPara()` en la Edge Function es el único código que lo genera, siempre `{usuario}@usuarios.booking.barber.cl}`) — así que la función entera sobraba. Se eliminó `supabase/sql/001_login_por_usuario.sql`, se renombró `002_cambiar_estado_barberia.sql` → `001_cambiar_estado_barberia.sql`, y `src/services/authService.js` ahora construye el email directamente del lado del cliente, dejando que `signInWithPassword` sea el único punto de "esto existe o no" — que Supabase Auth ya responde de forma genérica a propósito.
+
+**Alta 5 — nada exigía que la hora reservada calzara con la rejilla del barbero:** `intervalo_reserva_minutos` solo lo usaba el frontend para pintar los slots; una reserva pública a las 10:07 quedaba fuera de rejilla para siempre. Se agregó la validación al trigger `validar_disponibilidad_reserva`, con el cuidado que señaló el arquitecto: se ancla al INICIO DEL BLOQUE real (horario u excepción), no a la hora UTC en punto — confirmado necesario porque `SelectorIntervaloReserva.jsx` sí ofrece intervalos que no dividen la hora exacta (20, 45, 90 min). Se verificó además que `calcularSlotsDisponibles` (frontend) ya genera los slots exactamente con esa misma ancla, así que la reserva pública que ya se había probado (rondas anteriores) sigue funcionando sin cambios.
+
+**Alta 6 — `pagos` sin coherencia:** `pagos_estado_coherente` (un pago 'pagado' exige `pagado_at`, cualquier otro estado no debería tenerlo) y `pagos_sin_periodo_duplicado` (restricción de exclusión GiST — un solo pago pendiente/pagado por barbería y período, dejando afuera a propósito 'vencido'/'anulado' para permitir un reemplazo).
+
+**Media 7 (ya estaba bien) — `mi_perfil()` envuelta en subselect:** se revisó cada policy de RLS del archivo — las 27 ya usaban `(select ... from public.mi_perfil())`, ninguna la llamaba pelada. `mi_perfil()` ya estaba declarada `stable`. Nada que cambiar, se lo confirmé al arquitecto.
+
+**Media 8 — denormalizar `barberia_id` en horarios/excepciones:** el propio arquitecto lo marcó como no urgente ("si al probar RLS ves lentitud, ahí es donde mirar") — no se implementó, queda anotado para si hace falta después de probar contra un Supabase real.
+
+**Media 9 — vista `servicios_publicos`:** se agregó con `security_invoker = true` (así respeta las policies de RLS de quien consulta, no las del dueño de la vista — el detalle que agregó el arquitecto esta vez). NO se conectó el frontend a la vista todavía (sigue leyendo `servicios` directo) — cambiar esas queries requiere probarlo contra datos reales.
+
+**Media 10 — los índices de I1 no estaban perdidos:** el arquitecto los echó de menos porque el prompt resumido no los transcribió (para no hacerlo excesivamente largo) — se le confirmó que sí existen en el esquema real, completo.
+
+**Decisiones abiertas que ya estaban resueltas (aclarado, no vuelto a decidir):** zona horaria (`America/Santiago`, ya fijada) y baja de plan con exceso de barberos (ya bloqueada, `validar_baja_de_plan`) — el arquitecto las volvió a listar como abiertas porque el prompt no dejaba lo bastante claro que ya estaban resueltas.
+
+**Decisión NO aplicada, con criterio propio:** el arquitecto insistió en el estado `5 = Dado de baja` para "salida definitiva de un cliente". Dado que ninguna barbería se borra físicamente nunca (todo quedó en `restrict`), el estado `2 = Inactivo` ya cumple ese rol — no se ve qué agregaría un quinto estado redundante. Queda como desacuerdo razonado, no implementado.
+
+**Cómo se probó (Playwright, instalado y desinstalado como siempre; dev server reiniciado en limpio):**
+- Validación de largo mínimo de slug: un nombre de una sola letra se rechazó con el mensaje puntual antes de llegar al backend; un nombre normal se creó sin problema.
+- Login demo/demo1234 (modo de prueba) sigue funcionando sin cambios tras la reestructuración de `authService.js`.
+- El cambio de `authService.js`/la eliminación de la RPC **no se pudo probar en este entorno**: `iniciarSesion()` de ese archivo solo se ejecuta con `HAY_BACKEND_REAL = true`, que sigue en `false` — es código que hoy no corre hasta que exista un proyecto Supabase real. Se verificó por lectura de código (no hay ningún otro punto que escriba `email_tecnico` con un patrón distinto) en vez de por ejecución.
+- `npm run lint` y `npm run build` limpios.
+- El resto del SQL (FK compuesta de servicios, restricción de exclusión de pagos, rejilla de reservas) tampoco se pudo correr contra un Postgres real — mismo motivo de siempre.
+
+**Por qué:**
+- Corregir el diagnóstico de Alta 2 en vez de aplicarlo tal cual: agregar una lista de palabras reservadas basada en una premisa de ruteo que no es cierta para esta app habría sido "arreglar" algo que no está roto, y esa lista se habría quedado desactualizada apenas se agregara una ruta nueva sin que nadie se acordara de sincronizarla.
+- Eliminar la RPC de login en vez de solo "aceptar el riesgo": una vez confirmado que `email_tecnico` es 100% determinístico, mantener una función `security definer` invocable sin sesión que no aporta nada (el cliente puede construir el mismo dato solo) es pura superficie de ataque sin beneficio — no hay ninguna razón para conservarla.
+- No agregar el estado `5 = Dado de baja`: con `restrict` en todas las FK que apuntan a `barberias`, el borrado físico ya es imposible siempre — `Inactivo` ya comunica exactamente "esta barbería no opera más en la plataforma" sin necesitar un estado más que distinga lo mismo dos veces.
+
+**Archivos afectados:**
+- Eliminado: `supabase/sql/001_login_por_usuario.sql`.
+- Renombrado: `supabase/sql/002_cambiar_estado_barberia.sql` → `supabase/sql/001_cambiar_estado_barberia.sql`.
+- Modificado: `supabase/sql/000_schema.sql` (FK compuesta en servicios, `barberias_slug_formato`, `reservas.barberia_id` a restrict, rejilla de reservas, checks/exclusión de `pagos`, vista `servicios_publicos`), `supabase/sql/001_cambiar_estado_barberia.sql` (referencia de archivo), `supabase/functions/gestionar-usuario/index.ts` (comentario actualizado), `src/services/authService.js` (email construido del lado del cliente, sin RPC), `src/pages/panel/PanelSuperadminBarberias.jsx` (validación de largo mínimo de slug), `src/mocks/datosProvisoriosSuperadmin.js` / `src/pages/panel/hooks/useBarberiasSuperadmin.js` (referencias de archivo actualizadas).
+
+**Pendiente / próximos pasos:**
+- Los mismos de siempre: probar todo esto (y en particular la eliminación de la RPC de login) contra un Supabase real en cuanto exista uno, resolver el aviso de reserva nueva, definir hosting para las cabeceras anti-clickjacking, y decidir si conectar `servicios_publicos` al frontend cuando llegue el momento.
+- I9, tabla `clientes` completa, y denormalizar `barberia_id` en horarios/excepciones (Media 8) siguen pendientes, todos pospuestos a propósito.
+
+---
+
+## 2026-08-19 (3) - Backend real conectado: se apagó el modo `localStorage`
+
+**Qué se hizo:** Enzo conectó el proyecto Supabase real — esquema aplicado (13 tablas, RLS activo, 32 policies), primer superadmin creado (`esabattini`), Edge Function `gestionar-usuario` desplegada, buckets `logos`/`banners` creados. `HAY_BACKEND_REAL` pasa a `true` desde acá en adelante: **todo el modo de prueba en `localStorage` queda desactivado**, y con eso también termina la posibilidad de probar cambios con Playwright contra `npm run dev` sin arriesgar tocar datos reales — cualquier prueba de acá en adelante pega contra la base real.
+
+**Cambio puntual pedido — `useReservasDelDia.js`:** con RLS activo, un visitante sin sesión ya no podía leer `reservas` directo (bloqueado a propósito, expondría nombre/teléfono de clientes de cualquier barbería) — el paso "Elige día y hora" del asistente de reserva se quedaba sin datos. Se cambió a `supabase.rpc('horas_ocupadas', { p_barbero_id, p_fecha })`, que devuelve `{ inicio, fin }` en vez de filas de `reservas`. Alcance pedido explícitamente: solo ese archivo — quedó pendiente, a propósito sin tocar, que `calcularSlotsDisponibles` (`src/utils/horarios.js`) siga aproximando el fin de cada reserva ocupada con la duración del servicio que se está por reservar en vez de usar el `fin` real que la RPC ya entrega (ahora disponible como `fecha_hora_fin` en cada ocupado, sin consumir todavía).
+
+**Bug reportado + feature pedida — personalización por plan:** Enzo mostró una captura de la consola con errores y preguntó por un problema de personalización ("quiero que desde equipo se pueda personalizar"). Investigado antes de tocar nada:
+- Los errores de consola **no tienen que ver con personalización**: el 400 es un login fallido real (credenciales incorrectas) en la página de Login, y los "message channel closed" son un artefacto conocido de una extensión del navegador (no hay código de extensiones en este repo) — se le aclaró a Enzo que puede ignorar ambos.
+- "Desde equipo" era ambiguo (¿la sección "Equipo" del sitio, el plan "Equipo", o darle personalización a los barberos?) — se le preguntó, y confirmó: quiere que la personalización (galería, imagen+texto, equipo) sea una función del plan **Equipo** hacia arriba, oculta para el plan **Solo**.
+- De paso se confirmó que el bug original que sospechaba (una sección "Equipo" vacía mostrándose en la página pública sin barberos) **ya no existe** — `SeccionEquipo`/`SeccionGaleria`/`SeccionImagenTexto` en `VistaBarberia.jsx` ya devuelven `null` si no tienen datos que mostrar.
+- Implementado: `src/utils/planes.js` (nuevo, `PLAN_SOLO`/`PLAN_EQUIPO`/`PLAN_ESTUDIO` + `puedePersonalizarSecciones(planId)`). `plan_id` se agregó a las consultas que no lo traían (`usePersonalizacionAdmin.js`, `useBarberiaPorSlug.js`, y sus equivalentes en el mock). `PanelPersonalizacion.jsx` reemplaza el editor de secciones por un aviso de upsell si el plan no alcanza (sin borrar secciones ya guardadas — solo quedan ocultas hasta que suba de plan). `VistaBarberia.jsx` vuelve a chequear lo mismo en la página pública (no solo en el panel de edición), para que bajar de plan oculte las secciones de inmediato sin depender de que alguien vuelva a guardar el formulario.
+- La identidad básica (color, tipografía, eslogan, WhatsApp) sigue disponible para cualquier plan — no se restringió, Enzo solo mencionó "esas secciones".
+- Investigado sin encontrar causa concreta: el "bucle" de verificación de sesión que describió Enzo al final de su mensaje. Revisé `AuthContext.jsx` a fondo (el efecto de sesión real depende de `[verComo, sesionProvisoria]`, ninguno de los dos cambia en modo real, así que no debería re-dispararse solo) sin encontrar un ciclo posible por lectura de código — no se "arregló" nada a ciegas; si vuelve a pasar, hace falta que me diga los pasos exactos para reproducirlo.
+
+**Cómo se probó:** `npm run lint` y `npm run build` limpios. **No se probó con Playwright ni contra el dev server** — con el backend real ya conectado, cualquier prueba automatizada correría contra la base de datos de producción, no contra un mock; se evitó a propósito hasta tener un criterio claro de cómo probar sin tocar datos reales.
+
+**Por qué:**
+- Preguntar antes de adivinar "equipo": las tres lecturas posibles (sección del sitio / plan / permiso de barberos) llevaban a features completamente distintas — adivinar mal en una app ya en producción hubiera sido caro de deshacer.
+- Ocultar en dos lugares (panel Y página pública), no solo uno: si el gating viviera solo en el panel de edición, una barbería que baja de plan seguiría mostrando sus secciones viejas en su página pública hasta que alguien entrara a guardar el formulario de nuevo — un vacío de "cobro sin entregar lo que corresponde" nada trivial en un SaaS.
+- No borrar secciones al bajar de plan: perder el trabajo de armar una galería completa solo por una baja de plan (que puede ser temporal, o un error del superadmin) sería un castigo desproporcionado — mejor ocultarlas y que reaparezcan solas al volver a subir.
+
+**Archivos afectados:**
+- Nuevo: `src/utils/planes.js`.
+- Modificado: `src/pages/barberias/hooks/useReservasDelDia.js`, `src/pages/panel/hooks/usePersonalizacionAdmin.js`, `src/pages/barberias/hooks/useBarberiaPorSlug.js`, `src/pages/panel/PanelPersonalizacion.jsx`, `src/pages/barberias/components/VistaBarberia.jsx`, `src/mocks/datosProvisoriosSuperadmin.js` (paridad de `plan_id`).
+
+**Pendiente / próximos pasos:**
+- Definir un criterio seguro para seguir probando cambios ahora que el backend es real (¿un proyecto Supabase de staging separado? ¿datos de prueba dedicados dentro del mismo proyecto?) — sin esto, los próximos cambios se van a poder revisar por lectura de código pero no ejecutar.
+- Ajustar `calcularSlotsDisponibles` para usar el `fin` real de cada reserva ocupada (ya disponible desde `horas_ocupadas`) en vez de aproximarlo con la duración del servicio nuevo — quedó fuera del alcance de este cambio a pedido explícito.
+- Los mismos de siempre: resolver el aviso de reserva nueva, definir hosting para las cabeceras anti-clickjacking.
+
+---
+
+## 2026-08-20 (2) - Fix: 46 campos de formulario sin `id`/`name` (aviso de Chrome DevTools)
+
+**Qué se hizo:** Enzo mandó una captura del panel "Issues" de Chrome DevTools con el aviso "A form field element should have an id or name attribute" (95 nodos afectados — cuenta cada re-render, no archivos distintos). Un script en Node (`find-inputs.js`, ad-hoc, no se guardó en el repo) escaneó todos los `.jsx` buscando `<input>` sin `id` ni `name` literal. Encontró 46 inputs reales sin ninguno de los dos en 14 archivos, todos del panel de administración (dueño/superadmin) más un componente compartido (`SelectorArchivo.jsx`, el input de archivo oculto detrás del botón de subir logo/banner/fotos).
+
+**Fix:**
+- `SelectorArchivo.jsx`: se le agregó un `id` generado con `useId()` de React (no un string fijo) porque este componente se instancia varias veces en la misma página (logo, banner, cada foto de galería en Personalización) — un id fijo hubiera creado ids duplicados en el DOM.
+- En los otros 13 archivos (`CambiarPassword`, `ExcepcionesHorario`, `FilaHorario`, `FilaPlan`, `FilaServicioAdmin`, `PanelBarberoHorarios`, `PanelBarberos`, `PanelBarberoServicios`, `PanelHorarios`, `PanelPersonalizacion`, `PanelServicios`, `PanelSuperadminBarberiaDetalle`, `PanelSuperadminBarberias`, `PanelSuperadminPlanes`): se agregó `name="..."` (no `id`) a cada input controlado, porque varios se renderizan dentro de `.map()` (filas de horario, servicios, planes) y `name` no necesita ser único en el documento como sí lo necesita `id`.
+- **No se tocaron** `PasoDatos.jsx` (paso de datos del cliente en el asistente de reserva) ni `FormularioAcceso.jsx` (login): ambos usan `{...register('campo')}` de react-hook-form, que ya agrega `name` al `<input>` real en el DOM aunque no aparezca como texto literal en el JSX — el script los marcó como falso positivo por buscar la palabra `name=` en el código fuente, no lo que termina renderizado.
+
+**Aclarado de paso (no requirió cambio de código):** las otras dos advertencias de la misma captura —los ~29 requests a `gc.kes.v2.scr.kaspersky-labs.com` fallando la Attribution Reporting API, y el "Response was blocked by CORB" asociado— son 100% del agente Kaspersky Endpoint Security instalado en la PC de Enzo (intercepta tráfico HTTPS a nivel de sistema operativo), no del código de la app ni de Chrome. Se confirmó por `grep` que no hay ninguna referencia a Kaspersky/Attribution Reporting en el repo. Es ruido exclusivo del entorno de desarrollo de Enzo — no se reproduce igual para clientes reales, y aunque se reprodujera, falla en silencio sin romper nada visible para el usuario.
+
+**Cómo se probó:** el script de detección se corrió de nuevo después del fix y confirmó cero inputs sin `id`/`name` fuera de los 4 ya cubiertos por react-hook-form. `npm run lint` y `npm run build` limpios. No se probó con Playwright/dev server (backend real conectado, ver entradas anteriores).
+
+**Archivos afectados:**
+- Modificado: `src/components/common/SelectorArchivo.jsx`, `src/components/panel/CambiarPassword.jsx`, `src/pages/panel/components/ExcepcionesHorario.jsx`, `src/pages/panel/components/FilaHorario.jsx`, `src/pages/panel/components/FilaPlan.jsx`, `src/pages/panel/components/FilaServicioAdmin.jsx`, `src/pages/panel/PanelBarberoHorarios.jsx`, `src/pages/panel/PanelBarberos.jsx`, `src/pages/panel/PanelBarberoServicios.jsx`, `src/pages/panel/PanelHorarios.jsx`, `src/pages/panel/PanelPersonalizacion.jsx`, `src/pages/panel/PanelServicios.jsx`, `src/pages/panel/PanelSuperadminBarberiaDetalle.jsx`, `src/pages/panel/PanelSuperadminBarberias.jsx`, `src/pages/panel/PanelSuperadminPlanes.jsx`.
+
+**Pendiente / próximos pasos:**
+- Los mismos de siempre: definir criterio de testing seguro contra backend real, ajustar `calcularSlotsDisponibles`, aviso de reserva nueva, hosting + cabeceras anti-clickjacking.
+
+---
+
+## 2026-08-20 (3) - Encontrada la causa real del parpadeo "Verificando sesión" — solo pasaba en Personalización
+
+**Qué se hizo:** El fix del punto anterior sobre `AuthContext.jsx` (filtrar `TOKEN_REFRESHED`/`INITIAL_SESSION`) no resolvió el problema — Enzo confirmó que el parpadeo seguía, la URL nunca se movía de `/panel/personalizacion` (no era un redirect a `/login`), y que era el único flujo de toda la app donde pasaba. Se descartó paso a paso, con capturas de Enzo, que faltara alguna columna en `barberias` o `personalizacion` (ambas tablas tienen exactamente lo que las consultas piden) y que hubiera algún error real en la consola (solo aparecía el ruido ya conocido de una extensión del navegador).
+
+La pista real fue que "es el único flujo que falla": Personalización es la única pantalla con una vista previa en vivo dentro de un `<iframe>` (`PreviewBarberia.jsx`, montado por `PanelPersonalizacion.jsx`). Ese iframe carga la ruta `/_preview-barberia` de esta misma SPA — y como está declarada dentro del mismo `<AppRouter />`, que a su vez vive envuelto en `<AuthProvider>` en `main.jsx`, cargar ese iframe **vuelve a montar una segunda instancia completa de la app dentro de su propio documento, incluida una segunda sesión real de Supabase Auth**. Como el iframe es del mismo origen que la pestaña real, comparte el mismo `localStorage` — resultado: dos clientes de Supabase Auth (`GoTrueClient`) corriendo en paralelo, compitiendo por refrescar el mismo token, cada uno disparando eventos de sesión que el otro también recibe (Supabase sincroniza sesión entre contextos del mismo origen vía `storage`). Eso generaba los eventos de auth espurios en la pestaña real que hacían flashear el `cargando` de `AuthContext` — solo en esta pantalla, porque es la única con ese iframe montado.
+
+**Fix:** en `AuthContext.jsx`, si `window.location.pathname === '/_preview-barberia'`, el efecto de sesión real corta camino y hace `setCargando(false)` sin llamar a `supabase.auth.getSession()` ni suscribirse a `onAuthStateChange` — se confirmó por grep que ni `PreviewBarberia.jsx` ni `VistaBarberia.jsx` (ni ningún componente de `src/pages/barberias/`) usan `useAuth()`, así que esa ruta no necesita sesión real en absoluto.
+
+**Por qué:** el iframe de vista previa solo necesita mostrar lo que le llega por `postMessage` — nunca necesitó autenticarse. Inicializar ahí una sesión de Supabase real era pura casualidad de cómo está armado el router (todo bajo un mismo `<AuthProvider>` global), no una necesidad real de esa pantalla.
+
+**Cómo se probó:** `npm run lint` y `npm run build` limpios. No se probó en vivo contra el dev server (backend real conectado) — el fix quedó pendiente de que Enzo confirme en su navegador que el parpadeo ya no aparece.
+
+**Archivos afectados:**
+- Modificado: `src/context/AuthContext.jsx`.
+
+**Pendiente / próximos pasos:**
+- Confirmar con Enzo que el parpadeo en Personalización ya no ocurre.
+- Los mismos de siempre: definir criterio de testing seguro contra backend real, ajustar `calcularSlotsDisponibles`, aviso de reserva nueva, hosting + cabeceras anti-clickjacking.
+
+---
+
+## 2026-08-20 (4) - El aviso de campos sin `id`/`name` seguía: faltaban `<select>`/`<textarea>`
+
+**Qué se hizo:** Enzo mandó otra captura del panel "Issues" mostrando que el conteo de "A form field element should have an id or name attribute" seguía alto (82) después del fix de la entrada (2) de hoy. El script de detección de esa entrada solo buscaba `<input>` — nunca revisó `<select>` ni `<textarea>`, que están cubiertos por la misma regla de accesibilidad. Se corrigió el script para incluir las tres etiquetas y se re-escaneó todo `src/**/*.jsx`.
+
+**Encontrados y corregidos (13 campos reales, todos con `name="..."`):** `PanelShell.jsx` (select "Ver como"), `SelectorIntervaloReserva.jsx`, `FilaHorario.jsx` (select día), `PanelBarberoHorarios.jsx` (select día), `PanelHorarios.jsx` (select día), `PanelPersonalizacion.jsx` (select tipografía, textarea descripción, textarea de texto de sección imagen+texto — estos tres explican por qué el conteo en la captura de Enzo seguía alto justo en esta pantalla), `PanelSuperadminBarberiaDetalle.jsx` (select plan, select cambiar estado, textarea motivo), `PanelSuperadminBarberias.jsx` (select plan).
+
+**Cómo se probó:** re-escaneo tras el fix confirma cero `<input>`/`<select>`/`<textarea>` sin `id`/`name` fuera de los 4 ya cubiertos por react-hook-form. `npm run lint` y `npm run build` limpios.
+
+**Archivos afectados:**
+- Modificado: `src/components/panel/PanelShell.jsx`, `src/pages/panel/components/SelectorIntervaloReserva.jsx`, `src/pages/panel/components/FilaHorario.jsx`, `src/pages/panel/PanelBarberoHorarios.jsx`, `src/pages/panel/PanelHorarios.jsx`, `src/pages/panel/PanelPersonalizacion.jsx`, `src/pages/panel/PanelSuperadminBarberiaDetalle.jsx`, `src/pages/panel/PanelSuperadminBarberias.jsx`.
+
+**Pendiente / próximos pasos:**
+- Confirmar con Enzo que el parpadeo en Personalización ya no ocurre (fix de la entrada anterior) y que el conteo de "form field" en Issues ya baja a los 4 esperados (react-hook-form).
+- Los mismos de siempre: definir criterio de testing seguro contra backend real, ajustar `calcularSlotsDisponibles`, aviso de reserva nueva, hosting + cabeceras anti-clickjacking.
+
+---
+
+## 2026-08-20 - Fix: parpadeo de "Verificando sesión" al cambiar de pestaña
+
+**Qué se hizo:** Enzo dio la reproducción exacta del "bucle" que había quedado sin diagnosticar: entrar a Personalización y cambiar de pestaña del navegador repetidamente hace que la pantalla completa parpadee mostrando "Verificando sesión" una y otra vez. Encontrada la causa en `AuthContext.jsx`: el listener `supabase.auth.onAuthStateChange` hacía `setCargando(true)` sin filtrar el tipo de evento. Supabase-js revalida el token automáticamente cada vez que la pestaña recupera el foco/visibilidad, y eso dispara el evento igual (`TOKEN_REFRESHED`, a veces `INITIAL_SESSION`) aunque sea exactamente el mismo usuario logueado — cada vez que eso pasaba, `RutaProtegida.jsx` reemplazaba toda la página protegida por el loader de pantalla completa hasta que `cargarPerfil` volvía a resolver.
+
+**Fix:** en `AuthContext.jsx`, el callback de `onAuthStateChange` ahora mira el tipo de evento — si es `TOKEN_REFRESHED` o `INITIAL_SESSION` solo actualiza `sesion` (que ningún otro componente lee directamente, solo se usa internamente para `autenticado`) sin tocar `cargando` ni volver a pedir el perfil. Solo un cambio real de sesión (login/logout genuino) dispara `setCargando(true)` + `cargarPerfil`.
+
+**Por qué:** el perfil/rol de un usuario no cambia porque Supabase renueve su token en segundo plano — no había ninguna razón para re-verificar ni para tirar abajo la UI completa en ese caso. `sesion` se confirmó (por grep) que no se consume en ningún otro archivo más que dentro del propio `AuthContext.jsx`, así que seguir actualizándolo en el refresh es inofensivo y no rompe nada que dependa de un token vigente.
+
+**También se aclaró:** la captura del panel "Issues" de Chrome DevTools que mandó Enzo (avisos de "Attribution Reporting" y "form field sin id/name") no tiene relación con la app — son advertencias genéricas del navegador sobre APIs de tracking/accesibilidad, no errores de este código.
+
+**Cómo se probó:** `npm run lint` y `npm run build` limpios. No se probó con Playwright/dev server (backend real conectado, ver entrada anterior) — verificación por lectura de código + build limpio únicamente.
+
+**Archivos afectados:**
+- Modificado: `src/context/AuthContext.jsx`.
+
+**Pendiente / próximos pasos:**
+- Definir un criterio seguro para seguir probando cambios ahora que el backend es real (staging separado o datos de prueba dedicados) — sigue sin resolverse.
+- Ajustar `calcularSlotsDisponibles` para usar el `fin` real de `horas_ocupadas` (pendiente de la entrada anterior).
+- Los mismos de siempre: resolver el aviso de reserva nueva, definir hosting para las cabeceras anti-clickjacking.

@@ -20,7 +20,7 @@ import { PanelSuperadminLayout } from '../pages/panel/PanelSuperadminLayout'
 import { PanelSuperadminBarberias } from '../pages/panel/PanelSuperadminBarberias'
 import { PanelSuperadminBarberiaDetalle } from '../pages/panel/PanelSuperadminBarberiaDetalle'
 import { PanelSuperadminPlanes } from '../pages/panel/PanelSuperadminPlanes'
-import { ROL_BARBERO, ROL_ADMIN } from '../utils/roles'
+import { ROL_BARBERO, ROL_ADMIN, ROL_SUPERADMIN } from '../utils/roles'
 
 const router = createBrowserRouter([
   { path: '/', element: <Home /> },
@@ -74,20 +74,25 @@ const router = createBrowserRouter([
       },
     ],
   },
-  // TEMPORAL: se saca el <RutaProtegida> de /admin para trabajar en el panel
-  // superadmin sin pasar por el login (todavía no hay Supabase real conectado
-  // — ver .env). Revertir envolviendo de nuevo en
-  // <RutaProtegida rolesPermitidos={[ROL_SUPERADMIN]}> (importar ROL_SUPERADMIN
-  // desde '../utils/roles') apenas se retome el login o se conecte el backend real.
   {
-    path: '/admin',
-    element: <PanelSuperadminLayout />,
+    element: <RutaProtegida rolesPermitidos={[ROL_SUPERADMIN]} />,
     children: [
-      { index: true, element: <PanelSuperadminBarberias /> },
-      { path: 'barberias/:id', element: <PanelSuperadminBarberiaDetalle /> },
-      { path: 'planes', element: <PanelSuperadminPlanes /> },
+      {
+        path: '/admin',
+        element: <PanelSuperadminLayout />,
+        children: [
+          { index: true, element: <PanelSuperadminBarberias /> },
+          { path: 'barberias/:id', element: <PanelSuperadminBarberiaDetalle /> },
+          { path: 'planes', element: <PanelSuperadminPlanes /> },
+        ],
+      },
     ],
   },
+  // Cualquier URL que no matchee nada de arriba (mal escrita, adivinada,
+  // apuntando a algo que ya no existe) vuelve al inicio en vez de quedar en
+  // blanco — no es una medida de seguridad en sí, pero evita que alguien
+  // "explorando" URLs a mano tenga alguna señal de que encontró algo.
+  { path: '*', element: <Navigate to="/" replace /> },
 ])
 
 export function AppRouter() {

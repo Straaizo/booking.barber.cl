@@ -62,6 +62,7 @@ export function FilaHorario({ horario, onGuardar }) {
         <label className="flex min-w-0 flex-1 flex-col gap-1">
           <span className="versalitas text-xs text-gris-calido-500">Día</span>
           <select
+            name="dia_semana"
             value={horario.dia_semana}
             onChange={(e) => commitDia(e.target.value)}
             className="min-h-11 max-w-xs border-b border-gris-calido-200 bg-transparent py-1 text-base font-medium text-negro-barbero outline-none transition-colors focus:border-cobre"
@@ -115,6 +116,7 @@ export function FilaHorario({ horario, onGuardar }) {
           <span className="versalitas flex min-h-7 items-center text-xs text-gris-calido-500">Desde</span>
           <input
             type="time"
+            name="hora_inicio"
             value={campos.hora_inicio}
             onChange={(e) => setCampos((c) => ({ ...c, hora_inicio: e.target.value }))}
             onBlur={() => commitHora('hora_inicio', campos.hora_inicio)}
@@ -126,6 +128,7 @@ export function FilaHorario({ horario, onGuardar }) {
           <span className="versalitas flex min-h-7 items-center text-xs text-gris-calido-500">Hasta</span>
           <input
             type="time"
+            name="hora_fin"
             value={campos.hora_fin}
             onChange={(e) => setCampos((c) => ({ ...c, hora_fin: e.target.value }))}
             onBlur={() => commitHora('hora_fin', campos.hora_fin)}

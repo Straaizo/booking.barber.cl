@@ -17,6 +17,12 @@ export function PreviewBarberia() {
 
   useEffect(() => {
     function alMensaje(evento) {
+      // Sin este chequeo, cualquier página del mundo podría incrustar esta
+      // ruta en un <iframe> propio y mandarle datos falsos — no hay ninguna
+      // escritura real de por medio (solo se muestra lo que llega), pero
+      // tampoco hay razón para aceptar mensajes de otro origen que no sea
+      // esta misma app.
+      if (evento.origin !== window.location.origin) return
       if (evento.data?.tipo === 'preview-barberia') setBarberia(evento.data.barberia)
     }
     window.addEventListener('message', alMensaje)

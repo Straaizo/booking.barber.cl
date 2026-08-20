@@ -110,6 +110,7 @@ export function ExcepcionesHorario({ barberoId }) {
             <span className="versalitas text-xs text-gris-calido-500">Fecha</span>
             <input
               type="date"
+              name="excepcion_fecha"
               min={hoyISO()}
               value={nueva.fecha}
               onChange={(e) => setNueva((n) => ({ ...n, fecha: e.target.value }))}
@@ -135,6 +136,7 @@ export function ExcepcionesHorario({ barberoId }) {
                 <span className="versalitas text-xs text-gris-calido-500">Desde</span>
                 <input
                   type="time"
+                  name="excepcion_hora_inicio"
                   value={nueva.hora_inicio}
                   onChange={(e) => setNueva((n) => ({ ...n, hora_inicio: e.target.value }))}
                   className="numeros-tabulares min-h-11 w-28 border-b border-gris-calido-200 bg-transparent py-1 text-negro-barbero outline-none transition-colors focus:border-cobre"
@@ -144,6 +146,7 @@ export function ExcepcionesHorario({ barberoId }) {
                 <span className="versalitas text-xs text-gris-calido-500">Hasta</span>
                 <input
                   type="time"
+                  name="excepcion_hora_fin"
                   value={nueva.hora_fin}
                   onChange={(e) => setNueva((n) => ({ ...n, hora_fin: e.target.value }))}
                   className="numeros-tabulares min-h-11 w-28 border-b border-gris-calido-200 bg-transparent py-1 text-negro-barbero outline-none transition-colors focus:border-cobre"

@@ -6,10 +6,12 @@ import { Button } from '../../components/common/Button'
 import { HoverLink } from '../../components/common/HoverLink'
 import { ToastGuardado } from '../../components/common/ToastGuardado'
 import { SelectorArchivo } from '../../components/common/SelectorArchivo'
+import { Interruptor } from '../../components/panel/Interruptor'
 import { usePersonalizacionAdmin, useGuardarPersonalizacion } from './hooks/usePersonalizacionAdmin'
 import { archivoAImagenComprimida } from '../../utils/imagenes'
 import { FUENTES_DISPONIBLES, asegurarFuenteCargada } from '../../utils/fuentes'
 import { ordenarEquipo } from '../../utils/personalizacion'
+import { puedePersonalizarSecciones } from '../../utils/planes'
 
 // La vista previa usa exactamente el mismo componente que la página pública
 // real (`VistaBarberia`, renderizado dentro de un <iframe> — ver
@@ -159,6 +161,11 @@ export function PanelPersonalizacion() {
   // en la página pública (recién se publica al guardar).
   const hayCambiosSinGuardar = form && formGuardado !== null && JSON.stringify(form) !== formGuardado
   const equipoOrdenado = form && barberia ? ordenarEquipo(barberia.barberos, form.orden_equipo) : []
+  // Galería, imagen+texto y equipo son una función paga desde el plan Equipo
+  // — con plan Solo, esta pantalla no deja agregar ni editar secciones (las
+  // que ya existiera de antes de bajar de plan quedan guardadas, solo
+  // ocultas de la edición y de la página pública hasta que vuelva a subir).
+  const puedeSecciones = barberia ? puedePersonalizarSecciones(barberia.plan_id) : false
 
   async function subirLogo(evento) {
     const archivo = evento.target.files?.[0]
@@ -410,6 +417,7 @@ export function PanelPersonalizacion() {
                 <div className="flex items-center gap-2">
                   <input
                     type="color"
+                    name="color_primario"
                     value={form.color_primario || '#a85c32'}
                     onChange={(e) => setForm((f) => ({ ...f, color_primario: e.target.value }))}
                     className="h-11 w-14 cursor-pointer border border-gris-calido-200 bg-transparent"
@@ -418,6 +426,7 @@ export function PanelPersonalizacion() {
                     <button
                       type="button"
                       onClick={() => setForm((f) => ({ ...f, color_primario: '' }))}
+                      aria-label="Quitar color de marca"
                       className="text-xs text-gris-calido-500 hover:text-red-700"
                     >
                       ✕
@@ -431,6 +440,7 @@ export function PanelPersonalizacion() {
                 <div className="flex items-center gap-2">
                   <input
                     type="color"
+                    name="color_header"
                     value={form.color_header || '#1c1b19'}
                     onChange={(e) => setForm((f) => ({ ...f, color_header: e.target.value }))}
                     className="h-11 w-14 cursor-pointer border border-gris-calido-200 bg-transparent"
@@ -439,6 +449,7 @@ export function PanelPersonalizacion() {
                     <button
                       type="button"
                       onClick={() => setForm((f) => ({ ...f, color_header: '' }))}
+                      aria-label="Quitar color del header"
                       className="text-xs text-gris-calido-500 hover:text-red-700"
                     >
                       ✕
@@ -452,6 +463,7 @@ export function PanelPersonalizacion() {
             <label className="flex flex-col gap-2">
               <span className="versalitas text-xs text-gris-calido-500">Tipografía de títulos</span>
               <select
+                name="fuente_display"
                 value={form.fuente_display}
                 onChange={(e) => {
                   const clave = e.target.value
@@ -476,6 +488,7 @@ export function PanelPersonalizacion() {
               <span className="versalitas text-xs text-gris-calido-500">Eslogan</span>
               <input
                 type="text"
+                name="eslogan"
                 value={form.eslogan}
                 onChange={(e) => setForm((f) => ({ ...f, eslogan: e.target.value }))}
                 placeholder="Corte de barrio, oficio de siempre"
@@ -486,6 +499,7 @@ export function PanelPersonalizacion() {
             <label className="flex flex-col gap-2">
               <span className="versalitas text-xs text-gris-calido-500">Descripción</span>
               <textarea
+                name="descripcion"
                 value={form.descripcion}
                 onChange={(e) => setForm((f) => ({ ...f, descripcion: e.target.value }))}
                 rows={3}
@@ -498,6 +512,7 @@ export function PanelPersonalizacion() {
               <span className="versalitas text-xs text-gris-calido-500">Dirección</span>
               <input
                 type="text"
+                name="direccion"
                 value={form.direccion}
                 onChange={(e) => setForm((f) => ({ ...f, direccion: e.target.value }))}
                 placeholder="Av. Irarrázaval 2140, Ñuñoa"
@@ -509,6 +524,7 @@ export function PanelPersonalizacion() {
               <span className="versalitas text-xs text-gris-calido-500">Teléfono de WhatsApp</span>
               <input
                 type="tel"
+                name="telefono_whatsapp"
                 value={form.telefono_whatsapp}
                 onChange={(e) => setForm((f) => ({ ...f, telefono_whatsapp: e.target.value }))}
                 placeholder="+56 9 1111 2222"
@@ -556,6 +572,7 @@ export function PanelPersonalizacion() {
                   <div className="flex items-center gap-2">
                     <input
                       type="color"
+                      name="whatsapp_color"
                       value={form.whatsapp_color || '#a85c32'}
                       onChange={(e) => setForm((f) => ({ ...f, whatsapp_color: e.target.value }))}
                       className="h-11 w-14 cursor-pointer border border-gris-calido-200 bg-transparent"
@@ -564,6 +581,7 @@ export function PanelPersonalizacion() {
                       <button
                         type="button"
                         onClick={() => setForm((f) => ({ ...f, whatsapp_color: '' }))}
+                        aria-label="Quitar color de la burbuja de WhatsApp"
                         className="text-xs text-gris-calido-500 hover:text-red-700"
                       >
                         ✕
@@ -604,14 +622,28 @@ export function PanelPersonalizacion() {
 
           <section className="flex flex-col gap-4">
             <TituloGrupo numero="03">Secciones de la página</TituloGrupo>
-            <p className="-mt-2 text-xs text-gris-calido-500">
-              Click en una sección para abrirla y editarla — el orden de la lista es el orden real en
-              tu página, entre el encabezado y el formulario de reserva. Incluye galerías, bloques de
-              imagen y texto, y tu equipo de barberos — todo se puede reordenar entre sí, por ejemplo
-              para mostrar el equipo antes o después de las fotos del trabajo.
-            </p>
 
-            {form.secciones.map((seccion, indice) => {
+            {!puedeSecciones ? (
+              <div className="rounded-lg border border-dashed border-cobre/40 bg-cobre/5 p-5">
+                <p className="text-sm text-gris-calido-700">
+                  Las secciones extra (galería de fotos, imagen y texto, y tu equipo de barberos) están
+                  disponibles desde el plan <strong>Equipo</strong>. Si ya tenías secciones armadas de
+                  antes, siguen guardadas — vuelven a aparecer apenas subas de plan.
+                </p>
+                <p className="mt-2 text-xs text-gris-calido-500">
+                  Habla con el administrador de la plataforma para mejorar tu plan.
+                </p>
+              </div>
+            ) : (
+              <>
+                <p className="-mt-2 text-xs text-gris-calido-500">
+                  Click en una sección para abrirla y editarla — el orden de la lista es el orden real en
+                  tu página, entre el encabezado y el formulario de reserva. Incluye galerías, bloques de
+                  imagen y texto, y tu equipo de barberos — todo se puede reordenar entre sí, por ejemplo
+                  para mostrar el equipo antes o después de las fotos del trabajo.
+                </p>
+
+                {form.secciones.map((seccion, indice) => {
               const abierta = seccionAbiertaId === seccion.id
               return (
                 <div
@@ -633,13 +665,20 @@ export function PanelPersonalizacion() {
                       </span>
                     </button>
                     <div className="flex shrink-0 gap-2 text-xs text-gris-calido-500">
-                      <button type="button" onClick={() => moverSeccion(indice, -1)} disabled={indice === 0} className="disabled:opacity-30">
+                      <button
+                        type="button"
+                        onClick={() => moverSeccion(indice, -1)}
+                        disabled={indice === 0}
+                        aria-label="Subir esta sección"
+                        className="disabled:opacity-30"
+                      >
                         ↑
                       </button>
                       <button
                         type="button"
                         onClick={() => moverSeccion(indice, 1)}
                         disabled={indice === form.secciones.length - 1}
+                        aria-label="Bajar esta sección"
                         className="disabled:opacity-30"
                       >
                         ↓
@@ -656,6 +695,7 @@ export function PanelPersonalizacion() {
                         <div className="flex flex-col gap-4">
                           <input
                             type="text"
+                            name="seccion_titulo"
                             value={seccion.titulo}
                             onChange={(e) => actualizarSeccion(seccion.id, { titulo: e.target.value })}
                             placeholder="Título de la sección — ej: Nuestro trabajo"
@@ -668,29 +708,37 @@ export function PanelPersonalizacion() {
                                 <img src={foto.url} alt={`Foto ${i + 1}`} className="h-24 w-full rounded object-cover" />
                                 <input
                                   type="text"
+                                  name="foto_leyenda"
                                   value={foto.leyenda}
                                   onChange={(e) => actualizarFotoEnGaleria(seccion.id, i, { leyenda: e.target.value })}
                                   placeholder="Leyenda"
                                   className="min-h-8 border-b border-gris-calido-200 bg-transparent py-1 text-xs text-negro-barbero outline-none transition-colors focus:border-cobre"
                                 />
-                                <label className="flex items-center gap-1.5 text-xs text-gris-calido-500">
-                                  <input
-                                    type="checkbox"
-                                    checked={foto.tamano === 'grande'}
-                                    onChange={(e) =>
-                                      actualizarFotoEnGaleria(seccion.id, i, { tamano: e.target.checked ? 'grande' : 'normal' })
+                                <div className="flex items-center gap-2 text-xs text-gris-calido-500">
+                                  <Interruptor
+                                    activo={foto.tamano === 'grande'}
+                                    etiqueta={`Destacar foto ${i + 1}`}
+                                    onCambiar={(valor) =>
+                                      actualizarFotoEnGaleria(seccion.id, i, { tamano: valor ? 'grande' : 'normal' })
                                     }
                                   />
                                   Destacar
-                                </label>
+                                </div>
                                 <div className="flex items-center justify-between text-xs text-gris-calido-500">
-                                  <button type="button" onClick={() => moverImagenEnGaleria(seccion.id, i, -1)} disabled={i === 0} className="disabled:opacity-30">
+                                  <button
+                                    type="button"
+                                    onClick={() => moverImagenEnGaleria(seccion.id, i, -1)}
+                                    disabled={i === 0}
+                                    aria-label={`Mover foto ${i + 1} antes`}
+                                    className="disabled:opacity-30"
+                                  >
                                     ↑
                                   </button>
                                   <button
                                     type="button"
                                     onClick={() => moverImagenEnGaleria(seccion.id, i, 1)}
                                     disabled={i === seccion.imagenes.length - 1}
+                                    aria-label={`Mover foto ${i + 1} después`}
                                     className="disabled:opacity-30"
                                   >
                                     ↓
@@ -729,12 +777,14 @@ export function PanelPersonalizacion() {
                           </div>
                           <input
                             type="text"
+                            name="seccion_titulo"
                             value={seccion.titulo}
                             onChange={(e) => actualizarSeccion(seccion.id, { titulo: e.target.value })}
                             placeholder="Título — ej: Nuestro espacio"
                             className="min-h-11 border-b border-gris-calido-200 bg-transparent py-2 text-sm text-negro-barbero outline-none transition-colors focus:border-cobre"
                           />
                           <textarea
+                            name="seccion_texto"
                             value={seccion.texto}
                             onChange={(e) => actualizarSeccion(seccion.id, { texto: e.target.value })}
                             rows={2}
@@ -748,6 +798,7 @@ export function PanelPersonalizacion() {
                         <div className="flex flex-col gap-4">
                           <input
                             type="text"
+                            name="seccion_titulo"
                             value={seccion.titulo}
                             onChange={(e) => actualizarSeccion(seccion.id, { titulo: e.target.value })}
                             placeholder="Título de la sección — ej: Nuestro equipo"
@@ -781,6 +832,7 @@ export function PanelPersonalizacion() {
                                       type="button"
                                       onClick={() => moverBarberoEnEquipo(i, -1)}
                                       disabled={i === 0}
+                                      aria-label={`Mover a ${barbero.nombre} antes en el equipo`}
                                       className="disabled:opacity-30"
                                     >
                                       ↑
@@ -789,6 +841,7 @@ export function PanelPersonalizacion() {
                                       type="button"
                                       onClick={() => moverBarberoEnEquipo(i, 1)}
                                       disabled={i === equipoOrdenado.length - 1}
+                                      aria-label={`Mover a ${barbero.nombre} después en el equipo`}
                                       className="disabled:opacity-30"
                                     >
                                       ↓
@@ -834,6 +887,8 @@ export function PanelPersonalizacion() {
                 </button>
               )}
             </div>
+              </>
+            )}
           </section>
 
           {/* El botón queda al final del formulario a propósito — se edita,

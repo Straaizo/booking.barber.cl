@@ -72,6 +72,7 @@ export function Cursor() {
   // `pointermove` real dentro del iframe ya lo revela solo.
   useEffect(() => {
     function alAvisoDeVisibilidad(evento) {
+      if (evento.origin !== window.location.origin) return
       if (evento.data?.tipo === 'cursor-propio-fuera-de-vista') setVisible(false)
     }
     window.addEventListener('message', alAvisoDeVisibilidad)

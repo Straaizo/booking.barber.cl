@@ -175,8 +175,12 @@ export function LiveDemo() {
   }, [enVista, prefiereReducido])
 
   return (
-    <section ref={contenedorRef} className="bg-gris-calido-100 px-6 py-20 md:px-10 md:py-28">
-      <SectionRule indice="— 02" texto="Así se ve, de verdad" tono="oscuro" />
+    <section
+      id="como-funciona"
+      ref={contenedorRef}
+      className="bg-gris-calido-100 px-6 py-20 md:px-10 md:py-28"
+    >
+      <SectionRule indice="— 01" texto="Así se ve, de verdad" tono="oscuro" />
 
       <div className="mt-14 grid grid-cols-1 items-center gap-12 md:grid-cols-2 md:gap-16">
         <div className="order-2 md:order-1">

@@ -49,6 +49,7 @@ export function PanelShell({ titulo, nav, children }) {
             <label className="hidden items-center gap-2 md:flex">
               <span className="versalitas text-xs text-gris-calido-400">Ver como</span>
               <select
+                name="ver_como"
                 value={verComo}
                 onChange={alCambiarVerComo}
                 className="min-h-9 rounded-md border border-gris-calido-700 bg-negro-barbero px-2 py-1 text-xs text-hueso outline-none"

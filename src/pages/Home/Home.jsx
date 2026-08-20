@@ -1,14 +1,9 @@
 import { Header } from '../../components/layout/Header'
 import { Footer } from '../../components/layout/Footer'
 import { Hero } from './components/Hero'
-import { HowItWorks } from './components/HowItWorks'
 import { LiveDemo } from './components/LiveDemo'
 import { Benefits } from './components/Benefits'
-import { Marquee } from './components/Marquee'
-import { CalculadoraCitasPerdidas } from './components/CalculadoraCitasPerdidas'
-import { PanelPreview } from './components/PanelPreview'
-import { BarberPanelPreview } from './components/BarberPanelPreview'
-import { CustomizationDemo } from './components/CustomizationDemo'
+import { TeamPanels } from './components/TeamPanels'
 import { NotebookVsApp } from './components/NotebookVsApp'
 import { Pricing } from './components/Pricing'
 import { FounderSpots } from './components/FounderSpots'
@@ -26,14 +21,9 @@ export function Home() {
         <Header />
         <Hero />
       </div>
-      <HowItWorks />
       <LiveDemo />
       <Benefits />
-      <Marquee />
-      <CalculadoraCitasPerdidas />
-      <PanelPreview />
-      <BarberPanelPreview />
-      <CustomizationDemo />
+      <TeamPanels />
       <NotebookVsApp />
       <Pricing />
       <FounderSpots />

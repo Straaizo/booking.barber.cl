@@ -4,10 +4,25 @@ import { HoverLink } from '../../components/common/HoverLink'
 import { Button } from '../../components/common/Button'
 import { useBarberiasSuperadmin, useCrearBarberia, slugDisponible } from './hooks/useBarberiasSuperadmin'
 import { usePlanesSuperadmin } from './hooks/usePlanesSuperadmin'
-import { NOMBRE_ESTADO, TONO_ESTADO } from '../../utils/estados'
+import { NOMBRE_ESTADO, TONO_ESTADO, ESTADO_ACTIVO } from '../../utils/estados'
+import { proximoPago, diasHastaProximoPago } from '../../utils/facturacion'
 import { generarSlug } from '../../utils/slug'
 
 const BARBERIA_VACIA = { nombre: '', slug: '', plan_id: '' }
+
+// Con cuántos días de anticipación avisar — bastante margen para escribirle
+// al dueño antes de que la barbería quede suspendida por falta de pago.
+const VENTANA_AVISO_DIAS = 7
+
+function textoDiasHasta(dias) {
+  if (dias === 0) return 'hoy'
+  if (dias === 1) return 'mañana'
+  return `en ${dias} días`
+}
+
+function formatoFechaCorta(fecha) {
+  return fecha.toLocaleDateString('es-CL', { day: 'numeric', month: 'short' })
+}
 
 export function PanelSuperadminBarberias() {
   const { data: barberias, isLoading, isError } = useBarberiasSuperadmin()
@@ -44,6 +59,13 @@ export function PanelSuperadminBarberias() {
       setErrorEnvio('Completa nombre, slug y plan.')
       return
     }
+    // Mismo mínimo que exige la base (`barberias_slug_formato`, 000_schema.sql)
+    // — se valida acá también para no dejar que un nombre muy corto llegue
+    // a mandarse y vuelva con un error crudo de la base.
+    if (nueva.slug.length < 3) {
+      setErrorEnvio('El slug necesita al menos 3 caracteres — prueba con un nombre un poco más largo.')
+      return
+    }
     if (estadoSlug !== 'disponible') {
       const disponible = await slugDisponible(nueva.slug)
       setEstadoSlug(disponible ? 'disponible' : 'ocupado')
@@ -66,6 +88,12 @@ export function PanelSuperadminBarberias() {
     }
   }
 
+  const proximasAPagar = (barberias ?? [])
+    .filter((b) => b.estado_id === ESTADO_ACTIVO && b.fecha_activacion)
+    .map((b) => ({ ...b, dias: diasHastaProximoPago(b.fecha_activacion) }))
+    .filter((b) => b.dias <= VENTANA_AVISO_DIAS)
+    .sort((a, b) => a.dias - b.dias)
+
   return (
     <div>
       <h1 className="font-display text-2xl font-light tracking-tight text-negro-barbero md:text-3xl">
@@ -74,6 +102,24 @@ export function PanelSuperadminBarberias() {
       <p className="mt-2 max-w-lg text-sm text-gris-calido-700">
         Todas las barberías registradas en la plataforma.
       </p>
+
+      {proximasAPagar.length > 0 && (
+        <div className="mt-6 rounded-lg border border-cobre/30 bg-cobre/5 p-5">
+          <span className="versalitas text-xs text-cobre">— Próximos a pagar</span>
+          <div className="mt-3 flex flex-col gap-2">
+            {proximasAPagar.map((barberia) => (
+              <div key={barberia.id} className="flex flex-wrap items-center justify-between gap-3">
+                <HoverLink href={`/admin/barberias/${barberia.id}`} className="text-sm">
+                  {barberia.nombre}
+                </HoverLink>
+                <span className="numeros-tabulares versalitas text-xs text-gris-calido-600">
+                  {textoDiasHasta(barberia.dias)} ({formatoFechaCorta(proximoPago(barberia.fecha_activacion))})
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="mt-8">
         {isLoading && (
@@ -129,6 +175,7 @@ export function PanelSuperadminBarberias() {
               <span className="versalitas text-xs text-gris-calido-500">Nombre</span>
               <input
                 type="text"
+                name="nombre"
                 value={nueva.nombre}
                 onChange={(e) => cambiarNombre(e.target.value)}
                 placeholder="Barbería El Zorro"
@@ -140,6 +187,7 @@ export function PanelSuperadminBarberias() {
               <span className="versalitas text-xs text-gris-calido-500">Slug (URL)</span>
               <input
                 type="text"
+                name="slug"
                 value={nueva.slug}
                 onChange={(e) => cambiarSlug(e.target.value)}
                 onBlur={verificarSlug}
@@ -162,6 +210,7 @@ export function PanelSuperadminBarberias() {
             <label className="flex flex-col gap-2">
               <span className="versalitas text-xs text-gris-calido-500">Plan</span>
               <select
+                name="plan_id"
                 value={nueva.plan_id}
                 onChange={(e) => setNueva((n) => ({ ...n, plan_id: e.target.value }))}
                 className="min-h-11 border-b border-gris-calido-200 bg-transparent py-2 text-negro-barbero outline-none transition-colors focus:border-cobre"

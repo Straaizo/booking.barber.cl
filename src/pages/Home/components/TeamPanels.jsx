@@ -176,14 +176,14 @@ export function TeamPanels() {
 
   return (
     <section className="px-6 py-20 md:px-10 md:py-28">
-      <SectionRule indice="— 03" texto="Tu equipo, su panel" tono="oscuro" />
+      <SectionRule indice="— 02" texto="Tu equipo, su panel" tono="oscuro" />
 
       <ScrollReveal className="mt-14 max-w-2xl">
         <h2 className="font-display text-3xl font-light leading-tight tracking-tight md:text-5xl">
-          Tu panel. <em className="not-italic text-cobre-texto">Y uno distinto para cada barbero.</em>
+          Tú ves todo. <em className="not-italic text-cobre-texto">Cada barbero, solo lo suyo.</em>
         </h2>
         <p className="mt-4 max-w-lg text-gris-calido-700">
-          Nadie usa el panel de otro. Cada uno ve solo lo suyo.
+          Ninguno entra al panel del otro — ni por accidente.
         </p>
       </ScrollReveal>
 

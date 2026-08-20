@@ -1,6 +1,6 @@
 import { ESTADO_ACTIVO, ESTADO_PENDIENTE_ACTIVACION } from '../utils/estados'
 import { normalizarPersonalizacion } from '../utils/personalizacion'
-import { ROL_BARBERO } from '../utils/roles'
+import { ROL_ADMIN, ROL_BARBERO } from '../utils/roles'
 import { generarUsuarioDesdeNombre } from '../utils/usuarios'
 
 // TEMPORAL: mientras no haya un Supabase real conectado (VITE_SUPABASE_URL
@@ -16,11 +16,18 @@ const CLAVE_STORAGE = 'booking_barber_datos_provisorios_v1'
 export const ID_BARBERIA_PROVISORIA = 'prov-barberia-1'
 export const ID_USUARIO_PROVISORIO = 'prov-usuario-1'
 
-// Credenciales del dueño en modo provisorio — fijas (no generadas) para que
-// siempre se pueda entrar a probar sin tener que ir a mirar el localStorage.
-// Se autodesactivan junto con el resto de lo provisorio en cuanto haya un
-// Supabase real conectado.
+// Credenciales de referencia para el aviso "modo de prueba" del login — las
+// mismas que trae de fábrica la barbería semilla (Don Manuel), así el aviso
+// nunca queda desincronizado del dato real. Cada barbería NUEVA que crea el
+// superadmin arranca sin cuenta de dueño hasta que se la crean a mano desde
+// "Usuarios" en su detalle — ya no hay un dueño único y global.
 export const ADMIN_PROVISORIO = { usuario: 'demo', password_provisoria: 'demo1234' }
+
+// Login de superadmin en modo de prueba — no pertenece a ninguna barbería
+// (rol_id = 1, sin barberia_id/barbero_id), así que no vive en el arreglo de
+// barberías como el resto de las cuentas. Ruta protegida (`/admin`) para que
+// nadie entre por URL sin pasar por este login.
+export const SUPERADMIN_PROVISORIO = { usuario: 'superadmin', password_provisoria: 'super1234' }
 
 const PLANES_SEED = [
   { id: 1, nombre: 'Solo', precio_clp: 5000, max_barberos: 1, orden: 1 },
@@ -39,6 +46,17 @@ const BARBERIAS_SEED = [
     email_contacto: 'contacto@donmanuel.cl',
     direccion: 'Av. Irarrázaval 2140, Ñuñoa',
     logo_url: null,
+    nombre_dueno: 'Demo',
+    usuario_dueno: 'demo',
+    password_dueno: 'demo1234',
+    // Activada "hace 25 días" (a propósito, no `created_at`) para que el
+    // aviso de "Próximos a pagar" del superadmin tenga algo real que mostrar
+    // apenas se abre el panel, sin tener que simular un mes entero.
+    fecha_activacion: new Date(Date.now() - 25 * 24 * 60 * 60 * 1000).toISOString(),
+    // "Hace 200 días" — distinta de `fecha_activacion` a propósito, para que
+    // se note que una nunca se pisa y la otra sí (ver el comentario en
+    // `cambiar_estado_barberia()`, supabase/sql/001_cambiar_estado_barberia.sql).
+    fecha_alta: new Date(Date.now() - 200 * 24 * 60 * 60 * 1000).toISOString(),
     personalizacion: {
       color_primario: '#7a4324',
       color_header: null,
@@ -100,6 +118,46 @@ function leerEstado() {
     estado.horarios_disponibles = estado.horarios_disponibles ?? HORARIOS_DISPONIBLES_SEED
     estado.reservas = estado.reservas ?? RESERVAS_SEED
     estado.excepciones_horario = estado.excepciones_horario ?? EXCEPCIONES_HORARIO_SEED
+    // Migración suave para sesiones guardadas antes de que la cuenta de dueño
+    // viviera por barbería (`usuario_dueno`/`password_dueno`/`nombre_dueno`):
+    // sin esto, un navegador con datos viejos se queda con la barbería semilla
+    // sin cuenta de dueño y el login demo/demo1234 deja de encontrar
+    // coincidencia — no es "credenciales incorrectas", es data vieja. Se
+    // distingue `undefined` (el campo nunca existió, dato viejo) de `null`
+    // (la cuenta se borró a propósito desde "Usuarios") a propósito: solo el
+    // primer caso se migra.
+    let huboMigracion = false
+    estado.barberias = estado.barberias.map((b) => {
+      if (b.usuario_dueno !== undefined) return b
+      huboMigracion = true
+      const esBarberiaSemilla = b.id === ID_BARBERIA_PROVISORIA
+      return {
+        ...b,
+        usuario_dueno: esBarberiaSemilla ? ADMIN_PROVISORIO.usuario : null,
+        password_dueno: esBarberiaSemilla ? ADMIN_PROVISORIO.password_provisoria : null,
+        nombre_dueno: esBarberiaSemilla ? 'Demo' : '',
+      }
+    })
+    // Misma idea para `fecha_activacion`: si una barbería ya estaba Activa
+    // antes de que existiera este campo, no hay forma de saber cuándo se
+    // activó de verdad — se usa "ahora" como aproximación (mejor eso que
+    // dejarla afuera del aviso de "Próximos a pagar" para siempre).
+    estado.barberias = estado.barberias.map((b) => {
+      if (b.fecha_activacion !== undefined) return b
+      huboMigracion = true
+      return { ...b, fecha_activacion: b.estado_id === ESTADO_ACTIVO ? new Date().toISOString() : null }
+    })
+    // Misma idea otra vez para `fecha_alta` — se aproxima con `fecha_activacion`
+    // si ya existe (mejor esa aproximación que dejarla en null para siempre).
+    estado.barberias = estado.barberias.map((b) => {
+      if (b.fecha_alta !== undefined) return b
+      huboMigracion = true
+      return { ...b, fecha_alta: b.fecha_activacion ?? null }
+    })
+    // Se persiste de una — si no, cada lectura futura tendría que volver a
+    // migrar en memoria, y el archivo guardado se queda para siempre con la
+    // forma vieja aunque la app ya esté funcionando con la nueva.
+    if (huboMigracion) localStorage.setItem(CLAVE_STORAGE, JSON.stringify(estado))
     return estado
   } catch {
     const inicial = {
@@ -135,6 +193,7 @@ export async function listarBarberiasProvisorias() {
         estado_id: b.estado_id,
         plan_id: b.plan_id,
         planes: plan ? { nombre: plan.nombre } : null,
+        fecha_activacion: b.fecha_activacion ?? null,
       }
     })
 }
@@ -154,6 +213,9 @@ export async function obtenerBarberiaProvisoria(id) {
     email_contacto: b.email_contacto,
     direccion: b.direccion,
     planes: plan ? { nombre: plan.nombre, max_barberos: plan.max_barberos } : null,
+    usuario_dueno: b.usuario_dueno ?? null,
+    nombre_dueno: b.nombre_dueno ?? '',
+    fecha_activacion: b.fecha_activacion ?? null,
   }
 }
 
@@ -161,7 +223,7 @@ export async function obtenerBarberiaProvisoriaPorSlug(slug) {
   const { barberias } = leerEstado()
   const b = barberias.find((x) => x.slug === slug)
   if (!b) throw new Error('Barbería provisoria no encontrada para el slug: ' + slug)
-  const { id, nombre, telefono_whatsapp, email_contacto, direccion, logo_url, estado_id, personalizacion, servicios, barberos } = b
+  const { id, nombre, telefono_whatsapp, email_contacto, direccion, logo_url, estado_id, plan_id, personalizacion, servicios, barberos } = b
   return {
     id,
     slug,
@@ -171,6 +233,7 @@ export async function obtenerBarberiaProvisoriaPorSlug(slug) {
     direccion,
     logo_url,
     estado_id,
+    plan_id,
     personalizacion: normalizarPersonalizacion(personalizacion),
     servicios,
     barberos,
@@ -199,6 +262,11 @@ export async function crearBarberiaProvisoria({ nombre, slug, plan_id }) {
     email_contacto: '',
     direccion: '',
     logo_url: null,
+    nombre_dueno: '',
+    usuario_dueno: null,
+    password_dueno: null,
+    fecha_activacion: null,
+    fecha_alta: null,
     personalizacion: normalizarPersonalizacion(null),
     servicios: [],
     barberos: [],
@@ -210,10 +278,20 @@ export async function crearBarberiaProvisoria({ nombre, slug, plan_id }) {
   return { id: nueva.id, nombre, slug, estado_id: nueva.estado_id, plan_id, planes: plan ? { nombre: plan.nombre } : null }
 }
 
+// Mismo límite que impone `validar_limite_barberos` del lado real (000_schema.sql):
+// no se puede bajar a un plan cuyo máximo de barberos ya está superado por
+// los barberos activos que la barbería tiene hoy.
 export async function cambiarPlanProvisorio(id, planId) {
   const estado = leerEstado()
   const barberia = estado.barberias.find((b) => b.id === id)
   if (!barberia) throw new Error('Barbería provisoria no encontrada: ' + id)
+  const planNuevo = estado.planes.find((p) => p.id === planId)
+  const activos = (barberia.barberos ?? []).filter((b) => b.activo).length
+  if (planNuevo && activos > planNuevo.max_barberos) {
+    throw new Error(
+      `Esta barbería tiene ${activos} barberos activos — el plan ${planNuevo.nombre} permite máximo ${planNuevo.max_barberos}.`
+    )
+  }
   barberia.plan_id = planId
   guardarEstado(estado)
 }
@@ -224,6 +302,15 @@ export async function cambiarEstadoProvisorio(barberiaId, estadoNuevoId, motivo)
   if (!barberia) throw new Error('Barbería provisoria no encontrada: ' + barberiaId)
   const estadoAnteriorId = barberia.estado_id
   barberia.estado_id = estadoNuevoId
+  // Cada vez que ENTRA a Activo (primera vez o reactivación tras una
+  // suspensión) queda como el nuevo día de cobro — si estuvo suspendida por
+  // pago, lo lógico es que el próximo vencimiento se cuente desde que volvió
+  // a pagar, no desde la fecha original de hace meses. `fecha_alta`, en
+  // cambio, nunca se pisa: solo se llena la primera vez.
+  if (estadoNuevoId === ESTADO_ACTIVO) {
+    barberia.fecha_activacion = new Date().toISOString()
+    if (!barberia.fecha_alta) barberia.fecha_alta = barberia.fecha_activacion
+  }
   barberia.historial = barberia.historial ?? []
   barberia.historial.unshift({
     id: 'prov-historial-' + Date.now(),
@@ -254,6 +341,7 @@ export async function obtenerBarberiaParaPersonalizacion(barberiaId) {
     logo_url: b.logo_url,
     direccion: b.direccion,
     telefono_whatsapp: b.telefono_whatsapp,
+    plan_id: b.plan_id,
     servicios: b.servicios ?? [],
     barberos: b.barberos ?? [],
     personalizacion: normalizarPersonalizacion(b.personalizacion),
@@ -281,7 +369,8 @@ export async function listarBarberosProvisorios(barberiaId) {
 
 function usuariosOcupadosProvisorios(estado) {
   const usuariosDeBarberos = estado.barberias.flatMap((b) => (b.barberos ?? []).map((barbero) => barbero.usuario))
-  return [ADMIN_PROVISORIO.usuario, ...usuariosDeBarberos].filter(Boolean)
+  const usuariosDeDuenos = estado.barberias.map((b) => b.usuario_dueno)
+  return [SUPERADMIN_PROVISORIO.usuario, ...usuariosDeDuenos, ...usuariosDeBarberos].filter(Boolean)
 }
 
 export async function crearBarberoProvisorio(barberiaId, nombre, password) {
@@ -305,10 +394,22 @@ export async function crearBarberoProvisorio(barberiaId, nombre, password) {
   return nuevo
 }
 
+// Mismo límite que impone `validar_limite_barberos` del lado real
+// (000_schema.sql) — no solo al crear un barbero nuevo, también al
+// reactivar uno con el interruptor "Activo/Inactivo": sin este chequeo acá,
+// alguien podía desactivar a un barbero y reactivar a otro para colarse por
+// arriba del límite del plan sin pasar por el formulario de "Nuevo barbero".
 export async function actualizarBarberoProvisorio(barberiaId, id, cambios) {
   const estado = leerEstado()
   const barberia = estado.barberias.find((b) => b.id === barberiaId)
   if (!barberia) throw new Error('Barbería provisoria no encontrada: ' + barberiaId)
+  if (cambios.activo === true) {
+    const plan = estado.planes.find((p) => p.id === barberia.plan_id)
+    const activos = (barberia.barberos ?? []).filter((b) => b.activo && b.id !== id).length
+    if (plan && activos >= plan.max_barberos) {
+      throw new Error(`El plan ${plan.nombre} permite un máximo de ${plan.max_barberos} barbero(s) activo(s).`)
+    }
+  }
   let actualizado = null
   barberia.barberos = (barberia.barberos ?? []).map((b) => {
     if (b.id !== id) return b
@@ -336,38 +437,54 @@ export async function establecerContrasenaBarberoProvisoria(barberiaId, id, pass
   return actualizado
 }
 
-// Borra al barbero y todo lo que era solo suyo (su horario, sus excepciones
-// puntuales, y su catálogo propio si tenía uno) — las reservas ya tomadas se
-// dejan intactas, son un registro histórico, no algo que le "pertenece" al
-// barbero en el mismo sentido.
-export async function eliminarBarberoProvisorio(barberiaId, id) {
+// "Dar de baja" es una baja LÓGICA, nunca un borrado físico — un barbero que
+// se va no debería llevarse su historial de reservas ni (si vuelve) obligar
+// a rearmar sus horarios desde cero. Le saca la cuenta (ya no puede entrar)
+// y lo pone `activo: 0` (desaparece de la página pública y del selector de
+// reserva), pero deja intactos su horario, sus excepciones y su catálogo
+// propio — quedan ahí, simplemente sin nadie mirándolos, hasta que alguien
+// decida reactivarlo o borrar la barbería entera.
+export async function darDeBajaBarberoProvisorio(barberiaId, id) {
   const estado = leerEstado()
   const barberia = estado.barberias.find((b) => b.id === barberiaId)
   if (!barberia) throw new Error('Barbería provisoria no encontrada: ' + barberiaId)
-  barberia.barberos = (barberia.barberos ?? []).filter((b) => b.id !== id)
-  barberia.servicios = (barberia.servicios ?? []).filter((s) => s.barbero_id !== id)
-  estado.horarios_disponibles = estado.horarios_disponibles.filter((h) => h.barbero_id !== id)
-  estado.excepciones_horario = estado.excepciones_horario.filter((e) => e.barbero_id !== id)
+  barberia.barberos = (barberia.barberos ?? []).map((b) =>
+    b.id === id ? { ...b, activo: false, usuario: null, password_provisoria: null } : b
+  )
   guardarEstado(estado)
 }
 
-// Valida usuario+contraseña contra el dueño provisorio o cualquier barbero de
-// la (única) barbería provisoria — reemplaza al selector "Ver como" como la
-// forma real de entrar como barbero, dentro de este modo de prueba. La
+// Valida usuario+contraseña contra el dueño o cualquier barbero de CUALQUIER
+// barbería provisoria (ya no una sola fija) — reemplaza al selector "Ver
+// como" como la forma real de entrar, dentro de este modo de prueba. La
 // contraseña vive en texto plano en `localStorage` porque no hay backend
 // real que la resguarde todavía — aceptable solo porque esto es
 // explícitamente modo de prueba, nunca producción.
 export function validarCredencialesProvisorias(usuario, password) {
   const usuarioNormalizado = usuario.trim().toLowerCase()
-  if (usuarioNormalizado === ADMIN_PROVISORIO.usuario && password === ADMIN_PROVISORIO.password_provisoria) {
-    return { tipo: 'dueno' }
+
+  if (
+    usuarioNormalizado === SUPERADMIN_PROVISORIO.usuario &&
+    password === SUPERADMIN_PROVISORIO.password_provisoria
+  ) {
+    return { tipo: 'superadmin' }
   }
+
   const { barberias } = leerEstado()
-  const barberia = barberias.find((b) => b.id === ID_BARBERIA_PROVISORIA)
-  const barbero = (barberia?.barberos ?? []).find(
-    (b) => b.usuario?.toLowerCase() === usuarioNormalizado && b.password_provisoria === password
-  )
-  return barbero ? { tipo: 'barbero', barberoId: barbero.id } : null
+
+  for (const barberia of barberias) {
+    if (
+      barberia.usuario_dueno?.toLowerCase() === usuarioNormalizado &&
+      barberia.password_dueno === password
+    ) {
+      return { tipo: 'dueno', barberiaId: barberia.id }
+    }
+    const barbero = (barberia.barberos ?? []).find(
+      (b) => b.usuario?.toLowerCase() === usuarioNormalizado && b.password_provisoria === password
+    )
+    if (barbero) return { tipo: 'barbero', barberoId: barbero.id, barberiaId: barberia.id }
+  }
+  return null
 }
 
 // Al activar "servicios propios" por primera vez, el barbero arranca con
@@ -547,9 +664,40 @@ export async function listarReservasDelDiaProvisorias(barberoId, fechaISO) {
     .map((r) => ({ fecha_hora: r.fecha_hora, servicio_id: r.servicio_id }))
 }
 
+// Mismo cálculo que el trigger `calcular_fin_reserva`/`precio_vigente()` del
+// lado real: el precio que se cobra es el de oferta solo si está activa, con
+// precio puesto, y no vencida — nunca lo que mande el cliente.
+function precioVigenteProvisorio(servicio) {
+  if (!servicio) return 0
+  const hoy = new Date().toISOString().slice(0, 10)
+  const ofertaVigente = servicio.oferta_activa && servicio.precio_oferta && (!servicio.oferta_vence || servicio.oferta_vence >= hoy)
+  return ofertaVigente ? servicio.precio_oferta : servicio.precio_clp
+}
+
+// Mismo criterio que el trigger `normalizar_telefono` del lado real: solo
+// dígitos, y si quedan 9 (un celular chileno sin código de país) se le
+// agrega el 56 adelante.
+function normalizarTelefonoProvisorio(telefono) {
+  let limpio = String(telefono ?? '').replace(/[^0-9]/g, '')
+  if (limpio.length === 9) limpio = '56' + limpio
+  return limpio
+}
+
 export async function crearReservaProvisoria(reserva) {
   const estado = leerEstado()
-  const nueva = { id: idNuevo('prov-reserva'), ...reserva }
+  const barberia = estado.barberias.find((b) => b.id === reserva.barberia_id)
+  const servicio = barberia?.servicios.find((s) => s.id === reserva.servicio_id)
+  const duracion = servicio?.duracion_minutos ?? 30
+  const fechaHoraFin = new Date(new Date(reserva.fecha_hora).getTime() + duracion * 60000).toISOString()
+  const nueva = {
+    id: idNuevo('prov-reserva'),
+    ...reserva,
+    cliente_telefono: normalizarTelefonoProvisorio(reserva.cliente_telefono),
+    duracion_minutos: duracion,
+    fecha_hora_fin: fechaHoraFin,
+    precio_cobrado_clp: precioVigenteProvisorio(servicio),
+    servicio_nombre_snapshot: servicio?.nombre ?? '',
+  }
   estado.reservas = [...estado.reservas, nueva]
   guardarEstado(estado)
   return nueva
@@ -598,25 +746,101 @@ export async function cancelarReservaProvisoria(id) {
 // login real que resolver todavía, así que esto reemplaza a una consulta de
 // `usuarios` por rol. Se lee de forma síncrona (sin awaits) porque
 // `AuthContext` necesita el perfil disponible antes del primer render, igual
-// que el resto del modo provisorio.
-export function listarBarberosParaSelectorProvisorio() {
+// que el resto del modo provisorio. Recibe `barberiaId` (antes era fija a la
+// única barbería sembrada) porque ahora el superadmin puede crear más de una.
+export function listarBarberosParaSelectorProvisorio(barberiaId) {
   const { barberias } = leerEstado()
-  const barberia = barberias.find((b) => b.id === ID_BARBERIA_PROVISORIA)
+  const barberia = barberias.find((b) => b.id === barberiaId)
   return (barberia?.barberos ?? []).map((b) => ({ id: b.id, nombre: b.nombre }))
 }
 
 export function perfilProvisorioParaBarbero(barberoId) {
   const { barberias } = leerEstado()
-  const barberia = barberias.find((b) => b.id === ID_BARBERIA_PROVISORIA)
+  const barberia = barberias.find((b) => (b.barberos ?? []).some((barbero) => barbero.id === barberoId))
   const barbero = barberia?.barberos.find((b) => b.id === barberoId)
-  if (!barbero) return null
+  if (!barbero || !barberia) return null
   return {
     id: 'prov-usuario-barbero-' + barbero.id,
     usuario: barbero.usuario,
     nombre: `${barbero.nombre} (modo provisorio)`,
     rol_id: ROL_BARBERO,
-    barberia_id: ID_BARBERIA_PROVISORIA,
+    barberia_id: barberia.id,
     barbero_id: barbero.id,
-    barberias: { estado_id: ESTADO_ACTIVO },
+    barberias: { estado_id: barberia.estado_id },
   }
+}
+
+// Análoga a la anterior, pero para el dueño de una barbería puntual — ya no
+// existe un solo "dueño global": cada barbería tiene la suya propia (o
+// ninguna todavía, si el superadmin no le creó la cuenta).
+export function perfilProvisorioParaDueno(barberiaId) {
+  const { barberias } = leerEstado()
+  const barberia = barberias.find((b) => b.id === barberiaId)
+  if (!barberia || !barberia.usuario_dueno) return null
+  return {
+    id: 'prov-usuario-dueno-' + barberia.id,
+    usuario: barberia.usuario_dueno,
+    nombre: `${barberia.nombre_dueno || barberia.nombre} (modo provisorio)`,
+    rol_id: ROL_ADMIN,
+    barberia_id: barberia.id,
+    barbero_id: null,
+    barberias: { estado_id: barberia.estado_id },
+  }
+}
+
+// --- Gestión de cuentas (usuarios) desde el panel de superadmin ---
+
+// Crea la cuenta de dueño de una barbería que todavía no tenía una — el
+// nombre lo escribe el superadmin, el usuario se genera solo (mismo criterio
+// que para un barbero), la contraseña la escribe el superadmin a mano por el
+// mismo motivo de siempre: tiene que ser algo que se le pueda pasar al dueño
+// de inmediato, no una cadena al azar.
+export async function crearCuentaDuenoProvisoria(barberiaId, { nombre, password }) {
+  const estado = leerEstado()
+  const barberia = estado.barberias.find((b) => b.id === barberiaId)
+  if (!barberia) throw new Error('Barbería provisoria no encontrada: ' + barberiaId)
+  if (barberia.usuario_dueno) throw new Error('Esta barbería ya tiene una cuenta de dueño')
+  const usuario = generarUsuarioDesdeNombre(nombre, usuariosOcupadosProvisorios(estado))
+  barberia.usuario_dueno = usuario
+  barberia.password_dueno = password
+  barberia.nombre_dueno = nombre
+  guardarEstado(estado)
+  return { usuario, nombre }
+}
+
+export async function establecerContrasenaDuenoProvisoria(barberiaId, password) {
+  const estado = leerEstado()
+  const barberia = estado.barberias.find((b) => b.id === barberiaId)
+  if (!barberia) throw new Error('Barbería provisoria no encontrada: ' + barberiaId)
+  if (!barberia.usuario_dueno) throw new Error('Esta barbería todavía no tiene cuenta de dueño')
+  barberia.password_dueno = password
+  guardarEstado(estado)
+  return { usuario: barberia.usuario_dueno }
+}
+
+// "Eliminar cuenta" le quita el login (usuario/contraseña) — no borra a la
+// barbería ni sus datos, exactamente como al barbero de abajo: es una acción
+// sobre el ACCESO, no sobre el negocio.
+export async function eliminarCuentaDuenoProvisoria(barberiaId) {
+  const estado = leerEstado()
+  const barberia = estado.barberias.find((b) => b.id === barberiaId)
+  if (!barberia) throw new Error('Barbería provisoria no encontrada: ' + barberiaId)
+  barberia.usuario_dueno = null
+  barberia.password_dueno = null
+  barberia.nombre_dueno = ''
+  guardarEstado(estado)
+}
+
+// Le quita el login al barbero (usuario/contraseña) sin tocar su ficha de
+// negocio (servicios, horarios, especialidad) — distinto de
+// `eliminarBarberoProvisorio`, que borra al barbero entero. Pensada para el
+// panel de superadmin ("Usuarios"), no para el panel del dueño.
+export async function eliminarCuentaBarberoProvisoria(barberiaId, barberoId) {
+  const estado = leerEstado()
+  const barberia = estado.barberias.find((b) => b.id === barberiaId)
+  if (!barberia) throw new Error('Barbería provisoria no encontrada: ' + barberiaId)
+  barberia.barberos = (barberia.barberos ?? []).map((b) =>
+    b.id === barberoId ? { ...b, usuario: null, password_provisoria: null } : b
+  )
+  guardarEstado(estado)
 }

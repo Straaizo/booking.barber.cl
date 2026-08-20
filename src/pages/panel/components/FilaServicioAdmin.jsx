@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Interruptor } from '../../../components/panel/Interruptor'
+import { errorDeOferta } from '../../../utils/ofertas'
 
 const ESTADOS = {
   guardando: 'Guardando…',
@@ -16,6 +17,7 @@ export function FilaServicioAdmin({ servicio, onGuardar }) {
     precio_oferta: String(servicio.precio_oferta ?? ''),
   })
   const [estado, setEstado] = useState(null)
+  const [errorOferta, setErrorOferta] = useState(null)
 
   useEffect(() => {
     setCampos({
@@ -48,14 +50,37 @@ export function FilaServicioAdmin({ servicio, onGuardar }) {
     }
   }
 
-  function commitNumero(campo, valorCrudo, valorOriginal, permiteVacio = false) {
-    if (valorCrudo === '' && permiteVacio) {
-      if (valorOriginal !== null) guardar({ [campo]: null })
-      return
-    }
+  function commitNumero(campo, valorCrudo, valorOriginal) {
     const valor = Number(valorCrudo)
     if (!Number.isFinite(valor) || valor === valorOriginal) return
     guardar({ [campo]: valor })
+  }
+
+  function alternarOferta(valor) {
+    const error = errorDeOferta(valor, servicio.precio_oferta, servicio.precio_clp)
+    if (error) {
+      setErrorOferta(error)
+      return
+    }
+    setErrorOferta(null)
+    guardar({ oferta_activa: valor })
+  }
+
+  function commitPrecioOferta() {
+    const valorCrudo = campos.precio_oferta
+    if (valorCrudo === '') {
+      if (servicio.precio_oferta !== null) guardar({ precio_oferta: null })
+      return
+    }
+    const valor = Number(valorCrudo)
+    if (!Number.isFinite(valor) || valor === servicio.precio_oferta) return
+    const error = errorDeOferta(servicio.oferta_activa, valor, servicio.precio_clp)
+    if (error) {
+      setErrorOferta(error)
+      return
+    }
+    setErrorOferta(null)
+    guardar({ precio_oferta: valor })
   }
 
   return (
@@ -70,6 +95,7 @@ export function FilaServicioAdmin({ servicio, onGuardar }) {
           <span className="versalitas text-xs text-gris-calido-500">Nombre</span>
           <input
             type="text"
+            name="nombre"
             value={campos.nombre}
             onChange={(e) => setCampos((c) => ({ ...c, nombre: e.target.value }))}
             onBlur={commitTexto}
@@ -124,6 +150,7 @@ export function FilaServicioAdmin({ servicio, onGuardar }) {
             type="number"
             min="0"
             inputMode="numeric"
+            name="duracion_minutos"
             value={campos.duracion_minutos}
             onChange={(e) => setCampos((c) => ({ ...c, duracion_minutos: e.target.value }))}
             onBlur={() =>
@@ -141,6 +168,7 @@ export function FilaServicioAdmin({ servicio, onGuardar }) {
             type="number"
             min="0"
             inputMode="numeric"
+            name="precio_clp"
             value={campos.precio_clp}
             onChange={(e) => setCampos((c) => ({ ...c, precio_clp: e.target.value }))}
             onBlur={() => commitNumero('precio_clp', campos.precio_clp, servicio.precio_clp)}
@@ -161,7 +189,7 @@ export function FilaServicioAdmin({ servicio, onGuardar }) {
             <Interruptor
               activo={servicio.oferta_activa}
               etiqueta={`Oferta activa de ${servicio.nombre}`}
-              onCambiar={(valor) => guardar({ oferta_activa: valor })}
+              onCambiar={alternarOferta}
             />
           </div>
           <input
@@ -169,13 +197,17 @@ export function FilaServicioAdmin({ servicio, onGuardar }) {
             min="0"
             inputMode="numeric"
             placeholder="—"
+            name="precio_oferta"
             value={campos.precio_oferta}
             onChange={(e) => setCampos((c) => ({ ...c, precio_oferta: e.target.value }))}
-            onBlur={() =>
-              commitNumero('precio_oferta', campos.precio_oferta, servicio.precio_oferta, true)
-            }
+            onBlur={commitPrecioOferta}
             className="numeros-tabulares min-h-11 border-b border-gris-calido-200 bg-transparent py-1 text-negro-barbero outline-none transition-colors focus:border-cobre disabled:text-gris-calido-400"
           />
+          {errorOferta && (
+            <p role="alert" className="text-xs text-red-700">
+              {errorOferta}
+            </p>
+          )}
         </div>
       </div>
     </div>

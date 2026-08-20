@@ -97,7 +97,7 @@ export function FAQ() {
 
   return (
     <section className="px-6 py-20 md:px-10 md:py-28">
-      <SectionRule indice="— 07" texto="Preguntas frecuentes" tono="oscuro" />
+      <SectionRule indice="— 06" texto="Preguntas frecuentes" tono="oscuro" />
 
       <div className="mt-14 grid grid-cols-12 gap-x-6">
         <div className="col-span-12 mb-8 md:col-span-3 md:mb-0">

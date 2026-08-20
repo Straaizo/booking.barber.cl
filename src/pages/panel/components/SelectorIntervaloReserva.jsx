@@ -43,6 +43,7 @@ export function SelectorIntervaloReserva({ barbero, onGuardar }) {
         <label className="flex flex-col gap-1">
           <span className="versalitas text-xs text-gris-calido-500">Intervalo entre reservas</span>
           <select
+            name="intervalo_reserva_minutos"
             value={valorActual}
             onChange={(e) => guardar(e.target.value)}
             className="min-h-11 min-w-40 border-b border-gris-calido-200 bg-transparent py-1 text-base font-medium text-negro-barbero outline-none transition-colors focus:border-cobre"

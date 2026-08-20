@@ -37,7 +37,7 @@ export function Pricing() {
       <div className="grid grid-cols-12 gap-x-6">
         <div className="col-span-12 mb-10 md:col-span-2 md:mb-0">
           <ScrollReveal>
-            <span className="versalitas text-xs text-gris-calido-500">— 02 / Planes</span>
+            <span className="versalitas text-xs text-gris-calido-500">— 04 / Planes</span>
           </ScrollReveal>
         </div>
 

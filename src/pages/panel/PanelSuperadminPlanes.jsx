@@ -82,6 +82,7 @@ export function PanelSuperadminPlanes() {
             <span className="versalitas text-xs text-gris-calido-500">Nombre</span>
             <input
               type="text"
+              name="nombre"
               value={nuevo.nombre}
               onChange={(e) => setNuevo((n) => ({ ...n, nombre: e.target.value }))}
               placeholder="Ej: Premium"
@@ -93,6 +94,7 @@ export function PanelSuperadminPlanes() {
             <input
               type="number"
               min="0"
+              name="precio_clp"
               value={nuevo.precio_clp}
               onChange={(e) => setNuevo((n) => ({ ...n, precio_clp: e.target.value }))}
               placeholder="8000"
@@ -104,6 +106,7 @@ export function PanelSuperadminPlanes() {
             <input
               type="number"
               min="1"
+              name="max_barberos"
               value={nuevo.max_barberos}
               onChange={(e) => setNuevo((n) => ({ ...n, max_barberos: e.target.value }))}
               placeholder="5"

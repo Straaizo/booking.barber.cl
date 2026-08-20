@@ -54,7 +54,7 @@ function Fila({ antes, despues, indice }) {
 export function NotebookVsApp() {
   return (
     <section className="bg-negro-barbero px-6 py-20 text-hueso md:px-10 md:py-28">
-      <SectionRule indice="— 05" texto="La competencia real" tono="claro" />
+      <SectionRule indice="— 03" texto="La competencia real" tono="claro" />
 
       <ScrollReveal className="mt-14">
         <h2 className="max-w-2xl font-display text-3xl font-light leading-tight tracking-tight md:text-5xl">

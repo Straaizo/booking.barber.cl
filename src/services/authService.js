@@ -30,28 +30,25 @@ function esErrorDeRed(error) {
 }
 
 // El login es por `usuario`, pero Supabase Auth solo sabe de email/password.
-// `obtener_email_por_usuario` es una función RPC (security definer) que expone
-// únicamente el email técnico correspondiente a un usuario — nunca se lee la
-// tabla `usuarios` completa desde un cliente sin sesión. Ver supabase/sql/.
-async function resolverEmailPorUsuario(usuario) {
-  const { data, error } = await supabase.rpc('obtener_email_por_usuario', {
-    p_usuario: usuario,
-  })
-  if (error) {
-    if (esErrorDeRed(error)) throw new ErrorLogin('conexion', MENSAJE_CONEXION)
-    throw new ErrorLogin('credenciales', MENSAJE_CREDENCIALES_INVALIDAS)
-  }
-  return data
+// El email técnico es siempre `{usuario}@usuarios.booking.barber.cl` (mismo
+// patrón que `emailTecnicoPara()` en supabase/functions/gestionar-usuario —
+// es el único código que lo genera, y nunca diverge de este formato) — se
+// construye acá mismo, sin ninguna llamada al servidor. Antes existía una
+// función RPC (`obtener_email_por_usuario`) para resolver esto, pero era
+// callable de forma anónima y respondía distinto según si el usuario existía
+// o no (un email real vs. `null`) — con nombres generados de forma
+// predecible (inicial + apellido), eso era un enumerador de cuentas
+// disponible para cualquiera con acceso directo a la API, sin pasar por el
+// formulario. Construir el email acá elimina esa función entera: el único
+// punto que puede decir "esto existe o no" pasa a ser `signInWithPassword`,
+// que Supabase Auth ya responde de forma deliberadamente genérica.
+function emailTecnicoDesdeUsuario(usuario) {
+  return `${usuario.trim().toLowerCase()}@usuarios.booking.barber.cl`
 }
 
 export async function iniciarSesion({ usuario, password }) {
-  const emailTecnico = await resolverEmailPorUsuario(usuario)
-  if (!emailTecnico) {
-    throw new ErrorLogin('credenciales', MENSAJE_CREDENCIALES_INVALIDAS)
-  }
-
   const { error } = await supabase.auth.signInWithPassword({
-    email: emailTecnico,
+    email: emailTecnicoDesdeUsuario(usuario),
     password,
   })
   if (error) {

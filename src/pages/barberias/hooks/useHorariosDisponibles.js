@@ -11,7 +11,7 @@ async function obtenerHorarios(barberoId) {
     .from('horarios_disponibles')
     .select('id, dia_semana, hora_inicio, hora_fin')
     .eq('barbero_id', barberoId)
-    .eq('activo', true)
+    .eq('activo', 1)
 
   if (error) throw error
   return data

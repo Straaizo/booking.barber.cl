@@ -9,6 +9,7 @@ import {
   crearExcepcionProvisoria,
   eliminarExcepcionProvisoria,
 } from '../../../mocks/datosProvisoriosSuperadmin'
+import { comoColumnasReales } from '../../../utils/booleanosReales'
 
 const COLUMNAS = 'id, barbero_id, dia_semana, hora_inicio, hora_fin, activo'
 const COLUMNAS_EXCEPCION = 'id, barbero_id, fecha, hora_inicio, hora_fin, cerrado'
@@ -47,7 +48,7 @@ export function useCrearHorario(barberoId) {
       if (!HAY_BACKEND_REAL) return crearHorarioProvisorio(barberoId, horario)
       const { data, error } = await supabase
         .from('horarios_disponibles')
-        .insert({ ...horario, barbero_id: barberoId, activo: true })
+        .insert({ ...comoColumnasReales(horario), barbero_id: barberoId, activo: 1 })
         .select(COLUMNAS)
         .single()
       if (error) throw error
@@ -93,7 +94,7 @@ export function useCrearExcepcion(barberoId) {
       if (!HAY_BACKEND_REAL) return crearExcepcionProvisoria(barberoId, excepcion)
       const { data, error } = await supabase
         .from('excepciones_horario')
-        .upsert({ ...excepcion, barbero_id: barberoId }, { onConflict: 'barbero_id,fecha' })
+        .upsert({ ...comoColumnasReales(excepcion), barbero_id: barberoId }, { onConflict: 'barbero_id,fecha' })
         .select(COLUMNAS_EXCEPCION)
         .single()
       if (error) throw error
@@ -122,7 +123,7 @@ export function useActualizarHorario(barberoId) {
       if (!HAY_BACKEND_REAL) return actualizarHorarioProvisorio(id, cambios)
       const { data, error } = await supabase
         .from('horarios_disponibles')
-        .update(cambios)
+        .update(comoColumnasReales(cambios))
         .eq('id', id)
         .select(COLUMNAS)
         .single()

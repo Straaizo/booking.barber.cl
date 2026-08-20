@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useAuth } from '../../hooks/useAuth'
 import { Loader } from '../../components/common/Loader'
 import { Button } from '../../components/common/Button'
 import { Interruptor } from '../../components/panel/Interruptor'
+import { CambiarPassword } from '../../components/panel/CambiarPassword'
 import { SelectorArchivo } from '../../components/common/SelectorArchivo'
 import { archivoAImagenComprimida } from '../../utils/imagenes'
 import { useBarberiaAdmin } from './hooks/useBarberiaAdmin'
@@ -11,96 +12,11 @@ import {
   useBarberosAdmin,
   useCrearBarbero,
   useActualizarBarbero,
-  useEliminarBarbero,
+  useDarDeBajaBarbero,
   useEstablecerContrasenaBarbero,
   useActivarCatalogoPropio,
   useDesactivarCatalogoPropio,
 } from './hooks/useBarberosAdmin'
-
-const ESTADOS_PASSWORD = {
-  guardando: 'Guardando…',
-  guardado: 'Contraseña actualizada',
-  error: 'No se pudo guardar',
-}
-
-// Control para cambiar la contraseña de un barbero ya existente — el dueño
-// la escribe él mismo (no una generada al azar): tiene que poder ser algo
-// que el barbero use de inmediato, sin depender de que alguien le dicte una
-// cadena rara. Colapsado por defecto para no ensuciar la tarjeta.
-function CambiarPassword({ onGuardar }) {
-  const [abierto, setAbierto] = useState(false)
-  const [password, setPassword] = useState('')
-  const [estado, setEstado] = useState(null)
-
-  useEffect(() => {
-    if (estado !== 'guardado') return
-    const temporizador = setTimeout(() => {
-      setEstado(null)
-      setAbierto(false)
-    }, 1500)
-    return () => clearTimeout(temporizador)
-  }, [estado])
-
-  async function guardar(evento) {
-    evento.preventDefault()
-    if (!password.trim()) return
-    setEstado('guardando')
-    try {
-      await onGuardar(password.trim())
-      setEstado('guardado')
-      setPassword('')
-    } catch {
-      setEstado('error')
-    }
-  }
-
-  if (!abierto) {
-    return (
-      <button
-        type="button"
-        onClick={() => setAbierto(true)}
-        className="versalitas text-xs text-gris-calido-500 transition-colors hover:text-cobre-texto"
-      >
-        Cambiar contraseña
-      </button>
-    )
-  }
-
-  return (
-    <form onSubmit={guardar} className="flex flex-wrap items-center gap-2">
-      <input
-        type="text"
-        autoFocus
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-        placeholder="Nueva contraseña"
-        className="min-h-9 w-40 border-b border-gris-calido-200 bg-transparent py-1 text-sm text-negro-barbero outline-none transition-colors focus:border-cobre"
-      />
-      <button
-        type="submit"
-        disabled={estado === 'guardando'}
-        className="versalitas text-xs text-cobre-texto transition-colors hover:text-cobre disabled:opacity-50"
-      >
-        Guardar
-      </button>
-      <button
-        type="button"
-        onClick={() => {
-          setAbierto(false)
-          setPassword('')
-        }}
-        className="versalitas text-xs text-gris-calido-500 transition-colors hover:text-negro-barbero"
-      >
-        Cancelar
-      </button>
-      {estado && (
-        <span className={`versalitas text-xs ${estado === 'error' ? 'text-red-700' : 'text-verde-barberia'}`}>
-          {ESTADOS_PASSWORD[estado]}
-        </span>
-      )}
-    </form>
-  )
-}
 
 // Foto + especialidad de cada barbero se muestran tal cual en la página
 // pública, en la sección "Nuestro equipo" (ver VistaBarberia.jsx) — por eso
@@ -110,8 +26,8 @@ function TarjetaBarbero({
   onCambiar,
   onCambiarCatalogoPropio,
   cambiandoCatalogo,
-  onEliminar,
-  eliminando,
+  onDarDeBaja,
+  dandoDeBaja,
   onCambiarPassword,
 }) {
   const [subiendo, setSubiendo] = useState(false)
@@ -160,6 +76,7 @@ function TarjetaBarbero({
           <span className="versalitas text-xs text-gris-calido-500">Especialidad</span>
           <input
             type="text"
+            name="especialidad"
             value={barbero.especialidad ?? ''}
             onChange={(e) => onCambiar({ especialidad: e.target.value })}
             placeholder="En qué se especializa — ej: Cortes clásicos y degradados"
@@ -206,11 +123,11 @@ function TarjetaBarbero({
         <CambiarPassword onGuardar={onCambiarPassword} />
         <button
           type="button"
-          onClick={onEliminar}
-          disabled={eliminando}
+          onClick={onDarDeBaja}
+          disabled={dandoDeBaja}
           className="versalitas text-xs text-gris-calido-500 transition-colors hover:text-red-700 disabled:opacity-50"
         >
-          {eliminando ? 'Eliminando…' : 'Eliminar'}
+          {dandoDeBaja ? 'Dando de baja…' : 'Dar de baja'}
         </button>
       </div>
     </div>
@@ -223,7 +140,7 @@ export function PanelBarberos() {
   const { data: barberos, isLoading, isError } = useBarberosAdmin(perfil.barberia_id)
   const crearBarbero = useCrearBarbero(perfil.barberia_id)
   const actualizarBarbero = useActualizarBarbero(perfil.barberia_id)
-  const eliminarBarbero = useEliminarBarbero(perfil.barberia_id)
+  const darDeBajaBarbero = useDarDeBajaBarbero(perfil.barberia_id)
   const establecerContrasena = useEstablecerContrasenaBarbero(perfil.barberia_id)
   const activarCatalogoPropio = useActivarCatalogoPropio(perfil.barberia_id)
   const desactivarCatalogoPropio = useDesactivarCatalogoPropio(perfil.barberia_id)
@@ -232,8 +149,26 @@ export function PanelBarberos() {
   const [passwordNueva, setPasswordNueva] = useState('')
   const [errorEnvio, setErrorEnvio] = useState(null)
   const [cambiandoCatalogoId, setCambiandoCatalogoId] = useState(null)
-  const [eliminandoId, setEliminandoId] = useState(null)
+  const [dandoDeBajaId, setDandoDeBajaId] = useState(null)
   const [usuarioCreado, setUsuarioCreado] = useState(null)
+  const [errorActivo, setErrorActivo] = useState(null)
+
+  // Reactivar a un barbero con el interruptor puede chocar con el límite de
+  // barberos del plan (no solo crear uno nuevo) — antes esta mutación era
+  // "mandar y olvidar", así que ese rechazo quedaba completamente en
+  // silencio para quien lo intentaba.
+  function cambiarBarbero(barbero, cambios) {
+    setErrorActivo(null)
+    actualizarBarbero.mutate(
+      { id: barbero.id, cambios },
+      {
+        onError: () =>
+          setErrorActivo(
+            `No pudimos actualizar a ${barbero.nombre}. Si intentabas activarlo, puede que hayas llegado al límite de barberos de tu plan.`
+          ),
+      }
+    )
+  }
 
   async function alternarCatalogoPropio(barberoId, activar) {
     setCambiandoCatalogoId(barberoId)
@@ -244,21 +179,26 @@ export function PanelBarberos() {
     }
   }
 
-  async function eliminar(barbero) {
+  async function darDeBaja(barbero) {
     const confirmado = window.confirm(
-      `¿Eliminar a ${barbero.nombre}? También se borran su horario, sus excepciones puntuales y su catálogo propio si tenía uno. Esta acción no se puede deshacer.`
+      `¿Dar de baja a ${barbero.nombre}? Ya no va a poder entrar a su panel ni aparecer en tu página pública, pero su historial de reservas y su horario quedan guardados por si lo reactivas más adelante.`
     )
     if (!confirmado) return
-    setEliminandoId(barbero.id)
+    setDandoDeBajaId(barbero.id)
     try {
-      await eliminarBarbero.mutateAsync(barbero.id)
+      await darDeBajaBarbero.mutateAsync(barbero.id)
     } finally {
-      setEliminandoId(null)
+      setDandoDeBajaId(null)
     }
   }
 
+  // Cuenta solo los ACTIVOS — el límite del plan es sobre barberos activos,
+  // no sobre el total histórico. Antes daba lo mismo (un barbero "eliminado"
+  // desaparecía del arreglo), pero desde que "dar de baja" los deja en la
+  // lista como inactivos (ver useDarDeBajaBarbero), contar el total incluiría
+  // para siempre a quienes ya no trabajan ahí.
   const maxBarberos = barberia?.planes?.max_barberos ?? null
-  const totalBarberos = barberos?.length ?? 0
+  const totalBarberos = barberos?.filter((b) => b.activo).length ?? 0
   const limiteAlcanzado = maxBarberos !== null && totalBarberos >= maxBarberos
 
   async function agregarBarbero(evento) {
@@ -293,6 +233,11 @@ export function PanelBarberos() {
         "Nuestro equipo". El usuario y la contraseña son con los que cada barbero entra a su propio
         panel.
       </p>
+      {errorActivo && (
+        <p role="alert" className="mt-3 text-sm text-red-700">
+          {errorActivo}
+        </p>
+      )}
 
       <div className="mt-8">
         {isLoading && (
@@ -319,11 +264,11 @@ export function PanelBarberos() {
               <TarjetaBarbero
                 key={barbero.id}
                 barbero={barbero}
-                onCambiar={(cambios) => actualizarBarbero.mutate({ id: barbero.id, cambios })}
+                onCambiar={(cambios) => cambiarBarbero(barbero, cambios)}
                 onCambiarCatalogoPropio={(valor) => alternarCatalogoPropio(barbero.id, valor)}
                 cambiandoCatalogo={cambiandoCatalogoId === barbero.id}
-                onEliminar={() => eliminar(barbero)}
-                eliminando={eliminandoId === barbero.id}
+                onDarDeBaja={() => darDeBaja(barbero)}
+                dandoDeBaja={dandoDeBajaId === barbero.id}
                 onCambiarPassword={(password) =>
                   establecerContrasena.mutateAsync({ barberoId: barbero.id, password })
                 }
@@ -347,6 +292,7 @@ export function PanelBarberos() {
                 <span className="versalitas text-xs text-gris-calido-500">Nombre del nuevo barbero</span>
                 <input
                   type="text"
+                  name="nombre_nuevo"
                   value={nombreNuevo}
                   onChange={(evento) => setNombreNuevo(evento.target.value)}
                   placeholder="Nombre y apellido"
@@ -357,6 +303,7 @@ export function PanelBarberos() {
                 <span className="versalitas text-xs text-gris-calido-500">Contraseña</span>
                 <input
                   type="text"
+                  name="password_nueva"
                   value={passwordNueva}
                   onChange={(evento) => setPasswordNueva(evento.target.value)}
                   placeholder="Con la que va a entrar"

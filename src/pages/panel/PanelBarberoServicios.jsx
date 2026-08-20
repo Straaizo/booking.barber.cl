@@ -5,6 +5,7 @@ import { Button } from '../../components/common/Button'
 import { Interruptor } from '../../components/panel/Interruptor'
 import { ToastGuardado } from '../../components/common/ToastGuardado'
 import { formatoCLP, ofertaVigente } from '../../utils/formatos'
+import { errorDeOferta } from '../../utils/ofertas'
 import { useBarberosAdmin } from './hooks/useBarberosAdmin'
 import {
   useServiciosDeBarberia,
@@ -104,6 +105,7 @@ const SERVICIO_VACIO = { nombre: '', duracion_minutos: '30', precio_clp: '' }
 function FilaServicioPropioBorrador({ servicio, cambios, onCambio }) {
   const valor = (campo) => (cambios && campo in cambios ? cambios[campo] : servicio[campo])
   const tieneCambios = Boolean(cambios)
+  const errorOferta = errorDeOferta(valor('oferta_activa'), valor('precio_oferta'), valor('precio_clp'))
 
   return (
     <div
@@ -116,6 +118,7 @@ function FilaServicioPropioBorrador({ servicio, cambios, onCambio }) {
           <span className="versalitas text-xs text-gris-calido-500">Nombre</span>
           <input
             type="text"
+            name="nombre"
             value={valor('nombre')}
             onChange={(e) => onCambio(servicio.id, 'nombre', e.target.value)}
             className="min-h-11 border-b border-gris-calido-200 bg-transparent py-1 text-base font-medium text-negro-barbero outline-none transition-colors focus:border-cobre"
@@ -151,6 +154,7 @@ function FilaServicioPropioBorrador({ servicio, cambios, onCambio }) {
             type="number"
             min="0"
             inputMode="numeric"
+            name="duracion_minutos"
             value={valor('duracion_minutos')}
             onChange={(e) => onCambio(servicio.id, 'duracion_minutos', e.target.value)}
             className="numeros-tabulares min-h-11 border-b border-gris-calido-200 bg-transparent py-1 text-negro-barbero outline-none transition-colors focus:border-cobre"
@@ -165,6 +169,7 @@ function FilaServicioPropioBorrador({ servicio, cambios, onCambio }) {
             type="number"
             min="0"
             inputMode="numeric"
+            name="precio_clp"
             value={valor('precio_clp')}
             onChange={(e) => onCambio(servicio.id, 'precio_clp', e.target.value)}
             className="numeros-tabulares min-h-11 border-b border-gris-calido-200 bg-transparent py-1 text-negro-barbero outline-none transition-colors focus:border-cobre"
@@ -189,10 +194,16 @@ function FilaServicioPropioBorrador({ servicio, cambios, onCambio }) {
             min="0"
             inputMode="numeric"
             placeholder="—"
+            name="precio_oferta"
             value={valor('precio_oferta') ?? ''}
             onChange={(e) => onCambio(servicio.id, 'precio_oferta', e.target.value)}
             className="numeros-tabulares min-h-11 border-b border-gris-calido-200 bg-transparent py-1 text-negro-barbero outline-none transition-colors focus:border-cobre"
           />
+          {errorOferta && (
+            <p role="alert" className="text-xs text-red-700">
+              {errorOferta}
+            </p>
+          )}
         </div>
       </div>
     </div>
@@ -227,6 +238,20 @@ function CatalogoPropio({ barberiaId, barberoId }) {
   }
 
   async function guardarCambios() {
+    // Revisa el estado FINAL de cada servicio con cambios pendientes (lo que
+    // ya tenía + lo que se cambió) antes de mandar nada — la misma tarjeta ya
+    // muestra el error puntual, esto solo evita el viaje al servidor si algo
+    // sigue sin cumplir la regla.
+    const hayError = Object.entries(cambiosPendientes).some(([id, cambios]) => {
+      const servicio = servicios.find((s) => String(s.id) === String(id))
+      const valor = (campo) => (campo in cambios ? cambios[campo] : servicio[campo])
+      return Boolean(errorDeOferta(valor('oferta_activa'), valor('precio_oferta'), valor('precio_clp')))
+    })
+    if (hayError) {
+      setEstadoToast('error')
+      return
+    }
+
     setEstadoToast('cargando')
     try {
       await Promise.all(
@@ -351,6 +376,7 @@ function CatalogoPropio({ barberiaId, barberoId }) {
               <span className="versalitas text-xs text-gris-calido-500">Nombre</span>
               <input
                 type="text"
+                name="nombre"
                 value={nuevo.nombre}
                 onChange={(e) => setNuevo((n) => ({ ...n, nombre: e.target.value }))}
                 placeholder="Ej: Corte + Barba"
@@ -362,6 +388,7 @@ function CatalogoPropio({ barberiaId, barberoId }) {
               <input
                 type="number"
                 min="0"
+                name="duracion_minutos"
                 value={nuevo.duracion_minutos}
                 onChange={(e) => setNuevo((n) => ({ ...n, duracion_minutos: e.target.value }))}
                 className="numeros-tabulares min-h-11 border-b border-gris-calido-200 bg-transparent py-1 text-negro-barbero outline-none transition-colors focus:border-cobre"
@@ -372,6 +399,7 @@ function CatalogoPropio({ barberiaId, barberoId }) {
               <input
                 type="number"
                 min="0"
+                name="precio_clp"
                 value={nuevo.precio_clp}
                 onChange={(e) => setNuevo((n) => ({ ...n, precio_clp: e.target.value }))}
                 placeholder="12000"

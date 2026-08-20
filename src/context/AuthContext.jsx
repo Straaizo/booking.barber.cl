@@ -3,31 +3,27 @@ import { supabase } from '../services/supabaseClient'
 import { obtenerPerfil, iniciarSesion, cerrarSesion, ErrorLogin } from '../services/authService'
 import {
   HAY_BACKEND_REAL,
-  ID_BARBERIA_PROVISORIA,
-  ID_USUARIO_PROVISORIO,
-  ADMIN_PROVISORIO,
+  SUPERADMIN_PROVISORIO,
   listarBarberosParaSelectorProvisorio,
   perfilProvisorioParaBarbero,
+  perfilProvisorioParaDueno,
   validarCredencialesProvisorias,
 } from '../mocks/datosProvisoriosSuperadmin'
-import { ROL_ADMIN } from '../utils/roles'
-import { ESTADO_ACTIVO } from '../utils/estados'
+import { ROL_SUPERADMIN } from '../utils/roles'
+
+// Perfil fijo del superadmin en modo de prueba — no vive en ninguna
+// barbería (no tiene barberia_id/barbero_id), a diferencia del resto de las
+// cuentas provisorias.
+const PERFIL_SUPERADMIN_PROVISORIO = {
+  id: 'prov-usuario-superadmin',
+  usuario: SUPERADMIN_PROVISORIO.usuario,
+  nombre: 'Superadmin (modo provisorio)',
+  rol_id: ROL_SUPERADMIN,
+  barberia_id: null,
+  barbero_id: null,
+}
 
 export const AuthContext = createContext(null)
-
-// TEMPORAL: sin Supabase real conectado, el login (`/login`) valida usuario+
-// contraseña contra los datos provisorios en vez de contra Supabase Auth —
-// ver `validarCredencialesProvisorias`. Se autodesactiva sola en cuanto
-// HAY_BACKEND_REAL sea true (ver mocks/datosProvisoriosSuperadmin.js).
-const PERFIL_PROVISORIO = {
-  id: ID_USUARIO_PROVISORIO,
-  usuario: ADMIN_PROVISORIO.usuario,
-  nombre: 'Demo (modo provisorio)',
-  rol_id: ROL_ADMIN,
-  barberia_id: ID_BARBERIA_PROVISORIA,
-  barbero_id: null,
-  barberias: { estado_id: ESTADO_ACTIVO },
-}
 
 // La sesión provisoria en sí (quién quedó logueado) sobrevive a un refresh
 // guardada acá — separada de "Ver como" (abajo), que es solo una vista previa
@@ -86,6 +82,19 @@ export function AuthProvider({ children }) {
   }
 
   useEffect(() => {
+    if (window.location.pathname === '/_preview-barberia') {
+      // Esta ruta vive en un <iframe> aparte (ver PreviewBarberia.jsx) y no
+      // usa autenticación en absoluto — pero al cargar ahí dentro, esta app
+      // se vuelve a montar completa en su propio documento, incluido este
+      // provider. Como comparte origen (y por lo tanto `localStorage`) con
+      // la pestaña real, se creaba una segunda sesión de Supabase Auth en
+      // paralelo compitiendo por refrescar el mismo token — eso disparaba
+      // eventos de auth espurios en la pestaña real, causando el parpadeo de
+      // "Verificando sesión" solo en Personalización (única pantalla con
+      // este iframe montado). Acá simplemente no se inicializa sesión real.
+      setCargando(false)
+      return
+    }
     if (!HAY_BACKEND_REAL) {
       if (!sesionProvisoria) {
         setSesion(null)
@@ -93,13 +102,25 @@ export function AuthProvider({ children }) {
         setCargando(false)
         return
       }
+      if (sesionProvisoria.tipo === 'superadmin') {
+        setSesion({ user: { id: PERFIL_SUPERADMIN_PROVISORIO.id } })
+        setPerfil(PERFIL_SUPERADMIN_PROVISORIO)
+        setCargando(false)
+        return
+      }
+
       setSesion({
-        user: { id: sesionProvisoria.tipo === 'dueno' ? ID_USUARIO_PROVISORIO : sesionProvisoria.barberoId },
+        user: {
+          id:
+            sesionProvisoria.tipo === 'dueno'
+              ? 'prov-usuario-dueno-' + sesionProvisoria.barberiaId
+              : sesionProvisoria.barberoId,
+        },
       })
       if (sesionProvisoria.tipo === 'dueno') {
         const idVista = verComo !== 'dueno' ? verComo : null
         const perfilVista = idVista ? perfilProvisorioParaBarbero(idVista) : null
-        setPerfil(perfilVista ?? PERFIL_PROVISORIO)
+        setPerfil(perfilVista ?? perfilProvisorioParaDueno(sesionProvisoria.barberiaId))
       } else {
         setPerfil(perfilProvisorioParaBarbero(sesionProvisoria.barberoId))
       }
@@ -139,7 +160,16 @@ export function AuthProvider({ children }) {
 
     supabase.auth.getSession().then(({ data }) => cargarPerfil(data.session))
 
-    const { data: suscripcion } = supabase.auth.onAuthStateChange((_evento, sesionActual) => {
+    const { data: suscripcion } = supabase.auth.onAuthStateChange((evento, sesionActual) => {
+      // Supabase re-dispara este evento (TOKEN_REFRESHED/INITIAL_SESSION) cada
+      // vez que la pestaña recupera el foco, aunque sea el mismo usuario —
+      // si mostráramos el loader de pantalla completa en cada uno de estos,
+      // la app "parpadea" en Verificando sesión con solo cambiar de pestaña.
+      // Solo se re-verifica el perfil ante un cambio real de sesión.
+      if (evento === 'TOKEN_REFRESHED' || evento === 'INITIAL_SESSION') {
+        setSesion(sesionActual)
+        return
+      }
       setCargando(true)
       cargarPerfil(sesionActual)
     })
@@ -185,7 +215,7 @@ export function AuthProvider({ children }) {
     cerrarSesion: cerrarSesionUsuario,
     verComo: puedeVerComo ? verComo : null,
     cambiarVerComo: puedeVerComo ? cambiarVerComo : null,
-    barberosParaSelector: puedeVerComo ? listarBarberosParaSelectorProvisorio() : [],
+    barberosParaSelector: puedeVerComo ? listarBarberosParaSelectorProvisorio(sesionProvisoria.barberiaId) : [],
   }
 
   return <AuthContext.Provider value={valor}>{children}</AuthContext.Provider>

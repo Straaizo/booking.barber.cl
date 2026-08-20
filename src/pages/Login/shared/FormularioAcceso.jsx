@@ -7,7 +7,7 @@ import { useLogin } from './useLogin'
 import { IconoOjo } from './IconoOjo'
 import { Button } from '../../../components/common/Button'
 import { linkWhatsApp } from '../../../utils/formatos'
-import { HAY_BACKEND_REAL, ADMIN_PROVISORIO } from '../../../mocks/datosProvisoriosSuperadmin'
+import { HAY_BACKEND_REAL, ADMIN_PROVISORIO, SUPERADMIN_PROVISORIO } from '../../../mocks/datosProvisoriosSuperadmin'
 
 const NUMERO_CONTACTO = import.meta.env.VITE_WHATSAPP_CONTACTO
 
@@ -168,7 +168,8 @@ export function FormularioAcceso({ onCambioFoco, onEscribiendo, compacto = false
           con el resto del modo provisorio (ver datosProvisoriosSuperadmin.js). */}
       {!HAY_BACKEND_REAL && (
         <p className="versalitas text-center text-xs text-gris-calido-400">
-          Modo de prueba — dueño: {ADMIN_PROVISORIO.usuario} / {ADMIN_PROVISORIO.password_provisoria}
+          Modo de prueba — dueño: {ADMIN_PROVISORIO.usuario} / {ADMIN_PROVISORIO.password_provisoria} · superadmin:{' '}
+          {SUPERADMIN_PROVISORIO.usuario} / {SUPERADMIN_PROVISORIO.password_provisoria}
         </p>
       )}
 
