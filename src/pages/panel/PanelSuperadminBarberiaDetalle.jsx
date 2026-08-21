@@ -513,7 +513,7 @@ export function PanelSuperadminBarberiaDetalle() {
         </span>
       </div>
       <p className="versalitas mt-1 text-xs text-gris-calido-500">
-        booking.barber.cl/barberias/{barberia.slug}
+        booking.barber.cl/{barberia.slug}
       </p>
 
       {barberia.estado_id === ESTADO_ACTIVO && barberia.fecha_activacion && (

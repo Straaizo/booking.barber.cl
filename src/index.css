@@ -36,6 +36,17 @@ body {
   color: var(--color-negro-barbero);
 }
 
+/* El botón flotante de "Reservar hora" y la vidriera de servicios saltan a
+   #reservar por ancla — con esto el salto es deslizante en vez de abrupto. */
+html {
+  scroll-behavior: smooth;
+}
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
+
 h1,
 h2,
 h3 {

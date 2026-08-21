@@ -3027,6 +3027,31 @@ La pista real fue que "es el único flujo que falla": Personalización es la ún
 
 ---
 
+## 2026-08-20 (5) - El fix del punto (3) era insuficiente: el iframe seguía creando un segundo cliente de Supabase Auth
+
+**Qué se hizo:** Enzo confirmó con evidencia dura de DevTools (pestaña Network, columna Initiator) que el fix de la entrada (3) de hoy no resolvió nada: el iframe de vista previa (`/_preview-barberia`) seguía recargándose solo, ~5782 veces en una sesión, cada ~550ms. Se le pidió a Enzo un diagnóstico riguroso sin asumir la hipótesis anterior, citando archivo y línea de cada eslabón — investigación completa antes de tocar código:
+
+- El `useEffect` de `AuthContext.jsx` (deps `[verComo, sesionProvisoria]`) no se re-dispara solo: ninguna de las dos dependencias cambia en modo real durante el uso normal de Personalización.
+- Ningún `postMessage` del repo navega ni recarga nada — todos solo hacen `setState` en el receptor (`PreviewBarberia.jsx`, `Cursor.jsx`).
+- El `src` del `<iframe>` (`PanelPersonalizacion.jsx:966`) es un string literal fijo (`"/_preview-barberia"`), nunca cambia entre renders — descarta que el propio iframe se esté "renavegando" por un cambio de atributo.
+- Cero `location.reload()`/`location.replace()`/`navigate()` apuntando a esa ruta en todo `src/`.
+- Detalle que no cerraba: el texto "Verificando sesión…" que Enzo reportaba ver "dentro del iframe" solo existe literalmente en `RutaProtegida.jsx` y `Login.jsx` — ninguno de los dos está en el árbol de render de `/_preview-barberia` (ruta de primer nivel, sin guard). Lo que se ve ahí es en realidad el loader de pantalla completa del PADRE — cuando `cargando` (del `AuthContext` de la pestaña real) se pone en `true`, `RutaProtegida` desmonta TODO el `<Outlet/>` (`PanelPersonalizacion` y su `<iframe>` incluidos), y al volver a `false` lo remonta de cero — remontar un iframe siempre dispara una petición nueva a su `src`. El conteo de reloads es un síntoma del padre, no un bug del iframe en sí.
+
+**La causa real, más profunda que el fix anterior:** `src/services/supabaseClient.js:12` construía el cliente con `createClient(supabaseUrl, supabaseAnonKey)` sin ninguna opción de `auth`, a nivel de módulo. `createClient()` de `@supabase/supabase-js` arranca `autoRefreshToken`/`persistSession`/sus listeners de `storage` **en el momento de construcción del cliente**, no cuando se llama a `.onAuthStateChange()`. El fix de la entrada (3) solo evitaba que *el código de la app* (`AuthContext.jsx`) llamara a esos métodos dentro del iframe — pero el módulo `supabaseClient.js` se importa igual dentro del bundle que corre ahí, así que el segundo `GoTrueClient` real se seguía creando e inicializando solo, compitiendo con el de la pestaña real por el mismo token en el mismo `localStorage` — la causa de fondo que ya habíamos sospechado en la entrada (3), pero que ese fix no llegaba a eliminar, solo silenciaba su eco en la app.
+
+**Fix:** en `supabaseClient.js`, si `window.location.pathname === '/_preview-barberia'`, `createClient()` recibe `{ auth: { autoRefreshToken: false, persistSession: false, detectSessionInUrl: false } }` — así el segundo cliente ni siquiera arranca su maquinaria de sesión, en vez de solo evitar que la app reaccione a ella.
+
+**Cómo se probó:** `npm run lint` y `npm run build` limpios. Queda pendiente que Enzo confirme con Network (caché deshabilitada) que el conteo de requests a `/_preview-barberia` ya no crece solo.
+
+**Archivos afectados:**
+- Modificado: `src/services/supabaseClient.js`.
+
+**Pendiente / próximos pasos:**
+- Confirmar con Enzo que el loop de recargas en Personalización ya no ocurre con este fix.
+- Los mismos de siempre: definir criterio de testing seguro contra backend real, ajustar `calcularSlotsDisponibles`, aviso de reserva nueva, hosting + cabeceras anti-clickjacking.
+
+---
+
 ## 2026-08-20 - Fix: parpadeo de "Verificando sesión" al cambiar de pestaña
 
 **Qué se hizo:** Enzo dio la reproducción exacta del "bucle" que había quedado sin diagnosticar: entrar a Personalización y cambiar de pestaña del navegador repetidamente hace que la pantalla completa parpadee mostrando "Verificando sesión" una y otra vez. Encontrada la causa en `AuthContext.jsx`: el listener `supabase.auth.onAuthStateChange` hacía `setCargando(true)` sin filtrar el tipo de evento. Supabase-js revalida el token automáticamente cada vez que la pestaña recupera el foco/visibilidad, y eso dispara el evento igual (`TOKEN_REFRESHED`, a veces `INITIAL_SESSION`) aunque sea exactamente el mismo usuario logueado — cada vez que eso pasaba, `RutaProtegida.jsx` reemplazaba toda la página protegida por el loader de pantalla completa hasta que `cargarPerfil` volvía a resolver.
@@ -3046,3 +3071,437 @@ La pista real fue que "es el único flujo que falla": Personalización es la ún
 - Definir un criterio seguro para seguir probando cambios ahora que el backend es real (staging separado o datos de prueba dedicados) — sigue sin resolverse.
 - Ajustar `calcularSlotsDisponibles` para usar el `fin` real de `horas_ocupadas` (pendiente de la entrada anterior).
 - Los mismos de siempre: resolver el aviso de reserva nueva, definir hosting para las cabeceras anti-clickjacking.
+
+---
+
+## 2026-08-21 - Personalización más profesional: color de eslogan, imagen+texto con posición, y carrusel de equipo
+
+**Contexto:** con el bug de la sesión duplicada resuelto, Enzo pidió ideas para que Personalización se sienta más profesional — mencionó puntualmente que el eslogan no tiene color propio, que la descripción no se puede acompañar de una imagen posicionable, y un carrusel para el equipo. Se investigaron patrones reales de sitios de barbería/salón (testimonios, mapa, horario visible, galería, equipo) y se propusieron 3 features concretas respetando la arquitectura existente (nada de romper lo que ya funciona) — Enzo aprobó implementarlas todas.
+
+**Qué se hizo:**
+- **Color del eslogan** (`eslogan_color`, mismo patrón que ya existía para `whatsapp_color`): `null` sigue usando el contraste automático de siempre según el color del header; un valor explícito lo independiza. Requirió una columna nueva en `personalizacion` — como el schema ya no vive en `supabase/sql/000_schema.sql` (ese archivo ya no existe; el proyecto pasó a manejarse con el flujo estándar de Supabase CLI, `supabase/migrations/`), se agregó la migración nueva `supabase/migrations/20260821000000_agregar_eslogan_color.sql` en vez de tocar la migración ya aplicada `20260819120000_schema.sql`. **Esta migración todavía no se corrió contra el proyecto real — Enzo tiene que aplicarla él mismo** (`supabase db push` o pegándola en el SQL Editor de Supabase), yo no tengo acceso directo a la base de datos real.
+- **"Imagen y texto" con posición** (`posicion_imagen: 'izquierda' | 'derecha'` en la sección, no requiere columna nueva — vive dentro del jsonb `secciones` que ya existía): se agregó el toggle en el editor y `md:flex-row-reverse` en `SeccionImagenTexto` (`VistaBarberia.jsx`) cuando es 'derecha'. En mobile no cambia nada — siempre queda imagen arriba, texto abajo.
+- **Carrusel para "Nuestro equipo"** (`estilo: 'grilla' | 'carrusel'` en la sección, mismo patrón — tampoco requiere columna nueva): nuevo componente `CarruselEquipo` en `VistaBarberia.jsx` — un barbero grande a la vez, con `framer-motion` (ya era dependencia del proyecto, ya se usaba en esta misma página para el lightbox de galería) para la transición de deslizamiento, flechas + puntos de navegación, y autoplay cada 4.5s.
+
+**Por qué:**
+- Ninguna de las 3 features tocó el campo fijo "Descripción" del encabezado — para texto+imagen posicionable ya existía la sección "Imagen y texto" (`SeccionImagenTexto`), reforzarla evita duplicar un sistema que ya funciona igual.
+- `posicion_imagen`/`estilo` (equipo) viven en el jsonb `secciones`, no como columnas — coherente con cómo ya vive el resto de la configuración de cada sección (`titulo`, `imagenes`, `texto`), sin pedirle a Enzo una migración por cada feature nueva de las secciones.
+- `eslogan_color` sí necesitaba columna propia porque `eslogan` mismo es una columna de `personalizacion`, no parte del jsonb — mismo criterio que ya se usó para `whatsapp_color`.
+
+**Cómo se probó:** `npm run lint` y `npm run build` limpios. No se probó contra el dev server (backend real conectado) — pendiente confirmación visual de Enzo, y la migración de `eslogan_color` todavía no está aplicada en la base real, así que ese campo específico no va a funcionar hasta que la corra.
+
+**Archivos afectados:**
+- Nuevo: `supabase/migrations/20260821000000_agregar_eslogan_color.sql`.
+- Modificado: `src/utils/personalizacion.js` (defaults de `eslogan_color`, `posicion_imagen`, `estilo`), `src/pages/barberias/components/VistaBarberia.jsx` (`CarruselEquipo` nuevo, posición en `SeccionImagenTexto`, color inline en el eslogan), `src/pages/panel/PanelPersonalizacion.jsx` (controles nuevos en el formulario y en los editores de sección, `nuevaSeccion` con los defaults), `src/pages/panel/hooks/usePersonalizacionAdmin.js` y `src/pages/barberias/hooks/useBarberiaPorSlug.js` (agregado `eslogan_color` al `select`).
+
+**Pendiente / próximos pasos:**
+- **Enzo tiene que correr la migración `20260821000000_agregar_eslogan_color.sql` contra el proyecto real** antes de que el color de eslogan funcione — sin la columna, el `select` de esas dos consultas va a fallar (columna inexistente) apenas la use un plan con backend real, así que hay que aplicarla antes de tocar Personalización otra vez.
+- Confirmar visualmente las 3 features nuevas contra datos reales una vez migrada la columna.
+- Ideas que quedaron sobre la mesa, no implementadas: horario de atención visible en la página pública, mapa embebido con la dirección, sección de testimonios/reseñas.
+- Los mismos de siempre: criterio de testing seguro, `calcularSlotsDisponibles`, aviso de reserva nueva, hosting + cabeceras anti-clickjacking.
+
+---
+
+## 2026-08-21 (2) - Fix de layout en "Imagen y texto": el texto se desbordaba de la sección
+
+**Qué se hizo:** Enzo probó la sección "Imagen y texto" con un texto largo sin espacios y se desbordaba fuera de la caja, además de verse muy vacía al lado — la imagen no tenía ancho definido en la fila flex (`SeccionImagenTexto`, `VistaBarberia.jsx`), así que con contenido sin espacios para cortar, el navegador no la achicaba por debajo de su tamaño de contenido. Además, toda la sección quedaba con un `max-w-3xl` (768px) que la dejaba mucho más angosta que Galería/Equipo (que usan todo el ancho de página), por eso se sentía vacía en pantallas anchas.
+
+**Fix:** al texto se le dio `md:flex-1 min-w-0 break-words` (ancho flexible + corte de palabra en vez de desborde) y se le sacó el límite `max-w-3xl` a todo el bloque para que ocupe el mismo ancho que las demás secciones. La imagen pasó de `md:w-1/2` a `md:w-3/5` (más grande) y de una proporción vertical (`aspect-[3/4]`) a horizontal (`aspect-[4/3]`) — Enzo pidió primero "más estirada" (se entendió como más alta) y después aclaró que quería decir más ancha, no más alta.
+
+**Cómo se probó:** `npm run lint` y `npm run build` limpios en cada paso.
+
+**Archivos afectados:**
+- Modificado: `src/pages/barberias/components/VistaBarberia.jsx` (`SeccionImagenTexto`).
+
+---
+
+## 2026-08-21 (3) - 5 features más para que Personalización no se sienta genérica
+
+**Qué se hizo:** Enzo pidió ideas para que la página pública se sienta más profesional. Se investigaron patrones reales de sitios de barbería que convierten bien (CTA de reserva visible sin scrollear, precio/duración de cada servicio visibles antes de reservar, prueba social, hero dinámico) y se propusieron 5 features — Enzo aprobó implementarlas todas de una:
+
+1. **Galería en modo carrusel** (`estilo: 'grilla' | 'carrusel'` en la sección, mismo patrón que ya tenía "Equipo"): nuevo componente `CarruselGaleria` en `VistaBarberia.jsx` — una foto grande a la vez, flechas + puntos, autoplay cada 5s, clickear abre el mismo `LightboxGaleria` de siempre (no una vista aparte).
+2. **Botón "Reservar hora" fijo/flotante** (`BotonReservarFlotante`): visible desde el primer scroll en toda la página pública, esquina inferior izquierda (la burbuja de WhatsApp ya usa la derecha, para que nunca se superpongan si las dos están activas). Salta a `#reservar` (nuevo `id` en el `<main>`) — se agregó `scroll-behavior: smooth` en `index.css` (respetando `prefers-reduced-motion`) para que el salto sea deslizante.
+3. **Vidriera de servicios con precio y duración** (`SeccionServicios`): lista de los servicios activos, visible ANTES del asistente de reserva — mismo tratamiento visual que `PasoServicio.jsx` (el paso real del asistente) a propósito, reutilizando `formatoCLP`/`ofertaVigente` de `utils/formatos.js` en vez de duplicar la lógica de precio vigente. Cada fila es un link a `#reservar` (no preselecciona el servicio todavía, queda como posible mejora futura).
+4. **Sección de testimonios** (tipo de sección nuevo en `TIPOS_SECCION`, `SeccionTestimonios`): una reseña grande a la vez (no una grilla de tarjetas, para que se lea completa), con estrellas, nombre opcional, puntos de navegación y autoplay cada 6s. Se escriben a mano desde el panel — sin integración con Google/Meta reviews todavía.
+5. **Horario de atención visible en la página pública** (`SeccionHorario` + `resumenHorarioSemanal()` nuevo en `utils/horarios.js`): se calcula solo a partir de los `horarios_disponibles` reales de los barberos activos (nunca se escribe a mano, para que no se desincronice), tomando la apertura más temprana y el cierre más tardío por día entre todos los barberos, y agrupando días consecutivos con el mismo horario en una sola línea ("Lunes a Viernes: 10:00 – 19:00"). Requirió agregar `horarios_disponibles (dia_semana, hora_inicio, hora_fin, activo)` anidado bajo `barberos` en el `select` de `useBarberiaPorSlug.js` **y** de `usePersonalizacionAdmin.js` (esta última para que la vista previa en vivo del panel no se desincronice de la página real — se confirmó por el mismo `select` que ya se usa en `useHorariosDisponibles.js` que hay policy de RLS pública para `horarios_disponibles`, así que no hizo falta tocar RLS).
+
+**Bug propio encontrado en el camino:** al revisar el guardado, `guardarCambios()` en `PanelPersonalizacion.jsx` nunca mandaba `eslogan_color` al backend (se me había pasado en la entrada anterior) — se veía bien en la vista previa pero nunca se guardaba de verdad al tocar "Guardar". Corregido en la misma pasada.
+
+**Por qué:**
+- El botón de reserva y la vidriera de servicios NO son parte de `secciones` (no son decorativos, son información básica de cómo reservar) — no dependen del plan ni del orden que arme la barbería, van siempre en el mismo lugar fijo de la página.
+- El horario se calcula, no se escribe a mano — cualquier alternativa manual (un campo de texto libre) se iba a desincronizar la primera vez que un barbero cambiara su horario real desde su propia pestaña.
+- Testimonios de a uno (no grilla): una reseña larga se ve mejor completa que truncada en una tarjeta chica, y es más fácil de leer en el celular.
+
+**Cómo se probó:** `npm run lint` y `npm run build` limpios en cada paso. No se probó contra el dev server (backend real conectado) — pendiente confirmación visual de Enzo.
+
+**Archivos afectados:**
+- Modificado: `src/utils/personalizacion.js` (tipo `testimonios`, `estilo` de galería), `src/utils/horarios.js` (`resumenHorarioSemanal`), `src/index.css` (`scroll-behavior: smooth`), `src/pages/barberias/components/VistaBarberia.jsx` (`CarruselGaleria`, `SeccionTestimonios`, `SeccionHorario`, `SeccionServicios`, `BotonReservarFlotante`, ancla `#reservar`), `src/pages/barberias/hooks/useBarberiaPorSlug.js` y `src/pages/panel/hooks/usePersonalizacionAdmin.js` (`horarios_disponibles` anidado en el `select`), `src/pages/panel/PanelPersonalizacion.jsx` (editor de testimonios, toggle de estilo en galería, fix del bug de `eslogan_color` sin guardar).
+
+**Pendiente / próximos pasos:**
+- Confirmar visualmente las 5 features contra datos reales (requiere que la migración de `eslogan_color` de la entrada anterior ya esté aplicada, aunque no depende de ella para funcionar).
+- Posible mejora futura: que clickear un servicio en la vidriera lo preseleccione en el asistente en vez de solo scrollear a `#reservar`.
+- Los mismos de siempre: criterio de testing seguro, `calcularSlotsDisponibles`, aviso de reserva nueva, hosting + cabeceras anti-clickjacking.
+
+---
+
+## 2026-08-21 (4) - Segundo control en el carrusel de galería: ancho Centrado/Completo
+
+**Qué se hizo:** Enzo probó el carrusel de galería y pidió una variante más — que la foto pueda ocupar todo el ancho de la sección (no solo el tamaño moderado y centrado de siempre), como forma de dar más variedad de plantillas entre barberías.
+
+**Fix:** nuevo campo `ancho: 'centrado' | 'completo'` en la sección de galería (solo tiene efecto cuando `estilo === 'carrusel'` — en modo grilla no aplica). 'Completo' quita el `max-w-3xl` y el borde redondeado, pasa la proporción de la foto de `16:10` a `21:9` (más panorámica, look editorial) y ocupa el ancho total de la página. Toggle nuevo en el editor de `PanelPersonalizacion.jsx`, visible solo cuando el estilo de esa sección ya es Carrusel.
+
+**Cómo se probó:** `npm run lint` y `npm run build` limpios.
+
+**Archivos afectados:**
+- Modificado: `src/utils/personalizacion.js` (default `ancho: 'centrado'`), `src/pages/barberias/components/VistaBarberia.jsx` (`CarruselGaleria` acepta `ancho`), `src/pages/panel/PanelPersonalizacion.jsx` (`nuevaSeccion`, toggle nuevo).
+
+**Pendiente / próximos pasos:**
+- Los mismos de siempre: confirmar visualmente contra datos reales, criterio de testing seguro, `calcularSlotsDisponibles`, aviso de reserva nueva, hosting + cabeceras anti-clickjacking.
+
+---
+
+## 2026-08-21 (5) - Fix real: "Guardar cambios" en Personalización devolvía 403 — no era ningún campo nuevo
+
+**Qué se hizo:** Enzo probó "Guardar cambios" en Personalización y saltó un error 403 en la request a `personalizacion` — nada se guardaba ni se reflejaba. Se descartó que fuera por los campos nuevos de hoy (`eslogan_color`, `estilo`, `ancho`, `posicion_imagen`, testimonios): un 403 es RLS negando la operación, no una columna faltante (eso da 400 con un mensaje de "column ... does not exist"), así que la pista apuntaba a otro lado.
+
+**Causa real:** `guardarPersonalizacionReal()` en `usePersonalizacionAdmin.js` guardaba con `.upsert(...)` sobre `personalizacion`. Un `upsert` es un `INSERT ... ON CONFLICT DO UPDATE` — Postgres evalúa la policy de RLS de **INSERT** sobre la fila propuesta ANTES de llegar a resolver el conflicto, sin importar que en la práctica termine siendo un update. Revisando `supabase/migrations/20260819120000_schema.sql`, la tabla `personalizacion` solo tiene policy de `update` para `authenticated` (`personalizacion_update`, línea ~1265) — **nunca se creó una policy de `insert`** para esa tabla, porque nunca hacía falta: la fila se crea sola vía el trigger `crear_personalizacion_default()` apenas se crea la barbería, así que un dueño jamás necesita insertarla, solo actualizarla. Pero como el código usaba `upsert` en vez de `update`, cada intento de guardar disparaba el chequeo de RLS de INSERT (que no existe → deniega todo) antes de siquiera llegar al UPDATE que sí estaba permitido — 403 garantizado, en cualquier guardado de Personalización, no solo con los campos de hoy. Este bug es anterior a esta sesión — probablemente nunca se había probado un guardado real hasta ahora.
+
+**Fix:** se cambió `.upsert({ barberia_id: barberiaId, ...personalizacionCambios })` por `.update(personalizacionCambios).eq('barberia_id', barberiaId)` — la fila siempre existe, así que un `update` común alcanza y evita completamente el chequeo de INSERT. No hizo falta ninguna migración ni tocar RLS.
+
+**Por qué:** cambiar el código del cliente para calzar con la garantía real del modelo de datos (la fila de `personalizacion` siempre existe) es más simple y seguro que agregar una policy de `insert` que en la práctica nunca se va a usar — menos superficie de RLS que mantener, sin ganar ninguna capacidad real.
+
+**Cómo se probó:** `npm run lint` y `npm run build` limpios. Queda pendiente que Enzo confirme que "Guardar cambios" ya funciona de verdad contra el backend real.
+
+**Archivos afectados:**
+- Modificado: `src/pages/panel/hooks/usePersonalizacionAdmin.js`.
+
+**Pendiente / próximos pasos:**
+- Confirmar con Enzo que el guardado en Personalización ya funciona (debería resolver TODOS los guardados de esa pantalla, no solo los campos nuevos).
+- Ya se revisó el único otro `.upsert()` del código real (`useHorariosAdmin.js:97`, para `excepciones_horario`) — ese SÍ tiene su policy correspondiente (`excepciones_escritura`, `for all`, cubre insert/update/delete de una), así que no comparte este bug. No hace falta tocarlo.
+- Los mismos de siempre: `eslogan_color` sigue esperando su migración, criterio de testing seguro, `calcularSlotsDisponibles`, aviso de reserva nueva, hosting + cabeceras anti-clickjacking.
+
+---
+
+## 2026-08-21 (6) - Toggle para ocultar el botón flotante "Reservar hora"
+
+**Qué se hizo:** Enzo probó el botón flotante de "Reservar hora" (agregado en la entrada (3) de hoy) y pidió poder desactivarlo — prefiere para su barbería mostrar solo la burbuja de WhatsApp. El botón se había agregado siempre visible, sin ningún control.
+
+**Fix:** nueva columna `mostrar_boton_reservar` (integer, `0`/`1`, default `1` — visible, para no cambiarle el comportamiento a nadie) en `personalizacion`, con su propio `Interruptor` en el panel (mismo componente que ya se usa para "Destacar foto" en galería) junto a la configuración de WhatsApp. En `VistaBarberia.jsx`, el botón ahora se renderiza condicionado a `Boolean(personalizacion.mostrar_boton_reservar)`, mismo patrón que ya usa la burbuja de WhatsApp con `estilo_whatsapp`.
+
+**Otra migración pendiente de correr:** igual que con `eslogan_color`, esto necesita una columna nueva —
+```sql
+alter table personalizacion
+  add column mostrar_boton_reservar integer not null default 1
+    check (mostrar_boton_reservar in (0, 1));
+```
+Archivo: `supabase/migrations/20260821000001_agregar_mostrar_boton_reservar.sql`. Enzo tiene que correrla en el SQL Editor (o `supabase db push`) — mientras no lo haga, el `select` que ya trae `mostrar_boton_reservar` va a fallar en Personalización, igual que pasaba con `eslogan_color`.
+
+**Cómo se probó:** `npm run lint` y `npm run build` limpios.
+
+**Archivos afectados:**
+- Nuevo: `supabase/migrations/20260821000001_agregar_mostrar_boton_reservar.sql`.
+- Modificado: `src/utils/personalizacion.js`, `src/pages/barberias/components/VistaBarberia.jsx`, `src/pages/panel/hooks/usePersonalizacionAdmin.js`, `src/pages/barberias/hooks/useBarberiaPorSlug.js`, `src/pages/panel/PanelPersonalizacion.jsx`.
+
+**Pendiente / próximos pasos:**
+- **Enzo tiene que correr 2 migraciones pendientes ahora** (`eslogan_color` y `mostrar_boton_reservar`) antes de que Personalización cargue sin errores de columna faltante.
+- Los mismos de siempre: criterio de testing seguro, `calcularSlotsDisponibles`, aviso de reserva nueva, hosting + cabeceras anti-clickjacking.
+
+---
+
+## 2026-08-21 (7) - Revertido: el toggle de la entrada anterior era la solución equivocada
+
+**Qué se hizo:** Enzo aclaró que no quería una configuración persistida para el botón flotante — el flujo de reserva "normal" (el asistente dentro de `<main id="reservar">`) ya existía de antes y nunca estuvo en discusión; lo que pedía era simplemente sacar el botón flotante que se agregó hoy en la entrada (3), sin agregar ninguna columna ni toggle nuevo. La entrada (6) de hoy resolvió el pedido equivocado — se revirtió por completo.
+
+**Revertido:**
+- Borrado `supabase/migrations/20260821000001_agregar_mostrar_boton_reservar.sql` (nunca se había corrido contra la base real, así que borrarlo no perdió ningún dato).
+- Sacado `mostrar_boton_reservar` de `personalizacion.js`, de los `select` de `usePersonalizacionAdmin.js`/`useBarberiaPorSlug.js`, y del formulario/vista previa/guardado de `PanelPersonalizacion.jsx` (incluido el `Interruptor` que se había agregado).
+- Eliminada la función `BotonReservarFlotante` de `VistaBarberia.jsx` y su uso — el botón flotante ya no existe en absoluto.
+
+**Lo que se mantuvo** (porque sigue siendo parte de otra feature, la vidriera de servicios, que Enzo no pidió tocar): el `id="reservar"` en el `<main>` y el `scroll-behavior: smooth` de `index.css` — la sección "Servicios y precios" (`SeccionServicios`) sigue enlazando ahí para saltar al asistente de reserva de siempre.
+
+**Cómo se probó:** `npm run lint` y `npm run build` limpios.
+
+**Archivos afectados:**
+- Eliminado: `supabase/migrations/20260821000001_agregar_mostrar_boton_reservar.sql`.
+- Modificado (revertido): `src/utils/personalizacion.js`, `src/pages/barberias/components/VistaBarberia.jsx`, `src/pages/panel/hooks/usePersonalizacionAdmin.js`, `src/pages/barberias/hooks/useBarberiaPorSlug.js`, `src/pages/panel/PanelPersonalizacion.jsx`.
+
+**Pendiente / próximos pasos:**
+- Ahora solo queda **1 migración pendiente** de correr: `eslogan_color` (la de `mostrar_boton_reservar` ya no existe, no hace falta correrla).
+- Los mismos de siempre: criterio de testing seguro, `calcularSlotsDisponibles`, aviso de reserva nueva, hosting + cabeceras anti-clickjacking.
+
+---
+
+## 2026-08-21 (8) - Link a Google Maps junto a la dirección
+
+**Qué se hizo:** Enzo pidió un botón junto a la dirección que lleve directo a Google Maps, para que el cliente encuentre la barbería fácil. Se armó sin agregar ningún campo ni migración nueva: Google Maps soporta búsqueda por texto vía URL (`google.com/maps/search/?api=1&query=...`), así que se genera el link a partir de la misma `direccion` que ya está guardada — la barbería no tiene que pegar ningún link a mano ni mantenerlo actualizado por separado.
+
+**Fix:** `linkGoogleMaps(direccion)` nuevo en `utils/formatos.js` (mismo lugar que `linkWhatsApp`). En `VistaBarberia.jsx`, junto a la dirección en el encabezado, un link "Ver en el mapa" (mismo componente `HoverLink` que ya usa "Escribir por WhatsApp") que abre Maps en una pestaña nueva.
+
+**Por qué:** un campo separado para "link de Maps" hubiera sido una configuración más para que la barbería mantenga sincronizada con la dirección real — armarlo desde la dirección que ya existe evita ese problema de raíz, al costo de que direcciones mal escritas o ambiguas puedan no geolocalizar perfecto (limitación aceptable, igual que le pasaría a cualquiera buscando esa dirección a mano en Maps).
+
+**Cómo se probó:** `npm run lint` y `npm run build` limpios.
+
+**Archivos afectados:**
+- Modificado: `src/utils/formatos.js`, `src/pages/barberias/components/VistaBarberia.jsx`.
+
+**Pendiente / próximos pasos:**
+- Los mismos de siempre: `eslogan_color` sigue esperando su migración, criterio de testing seguro, `calcularSlotsDisponibles`, aviso de reserva nueva, hosting + cabeceras anti-clickjacking.
+
+---
+
+## 2026-08-21 (9) - La página pública se mudó de `/barberias/:slug` a `/:slug`
+
+**Qué se hizo:** Enzo encontró que `booking.barber.cl/barberias/nombre` se veía demasiado larga y pidió que la página pública quede directo en `booking.barber.cl/nombre`.
+
+**Por qué esto es delicado y qué se verificó antes de tocar nada:** un review de arquitectura externo, hace unos días, había planteado que el slug de una barbería podría chocar con una ruta real de la app (ej: una barbería con slug "admin") — en ese momento se descartó porque las páginas vivían bajo `/barberias/:slug`, sin riesgo de colisión. Mover la ruta a la raíz **sí** activa ese riesgo, así que se verificó primero cómo resuelve React Router v6 los conflictos: las rutas con segmentos fijos (`/login`, `/demo`, `/panel`, `/admin`, `/_preview-barberia`) siempre le ganan a una dinámica (`/:slug`) en la ranking de especificidad de la librería, sin importar el orden en el array — así que mover la ruta a la raíz **no abre ningún hueco de seguridad** (nadie puede "robarse" `/login` con una barbería). El único efecto real es que esas palabras quedan reservadas: una barbería creada con uno de esos slugs jamás tendría una página pública alcanzable (el `/panel` real siempre gana). Por eso se agregó una validación para bloquear esos slugs al crear una barbería, en vez de dejar una que quede huérfana en silencio.
+
+**Fix:**
+- `AppRouter.jsx`: la ruta pública pasó de `/barberias/:slug` a `/:slug`. La vieja ruta `/barberias/:slug` ahora es un redirect (`RedirigirBarberiaSinPrefijo`, nuevo) a `/:slug` — para que cualquier link viejo que Enzo ya haya compartido (Instagram, WhatsApp, etc.) siga funcionando en vez de devolver un 404.
+- `utils/slug.js`: nuevo `esSlugReservado()` con la lista de palabras reservadas (`login`, `demo`, `panel`, `admin`, `_preview-barberia`).
+- `PanelSuperadminBarberias.jsx`: valida contra esa lista antes de crear una barbería nueva, con un mensaje explicando por qué (no un error crudo).
+- Todos los lugares que mostraban o enlazaban la URL pública (`PanelSuperadminBarberias.jsx`, `PanelSuperadminBarberiaDetalle.jsx`, `PanelPersonalizacion.jsx` — el link "Ver página pública →") se actualizaron para reflejar la URL corta.
+
+**Cómo se probó:** `npm run lint` y `npm run build` limpios. No se probó navegación real contra el dev server (backend real conectado) — pendiente que Enzo confirme que las 2 barberías existentes (`barberia-golden`, `barberia-jose-luis`, ninguna choca con la lista reservada) siguen siendo alcanzables en la URL corta, y que el link viejo con `/barberias/` todavía redirige bien.
+
+**Archivos afectados:**
+- Modificado: `src/routes/AppRouter.jsx`, `src/utils/slug.js`, `src/pages/panel/PanelSuperadminBarberias.jsx`, `src/pages/panel/PanelSuperadminBarberiaDetalle.jsx`, `src/pages/panel/PanelPersonalizacion.jsx`.
+
+**Pendiente / próximos pasos:**
+- Confirmar con Enzo que la navegación real (URL corta + redirect desde la vieja) funciona contra el backend real.
+- Los mismos de siempre: `eslogan_color` sigue esperando su migración, criterio de testing seguro, `calcularSlotsDisponibles`, aviso de reserva nueva, hosting + cabeceras anti-clickjacking.
+
+---
+
+## 2026-08-21 (10) - Fix: el carrusel de galería en modo "Completo" se veía gigante en pantallas anchas
+
+**Qué se hizo:** Enzo mandó una captura de `barberia-jose-luis` en un monitor grande — la foto del carrusel de galería (modo "Completo", de la entrada (4) de hoy) ocupaba una franja enorme, desproporcionada frente al resto de la página (header chico, avatar de equipo chico). Causa: esa variante usaba `aspect-[21/9]` sobre `w-full` — la altura quedaba atada al ancho de la ventana, así que en una pantalla ancha de verdad la foto crecía en alto sin ningún freno.
+
+**Fix:** en `CarruselGaleria` (`VistaBarberia.jsx`), la variante "Completo" pasó de una proporción (`aspect-[21/9]`) a una altura fija con tope: `h-[45vh] max-h-[520px] min-h-[280px]` — ahora la altura no depende del ancho de la ventana, se mantiene en un rango razonable sea cual sea el tamaño de pantalla. La variante "Centrado" no se tocó (ya estaba bien acotada por `max-w-3xl`, que en los hechos también le pone un techo a la altura).
+
+**Cómo se probó:** `npm run lint` y `npm run build` limpios.
+
+**Archivos afectados:**
+- Modificado: `src/pages/barberias/components/VistaBarberia.jsx`.
+
+**Pendiente / próximos pasos:**
+- Confirmar con Enzo que ahora se ve bien en pantalla grande.
+- Los mismos de siempre: `eslogan_color` sigue esperando su migración, criterio de testing seguro, `calcularSlotsDisponibles`, aviso de reserva nueva, hosting + cabeceras anti-clickjacking.
+
+---
+
+## 2026-08-21 (11) - Vuelta atrás parcial: el fix anterior se pasó de freno
+
+**Qué se hizo:** Enzo prefería cómo se veía antes (con `aspect-[21/9]`, la proporción de siempre) — el problema real era solo que en pantallas MUY anchas crecía demasiado, no que la proporción en sí estuviera mal. El fix de la entrada (10) cambió de proporción a una altura fija (`h-[45vh]`), lo cual sí resolvía el desborde pero perdía la sensación panorámica que a Enzo le gustaba en pantallas normales.
+
+**Fix:** se volvió a `aspect-[21/9]` (la proporción de siempre) pero ahora con un techo (`max-h-[420px]`) — en pantallas normales se comporta exactamente como antes (la proporción manda), y solo en pantallas realmente anchas la altura deja de crecer al llegar a ese techo, en vez de seguir agrandándose sin freno.
+
+**Cómo se probó:** `npm run lint` y `npm run build` limpios.
+
+**Archivos afectados:**
+- Modificado: `src/pages/barberias/components/VistaBarberia.jsx`.
+
+**Pendiente / próximos pasos:**
+- Seguir evaluando el tamaño exacto del techo (`420px`) contra pantallas reales — Enzo mencionó que van a seguir ajustando tamaños.
+- Los mismos de siempre: `eslogan_color` sigue esperando su migración, criterio de testing seguro, `calcularSlotsDisponibles`, aviso de reserva nueva, hosting + cabeceras anti-clickjacking.
+
+---
+
+## 2026-08-21 (12) - El carrusel de galería reemplaza "Ancho" por Posición + texto acompañante
+
+**Qué se hizo:** en vez de seguir iterando sobre el ancho del carrusel (entradas (4), (10) y (11) de hoy), Enzo pidió algo más flexible: poder posicionar el carrusel a la izquierda/centro/derecha de su sección, bien alineado con el espacio disponible, y un texto tipo eslogan al lado, personalizable con cursiva y subrayado — para tener una plantilla más versátil sin meterse todavía en animaciones ni en un editor de texto enriquecido de verdad (eso se dejó explícitamente para más adelante, cuando haga falta).
+
+**Se reemplazó por completo** el campo `ancho: 'centrado' | 'completo'` de la sección de galería (agregado hoy mismo, nunca llegó a guardarse de verdad en la base real) por:
+- `posicion: 'izquierda' | 'centro' | 'derecha'` — en "Centro" se comporta como el carrusel de siempre (foto moderada, centrada, sin texto). En "Izquierda"/"Derecha", el carrusel pasa a ocupar una columna (`md:w-3/5`, mismo ancho que ya usa "Imagen y texto") y aparece un texto en la columna opuesta.
+- `texto`, `texto_cursiva`, `texto_subrayado` — el texto acompañante y dos toggles de estilo (mismo componente `Interruptor` que ya se usa en el resto del panel).
+
+Todo esto vive dentro del jsonb `secciones` (igual que `posicion_imagen` de "Imagen y texto") — **no hizo falta ninguna columna ni migración nueva**, a diferencia de `eslogan_color`.
+
+**Cómo se probó:** `npm run lint` y `npm run build` limpios en cada paso.
+
+**Archivos afectados:**
+- Modificado: `src/utils/personalizacion.js`, `src/pages/barberias/components/VistaBarberia.jsx` (`CarruselGaleria` reescrito), `src/pages/panel/PanelPersonalizacion.jsx` (`nuevaSeccion`, editor nuevo de Posición + texto).
+
+**Pendiente / próximos pasos:**
+- Confirmar visualmente con Enzo que este diseño (posición + texto) es lo que buscaba.
+- Animaciones más elaboradas y un editor de texto enriquecido quedaron explícitamente pospuestos — "de momento es tener una plantilla más personalizable".
+- Los mismos de siempre: `eslogan_color` sigue esperando su migración, criterio de testing seguro, `calcularSlotsDisponibles`, aviso de reserva nueva, hosting + cabeceras anti-clickjacking.
+
+---
+
+## 2026-08-21 (13) - Tamaño y tipografía propios para el texto del carrusel de galería
+
+**Qué se hizo:** Enzo pidió más control sobre el texto acompañante del carrusel (entrada (12) de hoy) además de cursiva/subrayado — poder subirle el tamaño y elegir tipografía, dejando el techo del tamaño a criterio propio.
+
+**Fix:**
+- `texto_tamano: 'chica' | 'mediana' | 'grande' | 'enorme'` — 4 tamaños preestablecidos (mismo patrón de botones que ya usa `whatsapp_tamano`), no un input numérico libre. Techo puesto en "enorme" = `text-3xl md:text-4xl` (36px en desktop): más grande que eso, compartiendo columna con una foto en ~40% del ancho, empieza a cortar mal las líneas.
+- `texto_fuente` — reutiliza la lista curada `FUENTES_DISPONIBLES` de `utils/fuentes.js` (la misma que ya usa "Tipografía de títulos" en Identidad), independiente de la tipografía general del sitio. `null` = usa la misma del sitio; un valor explícito la carga aparte (`asegurarFuenteCargada`) y la aplica solo a este texto.
+
+**Por qué tamaños preestablecidos y no un input libre en píxeles:** un número libre deja elegir valores que rompen el layout (una fuente de 80px en una columna angosta se desborda o se ve absurda) — los botones acotan las opciones a algo que ya se probó que se ve bien, mismo criterio que el resto de los tamaños de la app (`whatsapp_tamano`, fotos "Destacar" en galería).
+
+**Cómo se probó:** `npm run lint` y `npm run build` limpios.
+
+**Archivos afectados:**
+- Modificado: `src/utils/personalizacion.js` (defaults `texto_fuente`/`texto_tamano`), `src/pages/barberias/components/VistaBarberia.jsx` (`TAMANOS_TEXTO_CARRUSEL`, carga de la fuente propia), `src/pages/panel/PanelPersonalizacion.jsx` (selector de tamaño y de tipografía en el editor).
+
+**Pendiente / próximos pasos:**
+- Los mismos de siempre: confirmar visualmente, `eslogan_color` sigue esperando su migración, criterio de testing seguro, `calcularSlotsDisponibles`, aviso de reserva nueva, hosting + cabeceras anti-clickjacking.
+
+---
+
+## 2026-08-21 (14) - Feedback de UX/UI + frase destacada en el carrusel + fix de la grilla de equipo vacía
+
+**Qué se hizo:** Enzo mandó una captura de `barberia-jose-luis` (la barbería de prueba, con muy poco contenido cargado — 1 foto, 1 barbero, sin servicios) y pidió feedback de UX/UI general, más una feature puntual: poder subrayar/agrandar/darle color a **una sola frase** dentro del texto del carrusel (ej: la última oración de un eslogan), no a todo el bloque.
+
+**Feedback dado** (investigando patrones de sitios de barbería profesionales antes de opinar): el problema más visible en la captura no era de código roto sino de **diseño para estado vacío** — la grilla de "Nuestro equipo" reserva 3-4 columnas fijas, así que con 1 solo barbero se ve pegado a la izquierda con un vacío enorme al lado. También se señaló la jerarquía tipográfica plana (todo el texto casi el mismo peso visual) y la falta de un color de acento que guíe la vista — exactamente lo que la frase destacada pedida resuelve.
+
+**Implementado:**
+- **Grilla de equipo, arreglada de raíz**: `SeccionEquipo` (modo grilla) pasó de `grid grid-cols-2 ... lg:grid-cols-4` (columnas fijas, deja huecos con pocos barberos) a `flex flex-wrap justify-center` — con 1 barbero queda centrado, con muchos se acomoda solo en varias filas, nunca pegado a un costado con espacio vacío al lado.
+- **Frase destacada** (`texto_resaltado` + `texto_resaltado_color`) en el carrusel de galería: se muestra al final del texto acompañante, siempre un escalón de tamaño más grande que el texto base (`tamanoResaltado()`, nuevo en `VistaBarberia.jsx` — si el texto ya está en "Enorme" se queda ahí, no hay escalón más arriba) y siempre subrayada, con color propio (por defecto el color de marca). No se agregaron controles de cursiva/subrayado separados para la frase destacada a propósito — el pedido fue puntual ("subrayarla, un color, más tamaño"), no un editor de estilos genérico.
+
+**Cómo se probó:** `npm run lint` y `npm run build` limpios.
+
+**Archivos afectados:**
+- Modificado: `src/utils/personalizacion.js`, `src/pages/barberias/components/VistaBarberia.jsx` (`SeccionEquipo`, `tamanoResaltado()`, `CarruselGaleria`), `src/pages/panel/PanelPersonalizacion.jsx` (input + color picker de la frase destacada).
+
+**Pendiente / próximos pasos:**
+- El resto del feedback de UX (jerarquía tipográfica general, ritmo entre secciones) queda como observación para cuando haya contenido real cargado — con la barbería de prueba vacía es difícil juzgar bien el resultado final.
+- Los mismos de siempre: `eslogan_color` sigue esperando su migración, criterio de testing seguro, `calcularSlotsDisponibles`, aviso de reserva nueva, hosting + cabeceras anti-clickjacking.
+
+---
+
+## 2026-08-21 (15) - La frase destacada pasó a tener tamaño/tipografía propios, no derivados
+
+**Qué se hizo:** Enzo probó la frase destacada (entrada (14) de hoy) y notó que no se podía elegir su tamaño ni tipografía por separado — quedaba pegada al tamaño del texto normal (solo con un escalón automático de más) y a la misma tipografía. Se sacó esa dependencia: ahora `texto_resaltado_tamano` y `texto_resaltado_fuente` son campos propios de la frase destacada, independientes de `texto_tamano`/`texto_fuente` del texto normal — se eliminó la función `tamanoResaltado()` (el escalón automático), ya no hace falta con un campo explícito.
+
+**Fix:** mismos controles que ya existen para el texto normal (4 botones de tamaño, selector de tipografía con `FUENTES_DISPONIBLES`), pero aplicados solo a la frase destacada, en su propio bloque del editor. Default `texto_resaltado_tamano: 'grande'` para que, si nunca se toca, siga viéndose como antes (más grande que el texto normal en mediana).
+
+**Cómo se probó:** `npm run lint` y `npm run build` limpios.
+
+**Archivos afectados:**
+- Modificado: `src/utils/personalizacion.js`, `src/pages/barberias/components/VistaBarberia.jsx`, `src/pages/panel/PanelPersonalizacion.jsx`.
+
+**Pendiente / próximos pasos:**
+- Los mismos de siempre: confirmar visualmente, `eslogan_color` sigue esperando su migración, criterio de testing seguro, `calcularSlotsDisponibles`, aviso de reserva nueva, hosting + cabeceras anti-clickjacking.
+
+---
+
+## 2026-08-21 (16) - Control de tamaño para la foto del carrusel + testimonios en lista/carrusel
+
+**Qué se hizo:** Enzo mandó otra captura de la página real: el carrusel de galería (posición "Izquierda", de la entrada (12)) se veía demasiado grande sin ninguna forma de achicarlo, y la sección de testimonios se veía chica/sola en su espacio — pidió poder elegir el tamaño del carrusel y, para testimonios, poder elegir entre lista horizontal o carrusel (como está ahora). Se investigaron patrones reales de testimonios en sitios de servicios antes de implementar (tarjetas independientes vs. carrusel — la recomendación general es que una mezcla de ambos formatos funciona mejor que uno solo, así que se dejan las dos opciones a elección de la barbería, no una reemplazando a la otra).
+
+**Implementado:**
+- **`imagen_tamano: 'chica' | 'mediana' | 'grande'`** en la sección de galería — nuevo control "Tamaño de la foto" en el editor. Con texto al lado (posición Izquierda/Derecha): chica=2/5, mediana=1/2, grande=3/5 del ancho de la fila. Sin texto (posición Centro): chica/mediana/grande son distintos `max-width`. **El default bajó de "siempre 3/5" a "mediana" (1/2)** — el reclamo real era que antes no había ninguna opción más chica, así que el tamaño de siempre pasó a ser la opción "Grande", no la única disponible.
+- **Testimonios**: nuevo `estilo: 'carrusel' | 'lista'` — "Carrusel" es el comportamiento de siempre (una reseña a la vez); "Lista" (nueva, `ListaTestimonios`) muestra todas las reseñas a la vez en tarjetas en una cuadrícula (1 columna en mobile, hasta 3 en desktop) — mejor cuando hay varias cargadas y no tiene sentido hacer esperar al autoplay. También se agregó `tamano` (chica/mediana/grande/enorme) para el tamaño del texto de la cita, independiente en ambos modos.
+
+**Aclarado de paso (no es un bug real):** en la captura se ve el texto del carrusel pasando "por detrás" de la burbuja de WhatsApp — eso es un artefacto de cómo la herramienta de captura de pantalla completa renderiza elementos `position: fixed` (quedan "congelados" en un punto de la imagen larga en vez de seguir el scroll real); en el navegador de un cliente real, la burbuja siempre queda pegada a la esquina de SU pantalla, nunca tapando contenido de una sección que ya se scrolleó — no hace falta ningún fix de z-index/posición para esto.
+
+**Cómo se probó:** `npm run lint` y `npm run build` limpios.
+
+**Archivos afectados:**
+- Modificado: `src/utils/personalizacion.js` (defaults `imagen_tamano`, `estilo`/`tamano` en testimonios), `src/pages/barberias/components/VistaBarberia.jsx` (`ANCHOS_CARRUSEL_*`, `ListaTestimonios` nuevo, `SeccionTestimonios` reestructurado), `src/pages/panel/PanelPersonalizacion.jsx` (controles nuevos en ambos editores).
+
+**Pendiente / próximos pasos:**
+- Los mismos de siempre: confirmar visualmente con contenido real cargado, `eslogan_color` sigue esperando su migración, criterio de testing seguro, `calcularSlotsDisponibles`, aviso de reserva nueva, hosting + cabeceras anti-clickjacking.
+
+---
+
+## 2026-08-21 (17) - Techo de altura en el carrusel + señal de scroll en el encabezado
+
+**Qué se hizo:** Enzo mandó una captura de cómo se ve la página apenas se abre, en la resolución de su propia pantalla: el encabezado + la foto del carrusel llenaban casi toda la altura visible, sin ninguna pista de que había más secciones debajo. Pidió que la página se adapte bien a cualquier pantalla, independiente de los tamaños que elija el dueño.
+
+**Fix:**
+- **Techo de altura en el carrusel de galería** (`ALTURAS_CARRUSEL_CON_TEXTO`/`ALTURAS_CARRUSEL_CENTRO`, nuevos en `VistaBarberia.jsx`): antes solo el ancho (`imagen_tamano`, de la entrada (16) de hoy) limitaba el tamaño de la foto — la altura quedaba libre según la proporción (`aspect-[4/3]`/`aspect-[16/10]`), así que en una pantalla angosta y alta podía crecer más de lo esperado. Ahora cada tamaño (Chica/Mediana/Grande) tiene también un máximo de alto en píxeles, para las dos posiciones (con texto al lado y "Centro").
+- **Indicador de scroll** (`IndicadorScroll`, nuevo): una flechita hacia abajo, animada con un rebote sutil, al final del encabezado — señal visual estándar en sitios profesionales para indicar "hay más contenido debajo". Respeta `prefers-reduced-motion` (queda quieta en vez de rebotar, pero sigue visible).
+
+**Por qué:** el problema de fondo no era un tamaño puntual mal elegido, sino que ningún tamaño tenía techo — cualquier combinación de ancho de pantalla + tamaño "Grande" podía terminar llenando el alto completo. Un techo fijo en píxeles (no en `vh`, que escalaría con la pantalla y volvería a repetir el mismo problema) resuelve esto para cualquier resolución.
+
+**Cómo se probó:** `npm run lint` y `npm run build` limpios.
+
+**Archivos afectados:**
+- Modificado: `src/pages/barberias/components/VistaBarberia.jsx`.
+
+**Pendiente / próximos pasos:**
+- Los mismos de siempre: confirmar visualmente con contenido real cargado, `eslogan_color` sigue esperando su migración, criterio de testing seguro, `calcularSlotsDisponibles`, aviso de reserva nueva, hosting + cabeceras anti-clickjacking.
+
+---
+
+## 2026-08-21 (18) - Tarjetas de testimonios personalizables + marca de agua de la plataforma en el header
+
+**Qué se hizo:** Enzo pidió que las tarjetas de "Lo que dicen nuestros clientes" (modo Lista, de la entrada (16) de hoy) se puedan personalizar en color/tamaño/tipografía — "todo lo que se pueda". Aparte, pidió agregar el logo de la plataforma (el wordmark `booking.barber.cl`, con la misma animación de subrayado al pasar el mouse que ya usa `Header.jsx` en el Inicio) arriba a la derecha del encabezado de cada barbería, como una marca de agua — pero que **no aparezca en la vista previa en vivo del panel**, solo en la página pública real.
+
+**Implementado:**
+- **Testimonios**: 3 campos nuevos en la sección — `fuente` (tipografía, reutiliza `FUENTES_DISPONIBLES`), `color_texto` (color de la cita, aplica en ambos modos: carrusel y lista), `color_fondo` (color de fondo de cada tarjeta, solo tiene sentido y solo se muestra el control cuando el estilo es "Lista"). Todo con `null` = hereda lo de siempre (tipografía del sitio, negro-barbero, blanco).
+- **Marca de agua del header**: `HoverLink` con el mismo wordmark y clase (`font-display italic`) que ya usa `Header.jsx` del sitio de marketing, posicionado `absolute` arriba a la derecha del encabezado de cada barbería. Se oculta con `esVistaPrevia` — un chequeo de `window.location.pathname === '/_preview-barberia'`, el mismo mecanismo ya usado en `AuthContext.jsx`/`supabaseClient.js` para detectar cuándo este componente corre dentro del iframe de vista previa del panel en vez de en la página pública real.
+
+**Por qué:** el color de fondo de las tarjetas solo se muestra cuando el estilo es "Lista" porque en "Carrusel" no hay ninguna tarjeta/caja de fondo que colorear — mostrar el control igual hubiera sido confuso (un control que no hace nada visible). La marca de agua se detecta por `pathname` en vez de por una prop nueva porque es exactamente el mismo problema ya resuelto antes (distinguir la vista previa de la página real) — reusar el mecanismo evita inventar una segunda forma de lo mismo.
+
+**Cómo se probó:** `npm run lint` y `npm run build` limpios.
+
+**Archivos afectados:**
+- Modificado: `src/utils/personalizacion.js` (defaults `fuente`/`color_texto`/`color_fondo` en testimonios), `src/pages/barberias/components/VistaBarberia.jsx` (props nuevas en `SeccionTestimonios`/`CarruselTestimonios`/`ListaTestimonios`, marca de agua + `esVistaPrevia`), `src/pages/panel/PanelPersonalizacion.jsx` (selector de tipografía + 2 color pickers en el editor de testimonios).
+
+**Pendiente / próximos pasos:**
+- Los mismos de siempre: confirmar visualmente con contenido real cargado, `eslogan_color` sigue esperando su migración, criterio de testing seguro, `calcularSlotsDisponibles`, aviso de reserva nueva, hosting + cabeceras anti-clickjacking.
+
+---
+
+## 2026-08-21 (19) - Fix: la marca de agua quedaba arriba a la izquierda, tapando el logo
+
+**Qué se hizo:** Enzo mandó una captura mostrando que la marca de agua `booking.barber.cl` (entrada (18) de hoy) quedaba arriba a la **izquierda**, superpuesta con el logo/avatar de la barbería — no arriba a la derecha como se pidió.
+
+**Causa:** `HoverLink` ya trae `relative` incorporado en su propia clase base (lo necesita para posicionar el subrayado animado que aparece al pasar el mouse). Le había puesto `absolute` en el `className` que se le pasa desde afuera — dos clases de igual especificidad CSS (`.relative` y `.absolute`, ambas de una sola clase) compitiendo por la misma propiedad (`position`). Cuál gana no depende del orden en el string de `className`, sino del orden en que Tailwind emite esas reglas en su hoja de estilos — y ahí `relative` terminaba ganando, dejando el element en el flujo normal del documento (arriba a la izquierda, como el primer elemento dentro del `<header>`) en vez de fijo en la esquina.
+
+**Fix:** el posicionamiento (`absolute right-6 top-6 md:right-10 md:top-8`) se movió a un `<div>` que envuelve al `HoverLink`, en vez de ponérselo directo al `HoverLink` — así no compite con su `relative` interno (ese sigue funcionando para el subrayado, ahora dentro de un contenedor ya posicionado, sin pelea de cascada).
+
+**Cómo se probó:** `npm run lint` y `npm run build` limpios.
+
+**Archivos afectados:**
+- Modificado: `src/pages/barberias/components/VistaBarberia.jsx`.
+
+**Pendiente / próximos pasos:**
+- Confirmar con Enzo que la marca de agua ya se ve arriba a la derecha.
+- Los mismos de siempre: `eslogan_color` sigue esperando su migración, criterio de testing seguro, `calcularSlotsDisponibles`, aviso de reserva nueva, hosting + cabeceras anti-clickjacking.
+
+---
+
+## 2026-08-21 (20) - Servicios y horario: de lista duplicada a tabla real, personalizable y ocultable
+
+**Qué se hizo:** Enzo dijo que le gustó mucho el horario de atención, pero notó que "Servicios y precios" (entrada (3) de hoy) se sentía repetido — se veía dos veces con el mismo look, una vez como vidriera informativa y otra vez dentro del paso "Elige un servicio" del asistente de reserva. Pidió que ambos bloques pasen a formar parte de Personalización, con la mayor personalización posible en colores y tablas, e investigar cómo lo hacen sitios profesionales antes de diseñar.
+
+**Investigado antes de implementar:** la práctica estándar en sitios de barbería/salón es un "menú de servicios" en formato tabla limpia (encabezado + filas), no una lista clickeable — la sensación de "ya vi esto" venía justamente de que la vidriera imitaba el look de `PasoServicio.jsx` (el paso real del asistente, con filas que resaltan al pasar el mouse como si fueran a hacer algo). Diferenciarlas visualmente resuelve el problema de raíz, no solo lo oculta.
+
+**Implementado:**
+- **Rediseño como tabla real** (`EncabezadoTabla` nuevo, reutilizado por ambas): fila de encabezado + filas con fondo alternado, sin ningún `<a>` por fila — en Servicios, un solo link "Reservar tu hora →" al final de la tabla en vez de que cada fila sea clickeable.
+- **`mostrar_servicios`/`mostrar_horario`** (integer 0/1, default 1) — toggles nuevos en Personalización, sección "04 — Servicios y horario", para ocultar cualquiera de los dos si el dueño lo sigue sintiendo redundante.
+- **`servicios_color_acento`/`horario_color_acento`** — color propio para la fila de encabezado de cada tabla (`null` = tono cobre de siempre).
+- Estos dos bloques **no son una "sección" más** dentro de `secciones` (a diferencia de galería/testimonios/etc.) porque no son contenido escrito a mano — se calculan solos a partir de los servicios/horarios reales, así que viven como columnas propias de `personalizacion`, igual que `eslogan_color`/`whatsapp_color`.
+
+**Otra migración más para correr:** `supabase/migrations/20260821000002_agregar_servicios_horario_personalizables.sql` agrega las 4 columnas nuevas (`mostrar_servicios`, `servicios_color_acento`, `mostrar_horario`, `horario_color_acento`) — **Enzo tiene ahora 2 migraciones pendientes** (esta + `eslogan_color` de antes) que correr en el SQL Editor de Supabase antes de que Personalización cargue sin errores de columna faltante.
+
+**Cómo se probó:** `npm run lint` y `npm run build` limpios.
+
+**Archivos afectados:**
+- Nuevo: `supabase/migrations/20260821000002_agregar_servicios_horario_personalizables.sql`.
+- Modificado: `src/utils/personalizacion.js` (defaults), `src/pages/barberias/components/VistaBarberia.jsx` (`EncabezadoTabla`, `SeccionServicios`/`SeccionHorario` rediseñadas), `src/pages/panel/hooks/usePersonalizacionAdmin.js` y `src/pages/barberias/hooks/useBarberiaPorSlug.js` (columnas nuevas en el `select`), `src/pages/panel/PanelPersonalizacion.jsx` (sección "04" nueva con los 2 toggles + 2 color pickers).
+
+**Pendiente / próximos pasos:**
+- **Correr las 2 migraciones pendientes** (`eslogan_color` y esta) antes de seguir probando Personalización contra el backend real.
+- Confirmar visualmente con Enzo que la tabla ya no se siente repetida frente al asistente de reserva.
+- Los mismos de siempre: criterio de testing seguro, `calcularSlotsDisponibles`, aviso de reserva nueva, hosting + cabeceras anti-clickjacking.
+
+---
+
+## 2026-08-21 (21) - Simplificado: sin color de acento propio, la tabla usa el color de marca
+
+**Qué se hizo:** Enzo preguntó si las 4 columnas nuevas de la entrada anterior eran realmente necesarias. Se le separó lo necesario (los 2 toggles de mostrar/ocultar, que sí necesitan una columna para persistir esa elección) de lo opcional (un color de acento propio por tabla, cuando ya existe `color_primario`) — eligió sacar el color propio y que ambas tablas usen directamente el color de marca general.
+
+**Fix:** se sacaron `servicios_color_acento`/`horario_color_acento` de la migración (ahora solo agrega `mostrar_servicios`/`mostrar_horario`, 2 columnas en vez de 4), de los `select` de ambos hooks, del formulario/guardado de `PanelPersonalizacion.jsx`, y de `VistaBarberia.jsx` — `EncabezadoTabla` ya no recibe ni necesita `colorAcento`, usa `bg-cobre/10` directo (que ya refleja `color_primario` vía la variable CSS `--color-cobre` que fija todo el resto de la página).
+
+**Cómo se probó:** `npm run lint` y `npm run build` limpios.
+
+**Archivos afectados:**
+- Modificado: `supabase/migrations/20260821000002_agregar_servicios_horario_personalizables.sql` (reescrita, ahora 2 columnas), `src/utils/personalizacion.js`, `src/pages/barberias/components/VistaBarberia.jsx`, `src/pages/panel/hooks/usePersonalizacionAdmin.js`, `src/pages/barberias/hooks/useBarberiaPorSlug.js`, `src/pages/panel/PanelPersonalizacion.jsx`.
+
+**Pendiente / próximos pasos:**
+- Correr las 2 migraciones pendientes (`eslogan_color` y la de `mostrar_servicios`/`mostrar_horario`, ahora más chica).
+- Los mismos de siempre: criterio de testing seguro, `calcularSlotsDisponibles`, aviso de reserva nueva, hosting + cabeceras anti-clickjacking.

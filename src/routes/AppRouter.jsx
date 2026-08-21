@@ -1,4 +1,4 @@
-import { createBrowserRouter, Navigate, RouterProvider } from 'react-router-dom'
+import { createBrowserRouter, Navigate, RouterProvider, useParams } from 'react-router-dom'
 import { Home } from '../pages/Home/Home'
 import { PaginaBarberia } from '../pages/barberias/PaginaBarberia'
 import { RutaBarberia } from '../pages/barberias/RutaBarberia'
@@ -22,6 +22,15 @@ import { PanelSuperadminBarberiaDetalle } from '../pages/panel/PanelSuperadminBa
 import { PanelSuperadminPlanes } from '../pages/panel/PanelSuperadminPlanes'
 import { ROL_BARBERO, ROL_ADMIN, ROL_SUPERADMIN } from '../utils/roles'
 
+// Cualquiera que ya tenga guardado un link viejo con el prefijo (compartido
+// antes de este cambio, en Instagram/WhatsApp/etc.) sigue llegando a la
+// página correcta en vez de un 404 — `replace` para no dejar el link viejo
+// en el historial del navegador.
+function RedirigirBarberiaSinPrefijo() {
+  const { slug } = useParams()
+  return <Navigate to={`/${slug}`} replace />
+}
+
 const router = createBrowserRouter([
   { path: '/', element: <Home /> },
   { path: '/login', element: <Login /> },
@@ -32,14 +41,22 @@ const router = createBrowserRouter([
   // incluido `<Cursor />` (ver main.jsx), que ahí sigue el mouse local a ese
   // documento sin ningún problema.
   { path: '/_preview-barberia', element: <PreviewBarberia /> },
-  {
-    path: '/barberias/:slug',
-    element: <RutaBarberia />,
-    children: [{ index: true, element: <PaginaBarberia /> }],
-  },
+  { path: '/barberias/:slug', element: <RedirigirBarberiaSinPrefijo /> },
   {
     path: '/demo',
     element: <RutaDemo />,
+    children: [{ index: true, element: <PaginaBarberia /> }],
+  },
+  // Va al final a propósito: React Router prioriza rutas fijas sobre esta
+  // (`/:slug`) sin importar el orden del array, así que `/login`, `/demo`,
+  // `/panel`, `/admin` y `/_preview-barberia` siguen resolviendo a lo suyo —
+  // esta solo atrapa cualquier otra cosa, que es exactamente lo que tiene
+  // que pasar con el slug de una barbería. `esSlugReservado()` (utils/slug.js)
+  // bloquea crear una barbería con alguna de esas palabras, para que nunca
+  // quede con una página pública inalcanzable.
+  {
+    path: '/:slug',
+    element: <RutaBarberia />,
     children: [{ index: true, element: <PaginaBarberia /> }],
   },
   {

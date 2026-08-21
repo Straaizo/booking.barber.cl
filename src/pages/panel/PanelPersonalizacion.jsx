@@ -28,12 +28,15 @@ function construirVistaPrevia(barberia, form) {
       color_header: form.color_header || null,
       fuente_display: form.fuente_display,
       eslogan: form.eslogan,
+      eslogan_color: form.eslogan_color || null,
       descripcion: form.descripcion,
       secciones: form.secciones,
       orden_equipo: form.orden_equipo,
       estilo_whatsapp: form.estilo_whatsapp,
       whatsapp_color: form.whatsapp_color || null,
       whatsapp_tamano: form.whatsapp_tamano,
+      mostrar_servicios: form.mostrar_servicios,
+      mostrar_horario: form.mostrar_horario,
     },
   }
 }
@@ -48,23 +51,58 @@ function formularioDesdeBarberia(barberia) {
     color_header: p.color_header ?? '',
     fuente_display: p.fuente_display || 'fraunces',
     eslogan: p.eslogan ?? '',
+    eslogan_color: p.eslogan_color ?? '',
     descripcion: p.descripcion ?? '',
     secciones: p.secciones ?? [],
     orden_equipo: p.orden_equipo ?? [],
     estilo_whatsapp: p.estilo_whatsapp || 'enlace',
     whatsapp_color: p.whatsapp_color ?? '',
     whatsapp_tamano: p.whatsapp_tamano || 'mediana',
+    mostrar_servicios: p.mostrar_servicios ?? 1,
+    mostrar_horario: p.mostrar_horario ?? 1,
   }
 }
 
 function nuevaSeccion(tipo) {
   const id = 'sec-' + Date.now() + '-' + Math.floor(Math.random() * 1000)
-  if (tipo === 'galeria') return { id, tipo: 'galeria', titulo: '', imagenes: [] }
-  if (tipo === 'equipo') return { id, tipo: 'equipo', titulo: 'Nuestro equipo' }
-  return { id, tipo: 'imagen_texto', imagen: null, titulo: '', texto: '' }
+  if (tipo === 'galeria') {
+    return {
+      id,
+      tipo: 'galeria',
+      titulo: '',
+      imagenes: [],
+      estilo: 'grilla',
+      posicion: 'centro',
+      texto: '',
+      texto_cursiva: false,
+      texto_subrayado: false,
+      imagen_tamano: 'mediana',
+    }
+  }
+  if (tipo === 'equipo') return { id, tipo: 'equipo', titulo: 'Nuestro equipo', estilo: 'grilla' }
+  if (tipo === 'testimonios') {
+    return {
+      id,
+      tipo: 'testimonios',
+      titulo: 'Lo que dicen nuestros clientes',
+      items: [],
+      estilo: 'carrusel',
+      tamano: 'mediana',
+    }
+  }
+  return { id, tipo: 'imagen_texto', imagen: null, titulo: '', texto: '', posicion_imagen: 'izquierda' }
 }
 
-const ETIQUETA_TIPO_SECCION = { galeria: 'Galería', imagen_texto: 'Imagen y texto', equipo: 'Equipo' }
+const ETIQUETA_TIPO_SECCION = {
+  galeria: 'Galería',
+  imagen_texto: 'Imagen y texto',
+  equipo: 'Equipo',
+  testimonios: 'Testimonios',
+}
+
+function nuevoTestimonio() {
+  return { id: 'test-' + Date.now() + '-' + Math.floor(Math.random() * 1000), nombre: '', texto: '', estrellas: 5 }
+}
 
 function resumenSeccion(seccion, cantidadBarberos) {
   if (seccion.tipo === 'galeria') {
@@ -73,6 +111,10 @@ function resumenSeccion(seccion, cantidadBarberos) {
   }
   if (seccion.tipo === 'equipo') {
     return `${seccion.titulo || 'Nuestro equipo'} — ${cantidadBarberos} barbero${cantidadBarberos === 1 ? '' : 's'}`
+  }
+  if (seccion.tipo === 'testimonios') {
+    const n = seccion.items?.length ?? 0
+    return `${seccion.titulo || 'Sin título'} — ${n} testimonio${n === 1 ? '' : 's'}`
   }
   return seccion.titulo || 'Sin título'
 }
@@ -278,6 +320,35 @@ export function PanelPersonalizacion() {
     }))
   }
 
+  function agregarTestimonio(idSeccion) {
+    setForm((f) => ({
+      ...f,
+      secciones: f.secciones.map((s) =>
+        s.id === idSeccion ? { ...s, items: [...(s.items ?? []), nuevoTestimonio()] } : s
+      ),
+    }))
+  }
+
+  function actualizarTestimonio(idSeccion, idTestimonio, cambios) {
+    setForm((f) => ({
+      ...f,
+      secciones: f.secciones.map((s) =>
+        s.id === idSeccion
+          ? { ...s, items: s.items.map((t) => (t.id === idTestimonio ? { ...t, ...cambios } : t)) }
+          : s
+      ),
+    }))
+  }
+
+  function quitarTestimonio(idSeccion, idTestimonio) {
+    setForm((f) => ({
+      ...f,
+      secciones: f.secciones.map((s) =>
+        s.id === idSeccion ? { ...s, items: s.items.filter((t) => t.id !== idTestimonio) } : s
+      ),
+    }))
+  }
+
   async function subirImagenDeSeccion(id, evento) {
     const archivo = evento.target.files?.[0]
     if (!archivo) return
@@ -303,12 +374,15 @@ export function PanelPersonalizacion() {
         color_header: form.color_header || null,
         fuente_display: form.fuente_display,
         eslogan: form.eslogan,
+        eslogan_color: form.eslogan_color || null,
         descripcion: form.descripcion,
         secciones: form.secciones,
         orden_equipo: form.orden_equipo,
         estilo_whatsapp: form.estilo_whatsapp,
         whatsapp_color: form.whatsapp_color || null,
         whatsapp_tamano: form.whatsapp_tamano,
+        mostrar_servicios: form.mostrar_servicios,
+        mostrar_horario: form.mostrar_horario,
       })
       setFormGuardado(JSON.stringify(form))
       setEstadoToast('ok')
@@ -349,7 +423,7 @@ export function PanelPersonalizacion() {
           Así se ve tu página pública. Cambia lo que quieras a la izquierda — la vista previa de al
           lado se actualiza al instante, con el mismo botón para ver cómo queda en PC o en el
           celular de un cliente, y recién queda pública cuando guardas.{' '}
-          <HoverLink href={`/barberias/${barberia.slug}`} target="_blank" rel="noreferrer">
+          <HoverLink href={`/${barberia.slug}`} target="_blank" rel="noreferrer">
             Ver página pública →
           </HoverLink>
         </p>
@@ -486,14 +560,37 @@ export function PanelPersonalizacion() {
 
             <label className="flex flex-col gap-2">
               <span className="versalitas text-xs text-gris-calido-500">Eslogan</span>
-              <input
-                type="text"
-                name="eslogan"
-                value={form.eslogan}
-                onChange={(e) => setForm((f) => ({ ...f, eslogan: e.target.value }))}
-                placeholder="Corte de barrio, oficio de siempre"
-                className="min-h-11 border-b border-gris-calido-200 bg-transparent py-2 text-negro-barbero outline-none transition-colors focus:border-cobre"
-              />
+              <div className="flex items-center gap-3">
+                <input
+                  type="text"
+                  name="eslogan"
+                  value={form.eslogan}
+                  onChange={(e) => setForm((f) => ({ ...f, eslogan: e.target.value }))}
+                  placeholder="Corte de barrio, oficio de siempre"
+                  className="min-h-11 flex-1 border-b border-gris-calido-200 bg-transparent py-2 text-negro-barbero outline-none transition-colors focus:border-cobre"
+                />
+                <input
+                  type="color"
+                  name="eslogan_color"
+                  value={form.eslogan_color || '#a85c32'}
+                  onChange={(e) => setForm((f) => ({ ...f, eslogan_color: e.target.value }))}
+                  aria-label="Color del eslogan"
+                  className="h-11 w-11 shrink-0 cursor-pointer border border-gris-calido-200 bg-transparent"
+                />
+                {form.eslogan_color && (
+                  <button
+                    type="button"
+                    onClick={() => setForm((f) => ({ ...f, eslogan_color: '' }))}
+                    aria-label="Quitar color del eslogan"
+                    className="shrink-0 text-xs text-gris-calido-500 hover:text-red-700"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+              <span className="text-xs text-gris-calido-500">
+                Sin elegir un color, se ajusta solo para contrastar con el header.
+              </span>
             </label>
 
             <label className="flex flex-col gap-2">
@@ -702,6 +799,247 @@ export function PanelPersonalizacion() {
                             className="min-h-11 border-b border-gris-calido-200 bg-transparent py-2 text-sm text-negro-barbero outline-none transition-colors focus:border-cobre"
                           />
 
+                          <div className="flex flex-col gap-1">
+                            <span className="versalitas text-xs text-gris-calido-500">Estilo</span>
+                            <div className="flex gap-2">
+                              {[
+                                ['grilla', 'Grilla'],
+                                ['carrusel', 'Carrusel'],
+                              ].map(([valor, etiqueta]) => (
+                                <button
+                                  key={valor}
+                                  type="button"
+                                  onClick={() => actualizarSeccion(seccion.id, { estilo: valor })}
+                                  className={`versalitas rounded-md border px-3 py-2 text-xs transition-colors ${
+                                    (seccion.estilo ?? 'grilla') === valor
+                                      ? 'border-cobre text-cobre-texto'
+                                      : 'border-gris-calido-200 text-gris-calido-500'
+                                  }`}
+                                >
+                                  {etiqueta}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+
+                          {(seccion.estilo ?? 'grilla') === 'carrusel' && (
+                            <>
+                              <div className="flex flex-col gap-1">
+                                <span className="versalitas text-xs text-gris-calido-500">Posición</span>
+                                <div className="flex gap-2">
+                                  {[
+                                    ['izquierda', 'Izquierda'],
+                                    ['centro', 'Centro'],
+                                    ['derecha', 'Derecha'],
+                                  ].map(([valor, etiqueta]) => (
+                                    <button
+                                      key={valor}
+                                      type="button"
+                                      onClick={() => actualizarSeccion(seccion.id, { posicion: valor })}
+                                      className={`versalitas rounded-md border px-3 py-2 text-xs transition-colors ${
+                                        (seccion.posicion ?? 'centro') === valor
+                                          ? 'border-cobre text-cobre-texto'
+                                          : 'border-gris-calido-200 text-gris-calido-500'
+                                      }`}
+                                    >
+                                      {etiqueta}
+                                    </button>
+                                  ))}
+                                </div>
+                                <span className="text-xs text-gris-calido-500">
+                                  "Centro" no muestra texto al lado. En "Izquierda"/"Derecha" el carrusel
+                                  queda en una columna y el texto de abajo aparece en la columna opuesta.
+                                </span>
+                              </div>
+
+                              <div className="flex flex-col gap-1">
+                                <span className="versalitas text-xs text-gris-calido-500">Tamaño de la foto</span>
+                                <div className="flex gap-2">
+                                  {[
+                                    ['chica', 'Chica'],
+                                    ['mediana', 'Mediana'],
+                                    ['grande', 'Grande'],
+                                  ].map(([valor, etiqueta]) => (
+                                    <button
+                                      key={valor}
+                                      type="button"
+                                      onClick={() => actualizarSeccion(seccion.id, { imagen_tamano: valor })}
+                                      className={`versalitas rounded-md border px-3 py-2 text-xs transition-colors ${
+                                        (seccion.imagen_tamano ?? 'mediana') === valor
+                                          ? 'border-cobre text-cobre-texto'
+                                          : 'border-gris-calido-200 text-gris-calido-500'
+                                      }`}
+                                    >
+                                      {etiqueta}
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+
+                              {(seccion.posicion ?? 'centro') !== 'centro' && (
+                                <div className="flex flex-col gap-3 rounded-lg border border-gris-calido-200 p-4">
+                                  <textarea
+                                    name="galeria_texto"
+                                    value={seccion.texto ?? ''}
+                                    onChange={(e) => actualizarSeccion(seccion.id, { texto: e.target.value })}
+                                    rows={3}
+                                    placeholder="Texto acompañante — ej: 15 años de oficio, un corte a la vez."
+                                    className="border-b border-gris-calido-200 bg-transparent py-2 text-sm text-negro-barbero outline-none transition-colors focus:border-cobre"
+                                  />
+                                  <div className="flex flex-wrap items-center gap-5">
+                                    <div className="flex items-center gap-3">
+                                      <Interruptor
+                                        activo={Boolean(seccion.texto_cursiva)}
+                                        etiqueta="Cursiva"
+                                        onCambiar={(valor) => actualizarSeccion(seccion.id, { texto_cursiva: valor })}
+                                      />
+                                      <span className="versalitas text-xs text-gris-calido-500">Cursiva</span>
+                                    </div>
+                                    <div className="flex items-center gap-3">
+                                      <Interruptor
+                                        activo={Boolean(seccion.texto_subrayado)}
+                                        etiqueta="Subrayado"
+                                        onCambiar={(valor) =>
+                                          actualizarSeccion(seccion.id, { texto_subrayado: valor })
+                                        }
+                                      />
+                                      <span className="versalitas text-xs text-gris-calido-500">Subrayado</span>
+                                    </div>
+                                  </div>
+
+                                  <div className="flex flex-col gap-1">
+                                    <span className="versalitas text-xs text-gris-calido-500">Tamaño</span>
+                                    <div className="flex gap-2">
+                                      {[
+                                        ['chica', 'Chica'],
+                                        ['mediana', 'Mediana'],
+                                        ['grande', 'Grande'],
+                                        ['enorme', 'Enorme'],
+                                      ].map(([valor, etiqueta]) => (
+                                        <button
+                                          key={valor}
+                                          type="button"
+                                          onClick={() => actualizarSeccion(seccion.id, { texto_tamano: valor })}
+                                          className={`versalitas rounded-md border px-3 py-2 text-xs transition-colors ${
+                                            (seccion.texto_tamano ?? 'mediana') === valor
+                                              ? 'border-cobre text-cobre-texto'
+                                              : 'border-gris-calido-200 text-gris-calido-500'
+                                          }`}
+                                        >
+                                          {etiqueta}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  </div>
+
+                                  <label className="flex flex-col gap-1">
+                                    <span className="versalitas text-xs text-gris-calido-500">Tipografía</span>
+                                    <select
+                                      name="galeria_texto_fuente"
+                                      value={seccion.texto_fuente ?? ''}
+                                      onChange={(e) => {
+                                        const clave = e.target.value || null
+                                        if (clave) asegurarFuenteCargada(clave)
+                                        actualizarSeccion(seccion.id, { texto_fuente: clave })
+                                      }}
+                                      className="min-h-11 border-b border-gris-calido-200 bg-transparent py-2 text-sm text-negro-barbero outline-none transition-colors focus:border-cobre"
+                                    >
+                                      <option value="">La misma del sitio</option>
+                                      {FUENTES_DISPONIBLES.map((f) => (
+                                        <option key={f.clave} value={f.clave}>
+                                          {f.etiqueta}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </label>
+
+                                  <div className="flex flex-col gap-2 border-t border-gris-calido-200 pt-3">
+                                    <span className="versalitas text-xs text-gris-calido-500">
+                                      Frase destacada (opcional)
+                                    </span>
+                                    <div className="flex items-center gap-3">
+                                      <input
+                                        type="text"
+                                        name="galeria_texto_resaltado"
+                                        value={seccion.texto_resaltado ?? ''}
+                                        onChange={(e) =>
+                                          actualizarSeccion(seccion.id, { texto_resaltado: e.target.value })
+                                        }
+                                        placeholder="ej: hecho a mano."
+                                        className="min-h-11 flex-1 border-b border-gris-calido-200 bg-transparent py-2 text-sm text-negro-barbero outline-none transition-colors focus:border-cobre"
+                                      />
+                                      <input
+                                        type="color"
+                                        name="galeria_texto_resaltado_color"
+                                        value={seccion.texto_resaltado_color || '#a85c32'}
+                                        onChange={(e) =>
+                                          actualizarSeccion(seccion.id, {
+                                            texto_resaltado_color: e.target.value,
+                                          })
+                                        }
+                                        aria-label="Color de la frase destacada"
+                                        className="h-11 w-11 shrink-0 cursor-pointer border border-gris-calido-200 bg-transparent"
+                                      />
+                                    </div>
+
+                                    <div className="flex flex-col gap-1">
+                                      <span className="versalitas text-xs text-gris-calido-500">Tamaño</span>
+                                      <div className="flex gap-2">
+                                        {[
+                                          ['chica', 'Chica'],
+                                          ['mediana', 'Mediana'],
+                                          ['grande', 'Grande'],
+                                          ['enorme', 'Enorme'],
+                                        ].map(([valor, etiqueta]) => (
+                                          <button
+                                            key={valor}
+                                            type="button"
+                                            onClick={() =>
+                                              actualizarSeccion(seccion.id, { texto_resaltado_tamano: valor })
+                                            }
+                                            className={`versalitas rounded-md border px-3 py-2 text-xs transition-colors ${
+                                              (seccion.texto_resaltado_tamano ?? 'grande') === valor
+                                                ? 'border-cobre text-cobre-texto'
+                                                : 'border-gris-calido-200 text-gris-calido-500'
+                                            }`}
+                                          >
+                                            {etiqueta}
+                                          </button>
+                                        ))}
+                                      </div>
+                                    </div>
+
+                                    <label className="flex flex-col gap-1">
+                                      <span className="versalitas text-xs text-gris-calido-500">Tipografía</span>
+                                      <select
+                                        name="galeria_texto_resaltado_fuente"
+                                        value={seccion.texto_resaltado_fuente ?? ''}
+                                        onChange={(e) => {
+                                          const clave = e.target.value || null
+                                          if (clave) asegurarFuenteCargada(clave)
+                                          actualizarSeccion(seccion.id, { texto_resaltado_fuente: clave })
+                                        }}
+                                        className="min-h-11 border-b border-gris-calido-200 bg-transparent py-2 text-sm text-negro-barbero outline-none transition-colors focus:border-cobre"
+                                      >
+                                        <option value="">La misma del texto normal</option>
+                                        {FUENTES_DISPONIBLES.map((f) => (
+                                          <option key={f.clave} value={f.clave}>
+                                            {f.etiqueta}
+                                          </option>
+                                        ))}
+                                      </select>
+                                    </label>
+
+                                    <span className="text-xs text-gris-calido-500">
+                                      Se muestra al final del texto de arriba, siempre subrayada — tamaño,
+                                      tipografía y color son propios, no dependen del texto normal.
+                                    </span>
+                                  </div>
+                                </div>
+                              )}
+                            </>
+                          )}
+
                           <div className="flex flex-wrap gap-3">
                             {(seccion.imagenes ?? []).map((foto, i) => (
                               <div key={i} className="flex w-40 flex-col gap-2 rounded border border-gris-calido-200 bg-white p-2">
@@ -791,6 +1129,32 @@ export function PanelPersonalizacion() {
                             placeholder="Texto que acompaña a la imagen"
                             className="border-b border-gris-calido-200 bg-transparent py-2 text-sm text-negro-barbero outline-none transition-colors focus:border-cobre"
                           />
+                          <div className="flex flex-col gap-1">
+                            <span className="versalitas text-xs text-gris-calido-500">Imagen a la</span>
+                            <div className="flex gap-2">
+                              {[
+                                ['izquierda', 'Izquierda'],
+                                ['derecha', 'Derecha'],
+                              ].map(([valor, etiqueta]) => (
+                                <button
+                                  key={valor}
+                                  type="button"
+                                  onClick={() => actualizarSeccion(seccion.id, { posicion_imagen: valor })}
+                                  className={`versalitas rounded-md border px-3 py-2 text-xs transition-colors ${
+                                    (seccion.posicion_imagen ?? 'izquierda') === valor
+                                      ? 'border-cobre text-cobre-texto'
+                                      : 'border-gris-calido-200 text-gris-calido-500'
+                                  }`}
+                                >
+                                  {etiqueta}
+                                </button>
+                              ))}
+                            </div>
+                            <span className="text-xs text-gris-calido-500">
+                              Solo afecta el orden en pantallas grandes — en el celular la imagen siempre
+                              queda arriba.
+                            </span>
+                          </div>
                         </div>
                       )}
 
@@ -804,6 +1168,30 @@ export function PanelPersonalizacion() {
                             placeholder="Título de la sección — ej: Nuestro equipo"
                             className="min-h-11 border-b border-gris-calido-200 bg-transparent py-2 text-sm text-negro-barbero outline-none transition-colors focus:border-cobre"
                           />
+
+                          <div className="flex flex-col gap-1">
+                            <span className="versalitas text-xs text-gris-calido-500">Estilo</span>
+                            <div className="flex gap-2">
+                              {[
+                                ['grilla', 'Grilla'],
+                                ['carrusel', 'Carrusel'],
+                              ].map(([valor, etiqueta]) => (
+                                <button
+                                  key={valor}
+                                  type="button"
+                                  onClick={() => actualizarSeccion(seccion.id, { estilo: valor })}
+                                  className={`versalitas rounded-md border px-3 py-2 text-xs transition-colors ${
+                                    (seccion.estilo ?? 'grilla') === valor
+                                      ? 'border-cobre text-cobre-texto'
+                                      : 'border-gris-calido-200 text-gris-calido-500'
+                                  }`}
+                                >
+                                  {etiqueta}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+
                           <p className="text-xs text-gris-calido-500">
                             Este es el orden en que aparecen. Para agregar, quitar o editar la foto y la
                             especialidad de un barbero, ve a la pestaña "Barberos".
@@ -853,6 +1241,214 @@ export function PanelPersonalizacion() {
                           )}
                         </div>
                       )}
+
+                      {seccion.tipo === 'testimonios' && (
+                        <div className="flex flex-col gap-4">
+                          <input
+                            type="text"
+                            name="seccion_titulo"
+                            value={seccion.titulo}
+                            onChange={(e) => actualizarSeccion(seccion.id, { titulo: e.target.value })}
+                            placeholder="Título de la sección — ej: Lo que dicen nuestros clientes"
+                            className="min-h-11 border-b border-gris-calido-200 bg-transparent py-2 text-sm text-negro-barbero outline-none transition-colors focus:border-cobre"
+                          />
+
+                          <div className="flex flex-col gap-1">
+                            <span className="versalitas text-xs text-gris-calido-500">Estilo</span>
+                            <div className="flex gap-2">
+                              {[
+                                ['carrusel', 'Carrusel'],
+                                ['lista', 'Lista'],
+                              ].map(([valor, etiqueta]) => (
+                                <button
+                                  key={valor}
+                                  type="button"
+                                  onClick={() => actualizarSeccion(seccion.id, { estilo: valor })}
+                                  className={`versalitas rounded-md border px-3 py-2 text-xs transition-colors ${
+                                    (seccion.estilo ?? 'carrusel') === valor
+                                      ? 'border-cobre text-cobre-texto'
+                                      : 'border-gris-calido-200 text-gris-calido-500'
+                                  }`}
+                                >
+                                  {etiqueta}
+                                </button>
+                              ))}
+                            </div>
+                            <span className="text-xs text-gris-calido-500">
+                              "Carrusel" muestra una reseña a la vez (mejor con pocas). "Lista" muestra
+                              todas en tarjetas, una al lado de la otra (mejor con varias cargadas).
+                            </span>
+                          </div>
+
+                          <div className="flex flex-col gap-1">
+                            <span className="versalitas text-xs text-gris-calido-500">Tamaño del texto</span>
+                            <div className="flex gap-2">
+                              {[
+                                ['chica', 'Chica'],
+                                ['mediana', 'Mediana'],
+                                ['grande', 'Grande'],
+                                ['enorme', 'Enorme'],
+                              ].map(([valor, etiqueta]) => (
+                                <button
+                                  key={valor}
+                                  type="button"
+                                  onClick={() => actualizarSeccion(seccion.id, { tamano: valor })}
+                                  className={`versalitas rounded-md border px-3 py-2 text-xs transition-colors ${
+                                    (seccion.tamano ?? 'mediana') === valor
+                                      ? 'border-cobre text-cobre-texto'
+                                      : 'border-gris-calido-200 text-gris-calido-500'
+                                  }`}
+                                >
+                                  {etiqueta}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+
+                          <label className="flex flex-col gap-1">
+                            <span className="versalitas text-xs text-gris-calido-500">Tipografía</span>
+                            <select
+                              name="testimonios_fuente"
+                              value={seccion.fuente ?? ''}
+                              onChange={(e) => {
+                                const clave = e.target.value || null
+                                if (clave) asegurarFuenteCargada(clave)
+                                actualizarSeccion(seccion.id, { fuente: clave })
+                              }}
+                              className="min-h-11 border-b border-gris-calido-200 bg-transparent py-2 text-sm text-negro-barbero outline-none transition-colors focus:border-cobre"
+                            >
+                              <option value="">La misma del sitio</option>
+                              {FUENTES_DISPONIBLES.map((f) => (
+                                <option key={f.clave} value={f.clave}>
+                                  {f.etiqueta}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+
+                          <div className="flex flex-wrap items-end gap-6">
+                            <label className="flex flex-col gap-2">
+                              <span className="versalitas text-xs text-gris-calido-500">Color del texto</span>
+                              <div className="flex items-center gap-2">
+                                <input
+                                  type="color"
+                                  name="testimonios_color_texto"
+                                  value={seccion.color_texto || '#1c1b19'}
+                                  onChange={(e) => actualizarSeccion(seccion.id, { color_texto: e.target.value })}
+                                  className="h-11 w-14 cursor-pointer border border-gris-calido-200 bg-transparent"
+                                />
+                                {seccion.color_texto && (
+                                  <button
+                                    type="button"
+                                    onClick={() => actualizarSeccion(seccion.id, { color_texto: null })}
+                                    aria-label="Quitar color del texto"
+                                    className="text-xs text-gris-calido-500 hover:text-red-700"
+                                  >
+                                    ✕
+                                  </button>
+                                )}
+                              </div>
+                            </label>
+
+                            {(seccion.estilo ?? 'carrusel') === 'lista' && (
+                              <label className="flex flex-col gap-2">
+                                <span className="versalitas text-xs text-gris-calido-500">
+                                  Color de las tarjetas
+                                </span>
+                                <div className="flex items-center gap-2">
+                                  <input
+                                    type="color"
+                                    name="testimonios_color_fondo"
+                                    value={seccion.color_fondo || '#ffffff'}
+                                    onChange={(e) =>
+                                      actualizarSeccion(seccion.id, { color_fondo: e.target.value })
+                                    }
+                                    className="h-11 w-14 cursor-pointer border border-gris-calido-200 bg-transparent"
+                                  />
+                                  {seccion.color_fondo && (
+                                    <button
+                                      type="button"
+                                      onClick={() => actualizarSeccion(seccion.id, { color_fondo: null })}
+                                      aria-label="Quitar color de las tarjetas"
+                                      className="text-xs text-gris-calido-500 hover:text-red-700"
+                                    >
+                                      ✕
+                                    </button>
+                                  )}
+                                </div>
+                              </label>
+                            )}
+                          </div>
+
+                          {(seccion.items ?? []).length === 0 && (
+                            <p className="text-sm text-gris-calido-500">Todavía no agregaste ningún testimonio.</p>
+                          )}
+
+                          <div className="flex flex-col gap-3">
+                            {(seccion.items ?? []).map((testimonio) => (
+                              <div
+                                key={testimonio.id}
+                                className="flex flex-col gap-2 rounded-lg border border-gris-calido-200 bg-white p-3"
+                              >
+                                <textarea
+                                  name="testimonio_texto"
+                                  value={testimonio.texto}
+                                  onChange={(e) =>
+                                    actualizarTestimonio(seccion.id, testimonio.id, { texto: e.target.value })
+                                  }
+                                  rows={2}
+                                  placeholder="Lo que dijo el cliente"
+                                  className="border-b border-gris-calido-200 bg-transparent py-1 text-sm text-negro-barbero outline-none transition-colors focus:border-cobre"
+                                />
+                                <div className="flex flex-wrap items-center gap-3">
+                                  <input
+                                    type="text"
+                                    name="testimonio_nombre"
+                                    value={testimonio.nombre}
+                                    onChange={(e) =>
+                                      actualizarTestimonio(seccion.id, testimonio.id, { nombre: e.target.value })
+                                    }
+                                    placeholder="Nombre del cliente"
+                                    className="min-h-9 flex-1 border-b border-gris-calido-200 bg-transparent py-1 text-sm text-negro-barbero outline-none transition-colors focus:border-cobre"
+                                  />
+                                  <div className="flex items-center gap-1">
+                                    {[1, 2, 3, 4, 5].map((n) => (
+                                      <button
+                                        key={n}
+                                        type="button"
+                                        onClick={() =>
+                                          actualizarTestimonio(seccion.id, testimonio.id, { estrellas: n })
+                                        }
+                                        aria-label={`${n} estrella${n === 1 ? '' : 's'}`}
+                                        className={`text-base ${
+                                          n <= testimonio.estrellas ? 'text-cobre' : 'text-gris-calido-300'
+                                        }`}
+                                      >
+                                        ★
+                                      </button>
+                                    ))}
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => quitarTestimonio(seccion.id, testimonio.id)}
+                                    className="text-xs text-gris-calido-500 hover:text-red-700"
+                                  >
+                                    Quitar
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => agregarTestimonio(seccion.id)}
+                            className="versalitas w-fit rounded-md border border-gris-calido-200 px-3 py-2 text-xs text-gris-calido-700 hover:border-cobre hover:text-cobre-texto"
+                          >
+                            + Agregar testimonio
+                          </button>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -886,9 +1482,44 @@ export function PanelPersonalizacion() {
                   + Nuestro equipo
                 </button>
               )}
+              <button
+                type="button"
+                onClick={() => agregarSeccion('testimonios')}
+                className="versalitas rounded-md border border-gris-calido-200 px-3 py-2 text-xs text-gris-calido-700 hover:border-cobre hover:text-cobre-texto"
+              >
+                + Testimonios
+              </button>
             </div>
               </>
             )}
+          </section>
+
+          <section className="flex flex-col gap-6">
+            <TituloGrupo numero="04">Servicios y horario</TituloGrupo>
+            <p className="-mt-2 text-xs text-gris-calido-500">
+              Se calculan solos a partir de tus servicios y horarios reales — no se editan a mano acá,
+              solo se pueden ocultar. El encabezado de sus tablas usa el color de marca de arriba.
+            </p>
+
+            <div className="flex flex-wrap gap-8">
+              <div className="flex items-center gap-3">
+                <Interruptor
+                  activo={Boolean(form.mostrar_servicios)}
+                  etiqueta="Mostrar vidriera de servicios y precios"
+                  onCambiar={(valor) => setForm((f) => ({ ...f, mostrar_servicios: valor ? 1 : 0 }))}
+                />
+                <span className="versalitas text-xs text-gris-calido-500">Servicios y precios</span>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <Interruptor
+                  activo={Boolean(form.mostrar_horario)}
+                  etiqueta="Mostrar horario de atención"
+                  onCambiar={(valor) => setForm((f) => ({ ...f, mostrar_horario: valor ? 1 : 0 }))}
+                />
+                <span className="versalitas text-xs text-gris-calido-500">Horario de atención</span>
+              </div>
+            </div>
           </section>
 
           {/* El botón queda al final del formulario a propósito — se edita,

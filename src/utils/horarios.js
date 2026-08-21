@@ -15,6 +15,54 @@ export function fechaISO(fecha) {
   return fecha.toISOString().slice(0, 10)
 }
 
+const NOMBRES_DIA = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
+// Se muestra empezando el lunes (convención local), aunque `dia_semana` en
+// la base sigue el `Date.getDay()` de siempre (0 = domingo).
+const ORDEN_SEMANA_VISIBLE = [1, 2, 3, 4, 5, 6, 0]
+
+// Resume el horario de TODOS los barberos activos en un solo "horario de
+// atención" del local, para mostrar en la página pública: por día, toma la
+// apertura más temprana y el cierre más tardío entre todos los barberos que
+// atienden ese día (si alguien está, el local "está abierto" en ese rango),
+// y agrupa días consecutivos con el mismo resultado en una sola línea
+// ("Lunes a Viernes: 10:00 – 19:00") en vez de repetir el mismo horario 5
+// veces. Los días sin ningún bloque activo simplemente no aparecen.
+export function resumenHorarioSemanal(horarios) {
+  const porDia = new Map()
+  for (const h of horarios ?? []) {
+    if (!h.activo) continue
+    const actual = porDia.get(h.dia_semana)
+    if (!actual) {
+      porDia.set(h.dia_semana, { inicio: h.hora_inicio, fin: h.hora_fin })
+    } else {
+      if (h.hora_inicio < actual.inicio) actual.inicio = h.hora_inicio
+      if (h.hora_fin > actual.fin) actual.fin = h.hora_fin
+    }
+  }
+
+  const grupos = []
+  for (const dia of ORDEN_SEMANA_VISIBLE) {
+    const bloque = porDia.get(dia)
+    const texto = bloque ? `${bloque.inicio.slice(0, 5)} – ${bloque.fin.slice(0, 5)}` : null
+    const ultimo = grupos[grupos.length - 1]
+    if (ultimo && ultimo.texto === texto) {
+      ultimo.diaFin = dia
+    } else {
+      grupos.push({ diaInicio: dia, diaFin: dia, texto })
+    }
+  }
+
+  return grupos
+    .filter((g) => g.texto !== null)
+    .map((g) => ({
+      etiqueta:
+        g.diaInicio === g.diaFin
+          ? NOMBRES_DIA[g.diaInicio]
+          : `${NOMBRES_DIA[g.diaInicio]} a ${NOMBRES_DIA[g.diaFin]}`,
+      horario: g.texto,
+    }))
+}
+
 // dia_semana sigue Date.getDay(): 0 = domingo ... 6 = sábado. Una excepción
 // abierta (por ejemplo, el barbero entrando especialmente un día que
 // normalmente tiene el horario semanal en cero) también cuenta como día

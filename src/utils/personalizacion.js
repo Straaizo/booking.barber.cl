@@ -6,7 +6,7 @@
 // intercalar libremente con las galerías/imagen-y-texto — antes del trabajo,
 // después, en el medio — en vez de vivir fija siempre en el mismo lugar,
 // justamente para que no todas las páginas terminen con la misma forma.
-export const TIPOS_SECCION = ['galeria', 'imagen_texto', 'equipo']
+export const TIPOS_SECCION = ['galeria', 'imagen_texto', 'equipo', 'testimonios', 'horario']
 
 // Cada foto de una sección de galería es un objeto (url + tamaño + leyenda),
 // no un string suelto — permite que la barbería destaque unas fotos más que
@@ -17,16 +17,81 @@ function normalizarFoto(foto) {
   return { tamano: 'normal', leyenda: '', ...foto }
 }
 
+function normalizarTestimonio(testimonio) {
+  return { nombre: '', texto: '', estrellas: 5, ...testimonio }
+}
+
 function normalizarSeccion(seccion) {
   if (seccion.tipo === 'galeria') {
+    // 'grilla' (de siempre) o 'carrusel' (una foto grande a la vez, deslizando).
+    // `posicion`/`texto*` solo aplican al carrusel: 'centro' (de siempre, sin
+    // texto al lado) o 'izquierda'/'derecha' (el carrusel queda en una
+    // columna y aparece un texto acompañante en la columna opuesta — mismo
+    // patrón que ya usa "Imagen y texto").
     return {
       titulo: 'Galería',
+      estilo: 'grilla',
+      posicion: 'centro',
+      texto: '',
+      texto_cursiva: false,
+      texto_subrayado: false,
+      // `null` = usa la misma tipografía de títulos del resto del sitio
+      // (`fuente_display`) — un valor explícito la independiza.
+      texto_fuente: null,
+      texto_tamano: 'mediana',
+      // Frase destacada al final del texto (ej: la última oración de un
+      // eslogan) — siempre subrayada, con tamaño, tipografía y color
+      // propios, independientes de los del texto normal (`null` en
+      // `texto_resaltado_fuente`/`texto_resaltado_color` = hereda lo del
+      // texto normal / usa el color de marca).
+      texto_resaltado: '',
+      texto_resaltado_color: null,
+      texto_resaltado_tamano: 'grande',
+      texto_resaltado_fuente: null,
+      // Qué tan grande es la foto en sí — independiente de `estilo`/`posicion`.
+      imagen_tamano: 'mediana',
       ...seccion,
       imagenes: (seccion.imagenes ?? []).map(normalizarFoto),
     }
   }
   if (seccion.tipo === 'equipo') {
-    return { titulo: 'Nuestro equipo', ...seccion }
+    // 'grilla' (de siempre) o 'carrusel' (un barbero a la vez, deslizando).
+    return { titulo: 'Nuestro equipo', estilo: 'grilla', ...seccion }
+  }
+  if (seccion.tipo === 'imagen_texto') {
+    // De qué lado va la imagen en desktop — en mobile siempre queda apilada
+    // (imagen arriba, texto abajo) sin importar esto.
+    return { posicion_imagen: 'izquierda', ...seccion }
+  }
+  if (seccion.tipo === 'horario') {
+    // El horario en sí se calcula siempre de los `horarios_disponibles`
+    // reales (nunca se escribe a mano, ver `resumenHorarioSemanal` en
+    // utils/horarios.js) — esta sección solo guarda cómo se ve: título,
+    // posición, e imagen opcional del local para darle más credibilidad
+    // (mismo patrón que "Imagen y texto"/el carrusel de galería).
+    return {
+      titulo: 'Horario de atención',
+      posicion: 'centro',
+      imagen: null,
+      imagen_tamano: 'mediana',
+      ...seccion,
+    }
+  }
+  if (seccion.tipo === 'testimonios') {
+    // 'carrusel' (de siempre, una reseña a la vez) o 'lista' (todas visibles
+    // a la vez, en tarjetas — mejor con varias reseñas cargadas). `null` en
+    // `fuente`/`color_texto` hereda del sitio; `color_fondo` solo se ve en
+    // modo "lista" (el fondo de cada tarjeta) — `null` = blanco, de siempre.
+    return {
+      titulo: 'Lo que dicen nuestros clientes',
+      estilo: 'carrusel',
+      tamano: 'mediana',
+      fuente: null,
+      color_texto: null,
+      color_fondo: null,
+      ...seccion,
+      items: (seccion.items ?? []).map(normalizarTestimonio),
+    }
   }
   return seccion
 }
@@ -56,11 +121,22 @@ export function normalizarPersonalizacion(personalizacion) {
   if (!secciones.some((s) => s.tipo === 'equipo')) {
     secciones = [{ id: 'sec-equipo-migrada', tipo: 'equipo', titulo: 'Nuestro equipo' }, ...secciones]
   }
+  // "horario" pasó de ser un bloque fijo (siempre antes de la vidriera de
+  // servicios) a ser una sección más — igual criterio que "equipo": nadie
+  // pierde su horario visible solo por no haber tocado nada en esta
+  // pantalla. Va al FINAL (no al principio, como equipo) para mantener la
+  // posición visual que ya tenía, justo antes de servicios/reserva.
+  if (!secciones.some((s) => s.tipo === 'horario')) {
+    secciones = [...secciones, { id: 'sec-horario-migrada', tipo: 'horario', titulo: 'Horario de atención' }]
+  }
   return {
     color_primario: null,
     color_header: null,
     fuente_display: 'fraunces',
     eslogan: '',
+    // `null` = el eslogan usa el contraste automático de siempre según el
+    // color del header; un valor explícito lo independiza.
+    eslogan_color: null,
     descripcion: '',
     banner_url: null,
     orden_equipo: [],
@@ -73,6 +149,10 @@ export function normalizarPersonalizacion(personalizacion) {
     // uno explícito se independiza del resto de la identidad.
     whatsapp_color: null,
     whatsapp_tamano: 'mediana',
+    // La vidriera de servicios es un dato real (no contenido escrito a
+    // mano), pero a diferencia de "horario" no necesita posición/imagen
+    // propia todavía — se queda como un toggle simple. `1` = visible.
+    mostrar_servicios: 1,
     ...p,
     secciones,
   }

@@ -6,7 +6,7 @@ import { useBarberiasSuperadmin, useCrearBarberia, slugDisponible } from './hook
 import { usePlanesSuperadmin } from './hooks/usePlanesSuperadmin'
 import { NOMBRE_ESTADO, TONO_ESTADO, ESTADO_ACTIVO } from '../../utils/estados'
 import { proximoPago, diasHastaProximoPago } from '../../utils/facturacion'
-import { generarSlug } from '../../utils/slug'
+import { generarSlug, esSlugReservado } from '../../utils/slug'
 
 const BARBERIA_VACIA = { nombre: '', slug: '', plan_id: '' }
 
@@ -64,6 +64,10 @@ export function PanelSuperadminBarberias() {
     // a mandarse y vuelva con un error crudo de la base.
     if (nueva.slug.length < 3) {
       setErrorEnvio('El slug necesita al menos 3 caracteres — prueba con un nombre un poco más largo.')
+      return
+    }
+    if (esSlugReservado(nueva.slug)) {
+      setErrorEnvio('Ese slug está reservado por la app — la página pública nunca sería alcanzable. Elige otro.')
       return
     }
     if (estadoSlug !== 'disponible') {
@@ -150,7 +154,7 @@ export function PanelSuperadminBarberias() {
                 <div>
                   <span className="block font-medium text-negro-barbero">{barberia.nombre}</span>
                   <span className="versalitas block text-xs text-gris-calido-500">
-                    booking.barber.cl/barberias/{barberia.slug} · {barberia.planes?.nombre}
+                    booking.barber.cl/{barberia.slug} · {barberia.planes?.nombre}
                   </span>
                 </div>
                 <div className="flex items-center gap-5">

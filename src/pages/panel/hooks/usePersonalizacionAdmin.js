@@ -15,9 +15,10 @@ async function obtenerBarberiaParaPersonalizacionReal(barberiaId) {
     .select(
       `
       id, nombre, slug, logo_url, direccion, telefono_whatsapp, plan_id,
-      personalizacion (color_primario, color_header, fuente_display, eslogan, descripcion, banner_url, secciones, orden_equipo, estilo_whatsapp, whatsapp_color, whatsapp_tamano),
+      personalizacion (color_primario, color_header, fuente_display, eslogan, eslogan_color, descripcion, banner_url, secciones, orden_equipo, estilo_whatsapp, whatsapp_color, whatsapp_tamano, mostrar_servicios, mostrar_horario),
       servicios (id, nombre, duracion_minutos, precio_clp, precio_oferta, oferta_activa, oferta_vence, activo, barbero_id),
-      barberos (id, nombre, activo, foto_url, especialidad, usa_catalogo_propio)
+      barberos (id, nombre, activo, foto_url, especialidad, usa_catalogo_propio,
+        horarios_disponibles (dia_semana, hora_inicio, hora_fin, activo))
     `
     )
     .eq('id', barberiaId)
@@ -51,9 +52,17 @@ async function guardarPersonalizacionReal(barberiaId, cambios) {
     if (error) throw error
   }
   if (Object.keys(personalizacionCambios).length > 0) {
+    // `update`, no `upsert`: la fila de `personalizacion` siempre existe de
+    // antes (la crea sola `crear_personalizacion_default()` al crear la
+    // barbería) — con `upsert`, Postgres evalúa la política RLS de INSERT
+    // sobre la fila propuesta ANTES de llegar siquiera a la resolución por
+    // conflicto, y esa tabla nunca tuvo una policy de `insert` para
+    // `authenticated` (solo `personalizacion_update`) — por eso todo intento
+    // de guardar volvía 403, sin relación con ningún campo nuevo.
     const { error } = await supabase
       .from('personalizacion')
-      .upsert({ barberia_id: barberiaId, ...personalizacionCambios })
+      .update(personalizacionCambios)
+      .eq('barberia_id', barberiaId)
     if (error) throw error
   }
 }
