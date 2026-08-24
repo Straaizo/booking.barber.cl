@@ -1,9 +1,15 @@
 import { useEffect, useState } from 'react'
 
+// Mismo mínimo que valida la Edge Function `gestionar-usuario` (fuente de
+// verdad real) — repetido acá solo para avisar antes de gastar una llamada
+// al servidor, nunca como el único lugar que lo exige.
+const LARGO_MINIMO_PASSWORD = 8
+
 const ESTADOS_PASSWORD = {
   guardando: 'Guardando…',
   guardado: 'Contraseña actualizada',
   error: 'No se pudo guardar',
+  debil: `Mínimo ${LARGO_MINIMO_PASSWORD} caracteres`,
 }
 
 // Control para cambiar la contraseña de una cuenta ya existente — el dueño
@@ -27,10 +33,15 @@ export function CambiarPassword({ onGuardar }) {
 
   async function guardar(evento) {
     evento.preventDefault()
-    if (!password.trim()) return
+    const limpia = password.trim()
+    if (!limpia) return
+    if (limpia.length < LARGO_MINIMO_PASSWORD) {
+      setEstado('debil')
+      return
+    }
     setEstado('guardando')
     try {
-      await onGuardar(password.trim())
+      await onGuardar(limpia)
       setEstado('guardado')
       setPassword('')
     } catch {
@@ -79,7 +90,7 @@ export function CambiarPassword({ onGuardar }) {
         Cancelar
       </button>
       {estado && (
-        <span className={`versalitas text-xs ${estado === 'error' ? 'text-red-700' : 'text-verde-barberia'}`}>
+        <span className={`versalitas text-xs ${estado === 'error' || estado === 'debil' ? 'text-red-700' : 'text-verde-barberia'}`}>
           {ESTADOS_PASSWORD[estado]}
         </span>
       )}

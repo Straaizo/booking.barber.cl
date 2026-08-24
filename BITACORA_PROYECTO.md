@@ -3505,3 +3505,357 @@ Todo esto vive dentro del jsonb `secciones` (igual que `posicion_imagen` de "Ima
 **Pendiente / próximos pasos:**
 - Correr las 2 migraciones pendientes (`eslogan_color` y la de `mostrar_servicios`/`mostrar_horario`, ahora más chica).
 - Los mismos de siempre: criterio de testing seguro, `calcularSlotsDisponibles`, aviso de reserva nueva, hosting + cabeceras anti-clickjacking.
+
+---
+
+## 2026-08-21 (22) - "Horario de atención" pasó a ser una sección más, con posición e imagen
+
+**Qué se hizo:** Enzo pidió poder darle más credibilidad al horario de atención — agregarle una foto del local, y poder elegir su posición/tamaño como con las demás secciones — y planteó que tendría más sentido que fuera una sección de la página, no un bloque fijo. Se le preguntó explícitamente si convenía convertirlo (implicaba sacar el toggle `mostrar_horario` recién agregado) y confirmó que sí.
+
+**Implementado:** "horario" es ahora un tipo de sección más en `TIPOS_SECCION` (`utils/personalizacion.js`), con el mismo patrón que "Imagen y texto"/el carrusel de galería: `posicion` ('izquierda'/'centro'/'derecha' — en "Centro" solo la tabla, sin foto), `imagen` (foto opcional del local), `imagen_tamano`. El horario en sí sigue calculándose solo a partir de `horarios_disponibles` reales — nunca se escribe a mano, eso no cambió. Igual que pasó con "equipo" en su momento, `normalizarPersonalizacion` inyecta una sección de horario para cualquier barbería que no tenga una todavía (al final de la lista, en la misma posición visual que ya tenía) — nadie pierde su horario visible por este cambio.
+
+**Revertido de la entrada anterior:** la columna `mostrar_horario` (nunca llegó a usarse en la base real) — la migración pendiente quedó con una sola columna, `mostrar_servicios` (que sí se queda como toggle simple, porque a diferencia de horario todavía no pidió posición/imagen propia).
+
+**Cómo se probó:** `npm run lint` y `npm run build` limpios en cada paso.
+
+**Archivos afectados:**
+- Modificado: `supabase/migrations/20260821000002_agregar_servicios_horario_personalizables.sql` (reescrita otra vez, ahora 1 columna), `src/utils/personalizacion.js`, `src/pages/barberias/components/VistaBarberia.jsx` (`SeccionHorario` reescrita con posición/imagen), `src/pages/panel/hooks/usePersonalizacionAdmin.js`, `src/pages/barberias/hooks/useBarberiaPorSlug.js`, `src/pages/panel/PanelPersonalizacion.jsx` (editor de sección "horario" nuevo, botón "+ Horario de atención").
+
+**Pendiente / próximos pasos:**
+- Correr la migración pendiente (`eslogan_color` + la de `mostrar_servicios`, ahora 1 sola columna).
+- Confirmar visualmente con Enzo que puede agregar la foto del local y reordenar el horario junto a las demás secciones.
+- Los mismos de siempre: criterio de testing seguro, `calcularSlotsDisponibles`, aviso de reserva nueva, hosting + cabeceras anti-clickjacking.
+
+---
+
+## 2026-08-21 (23) - La marca de agua del header pasó a usar el mismo tamaño que el logo real
+
+**Qué se hizo:** Enzo mandó una captura del wordmark `booking.barber.cl` tal como se ve en `Header.jsx` (el sitio de marketing) — quería que la marca de agua del header de cada barbería (entradas (18)/(19) de hoy) se vea igual, no la versión chica y semi-transparente (`text-sm`, `opacity-70`) que se había puesto.
+
+**Fix:** las clases pasaron a `text-xl font-semibold italic tracking-tight` (exactamente las de `Header.jsx`) sin `opacity-70` — mismo tamaño y peso que el logo real, solo que reposicionado arriba a la derecha del encabezado de la barbería (y sigue oculto en la vista previa del panel, sin cambios ahí).
+
+**Cómo se probó:** `npm run lint` y `npm run build` limpios.
+
+**Archivos afectados:**
+- Modificado: `src/pages/barberias/components/VistaBarberia.jsx`.
+
+**Pendiente / próximos pasos:**
+- Los mismos de siempre: correr las migraciones pendientes, criterio de testing seguro, `calcularSlotsDisponibles`, aviso de reserva nueva, hosting + cabeceras anti-clickjacking.
+
+---
+
+## 2026-08-21 (24) - Bug real: la marca de agua cambiaba con la tipografía de la barbería + QA visual con Playwright
+
+**Qué se hizo:** Enzo reportó que al cambiar "Tipografía de títulos" en Identidad, "toda la tipografía de la página, o al menos lo que se puede personalizar" cambiaba junto con eso — le pareció un error. Pidió QA profesional con alguna librería que permita visualizar la página mientras se prueba, no solo revisión de código.
+
+**Auditoría de código (antes de tocar nada):** se rastrearon todos los usos de la clase `font-display` en `VistaBarberia.jsx`. La mayoría son intencionales (nombre de la barbería, títulos de sección, avatares sin foto, citas de testimonios, nombres de servicios) — todos elementos DE la barbería, que tiene sentido que sigan su tipografía elegida. Se encontró **una excepción real**: la marca de agua `booking.barber.cl` (agregada hoy en las entradas (18)/(19)/(23)) también usaba la clase `font-display`, así que heredaba `var(--font-display)` — la misma variable CSS que `estiloMarca` pisa con la tipografía que la barbería elige. Como esa marca es de la plataforma, no de la barbería, no tenía que cambiar nunca con esa elección — este era el bug real detrás del reclamo.
+
+**Fix:** la marca de agua dejó la clase `font-display` y pasó a fijar `style={{ fontFamily: '"Fraunces", ui-serif, Georgia, serif' }}` a mano — la misma pila que usa por defecto todo el sitio, pero ahora inmune a lo que la barbería elija.
+
+**QA visual con Playwright (instalado temporalmente, como se hacía antes de que el backend fuera real):**
+- Se instaló `playwright` + Chromium solo para esta prueba, se desinstaló después (`git diff` confirma que `package.json`/`package-lock.json` quedaron sin cambios).
+- Se levantó el dev server y se navegó de verdad a las 2 barberías reales (`barberia-jose-luis`, `barberia-golden`) — **solo lectura, ninguna escritura**: se inspeccionó la página pública tal cual está hoy, sin loguearse ni guardar nada.
+- Se confirmó por inspección del DOM real que la marca de agua ahora tiene `style="font-family: Fraunces, ui-serif, Georgia, serif"` fijo en el HTML — no la clase `font-display` que lee la variable personalizable. Como las dos barberías de prueba tienen su tipografía en "Fraunces" (la de siempre), el valor computado coincide igual que antes del fix — por eso la prueba definitiva fue estructural (inspeccionar el HTML/`style` real), no solo comparar el valor final.
+- Se guardaron capturas de ambas páginas para registro visual — sin regresiones visibles en galería, testimonios, equipo ni el resto de lo agregado hoy.
+
+**Cómo se probó:** `npm run lint` y `npm run build` limpios, más la QA visual real descrita arriba.
+
+**Archivos afectados:**
+- Modificado: `src/pages/barberias/components/VistaBarberia.jsx`.
+
+**Pendiente / próximos pasos:**
+- Sería ideal probar con una barbería que tenga una tipografía DISTINTA a Fraunces elegida, para ver con los propios ojos que la marca de agua ya no la sigue (hoy las 2 barberías reales usan la default, así que el cambio de valor no se pudo ver a simple vista, solo confirmar por HTML).
+- Los mismos de siempre: correr las migraciones pendientes, criterio de testing seguro, `calcularSlotsDisponibles`, aviso de reserva nueva, hosting + cabeceras anti-clickjacking.
+
+---
+
+## 2026-08-21 (25) - QA completa con Playwright sobre todo lo público + bug real encontrado en /demo
+
+**Qué se hizo:** Enzo pidió extender la QA visual (entrada (24)) a todo el resto de la aplicación y feedback de qué mejorar. Se instaló Playwright de nuevo (mismo criterio: temporal, solo lectura, desinstalado al final) y se recorrieron todas las rutas públicas en desktop (1400px) y mobile (390px): `/` (Inicio), `/login`, `/demo`, las 2 barberías reales, y una ruta inexistente — capturando pantalla, midiendo desborde horizontal (0 en todas) y grabando cualquier error/warning de consola.
+
+**2 falsas alarmas descartadas antes de reportarlas como bugs** (se verificaron a fondo, no se asumió nada):
+- La ruta inexistente parecía quedarse trabada en "Cargando barbería…" — con más tiempo de espera (~1s) se confirmó que sí redirige a Inicio; la primera prueba simplemente no esperó a que React Query terminara su reintento tras el 406 de Supabase (esperado: `.single()` sin filas devuelve error).
+- El campo de contraseña del login se veía "con puntos ya escritos" en la captura — es el `placeholder="••••••••"` (texto de ejemplo), no una contraseña precargada. Se confirmó leyendo `FormularioAcceso.jsx`: no hay ningún valor por defecto ni credencial hardcodeada.
+
+**Bug real encontrado y arreglado:** `/demo` (la página que le muestra el producto a alguien que todavía no es cliente) nunca mostraba "Nuestro equipo", "Horario de atención" ni "Servicios y precios" — su `personalizacion` en `config/demo.js` era un objeto literal que nunca pasaba por `normalizarPersonalizacion()` (a diferencia de toda barbería real, que sí pasa por ahí en los hooks reales), así que le faltaban `secciones` (con el "equipo"/"horario" que se auto-inyectan) y `mostrar_servicios`. La demo estaba mostrando el producto con menos funciones de las que tiene de verdad — justo el peor lugar para que eso pase.
+
+**Fix:** `BARBERIA_DEMO.personalizacion` ahora se construye con `normalizarPersonalizacion(...)`, igual que cualquier barbería real. Se le agregó `horarios_disponibles: HORARIOS_DEMO` al barbero de la demo (antes no tenía, así que aunque existiera la sección "Horario" no iba a tener datos para mostrar) y `plan_id: 2` (Equipo) para que las secciones personalizables no queden bloqueadas por plan. Confirmado con una nueva captura: la demo ya muestra Equipo, Horario de atención y Servicios y precios, igual que una barbería real.
+
+**Cómo se probó:** `npm run lint` y `npm run build` limpios, más el recorrido visual completo descrito arriba (0 errores de consola reales en ninguna ruta, aparte de warnings de GPU del modelo 3D que ya tiene su propio manejo de degradación a ilustración estática).
+
+**Feedback general para Enzo:**
+- Lo más urgente: **correr las 2 migraciones pendientes** (`eslogan_color`, `mostrar_servicios`) — sin eso, varios de los campos nuevos de hoy no se van a guardar de verdad todavía.
+- Esta QA cubrió todo lo público (Inicio, Login, Demo, páginas de barbería) porque no requiere sesión — el panel de administración (Personalización, Barberos, etc.) sigue sin poder probarse con Playwright porque no tengo credenciales reales y no corresponde que las adivine. Si en algún momento Enzo quiere que se prueben también esos flujos, hace falta una cuenta de prueba dedicada (o el criterio de testing seguro que sigue pendiente desde hace varias entradas).
+- Con tantos controles nuevos de tamaño/posición agregados hoy (galería, imagen y texto, testimonios, horario), el próximo paso más valioso sería probar el panel de Personalización en sí mismo — clickear cada control nuevo y confirmar que la vista previa reacciona bien — apenas haya forma segura de hacerlo.
+
+**Archivos afectados:**
+- Modificado: `src/config/demo.js`.
+
+**Pendiente / próximos pasos:**
+- Correr las migraciones pendientes.
+- Definir cómo probar el panel autenticado de forma segura (cuenta de prueba dedicada o proyecto de staging).
+- Los mismos de siempre: `calcularSlotsDisponibles`, aviso de reserva nueva, hosting + cabeceras anti-clickjacking.
+
+---
+
+## 2026-08-24 (26) - QA autenticada real (dueño + superadmin) contra la base de datos en vivo
+
+**Qué se hizo:** Enzo corrió él mismo las 2 migraciones pendientes desde el panel SQL de Supabase (`eslogan_color`, `mostrar_servicios`) y compartió credenciales reales para destrabar la QA que quedó pendiente en la entrada (25): dueño `jluis` y superadmin `esabattini`. Se instaló Playwright de nuevo (mismo criterio de siempre: temporal, desinstalado al final) y se probaron ambos flujos autenticados contra el backend real, siempre en modo lectura salvo un cambio explícitamente invitado por Enzo.
+
+**Flujo dueño (`jluis`):**
+- Login limpio, sin errores de consola/HTTP.
+- Panel de Personalización + vista previa en vivo cargan correctamente reflejando todo lo construido en la entrada (25): galería con posición y frase destacada independiente, testimonios, "Horario de atención" ya como sección reordenable, tabla de Servicios.
+- Prueba de guardado real: se cambió `eslogan_color` a `#2f4538` (verde barbería), se guardó, y **se confirmó que persiste tras recargar la página desde cero** — valida en producción tanto la migración recién corrida como el fix de la entrada (24) (`.update()` en vez de `.upsert()` por el 403 de RLS) y el fix de "se me olvidó `eslogan_color` en el payload de guardado". Ese cambio se dejó así (no se revirtió), por invitación explícita de Enzo.
+- Recorrido completo del formulario en tramos de scroll (alto real: 1929px): "Secciones de la página" muestra Galería/Testimonios/Horario de atención/Equipo en la lista reordenable, con los botones "+ Horario de atención"/"+ Nuestro equipo" correctamente ocultos porque esas secciones ya existen; el toggle de "Servicios y precios" y el botón "Guardar cambios" se ven bien. Cero errores.
+
+**Bug de metodología de prueba encontrado y corregido (no es bug de la app):** asignar `.value` directo a un `<input type="color">` controlado por React y despachar un evento `input` no alcanza — React instrumenta el setter nativo, así que el cambio se ignora silenciosamente (el swatch cambia pero la vista previa no reacciona). Se resolvió llamando al setter *nativo* del prototipo antes de despachar el evento — ver el comentario en el script de la época, ya borrado junto con el resto de los temporales.
+
+**Flujo superadmin (`esabattini`), solo lectura:** login limpio; lista de Barberías (`/admin`) muestra las 2 barberías reales con la URL ya acortada correctamente (`booking.barber.cl/barberia-golden`, sin el prefijo `/barberias/`); página de detalle/auditoría de una barbería renderiza plan, cambio de estado, usuarios y historial sin tocar ningún control de escritura; Planes se ve correcto. Cero errores de consola/HTTP en todo el flujo.
+
+**Conclusión:** las 3 correcciones más importantes de las últimas entradas ((24) el 403 de guardado, (25) las secciones faltantes en /demo, y el acortamiento de URL) quedan confirmadas funcionando de punta a punta contra la base de datos real, no solo por lectura de código.
+
+**Cómo se probó:** Playwright contra `http://localhost:5177` apuntando al backend real de Supabase (sin BD de prueba separada, decisión consciente de Enzo) — login real con ambas cuentas, captura de pantalla en cada paso, verificación de consola/HTTP en cada script.
+
+**IMPORTANTE — seguridad:** las contraseñas reales de `esabattini` y `jluis` quedaron escritas en el historial de esta conversación con Claude. Se le recomendó a Enzo rotar la contraseña de `esabattini` (la cuenta con más privilegios) ahora que ya se usó y quedó expuesta en ese historial.
+
+**Archivos afectados:**
+- Ninguno de código — solo datos reales (`eslogan_color` de "Barbería Jose Luis" cambiado a `#2f4538`, cambio deseado y dejado así).
+- Limpieza: se borraron los 6 scripts temporales de QA de esta y la sesión anterior, se desinstaló Playwright (`git diff --stat package.json package-lock.json` vacío) y se detuvo el servidor de desarrollo en segundo plano.
+
+**Pendiente / próximos pasos:**
+- Enzo: rotar la contraseña de `esabattini`.
+- Seguir proponiendo mejoras concretas ahora que hay forma segura de probar el panel autenticado (cuenta dueño real, de bajo riesgo).
+- Los mismos de siempre: `calcularSlotsDisponibles` (usar el `fin` real de `horas_ocupadas` en vez de aproximarlo), aviso de reserva nueva (sigue en `console.info`), hosting + cabeceras anti-clickjacking, criterio formal de testing seguro (aunque esta entrada ya deja un patrón que funciona: Playwright temporal + cuentas reales de bajo riesgo con autorización explícita).
+
+---
+
+## 2026-08-24 (27) - Auditoría de seguridad completa (RLS, Edge Function, XSS, fuga de datos) + 2 fixes reales
+
+**Qué se hizo:** Enzo pidió explícitamente ponerse en rol de ciberseguridad y revisar todo el sistema (especialmente lo que pasa por Supabase — RLS, API, Auth) buscando fugas de datos o formas de vulnerarlo, y protegerlo. Se auditó de punta a punta, no solo por lectura superficial: las ~40 policies RLS de `20260819120000_schema.sql` tabla por tabla, los `grant` a nivel de esquema, las 4 funciones `security definer`, la Edge Function `gestionar-usuario` (el único punto con `SUPABASE_SERVICE_ROLE_KEY`), el flujo de login por `usuario` (no email), el manejo de imágenes (confirmado: siguen como data URL en columnas de texto, nunca se migraron a Supabase Storage real — ver comentario en `utils/imagenes.js`), todos los `href`/`src` que usan texto personalizable por el dueño (posible XSS), el postMessage del iframe de vista previa, y que ninguna clave de servicio quedara expuesta en `.env`, en el bundle de `dist/` o en el historial de git.
+
+**Conclusión general:** el diseño ya es sólido — RLS multi-tenant correctamente aislado por `barberia_id`/`barbero_id` en cada tabla, sin ninguna policy que permita cruzar de tenant; `usuarios` sin ninguna policy de insert/update/delete (todo pasa por la Edge Function, que verifica rol de verdad contra la tabla, no confía en el body); ninguna clave de servicio en el cliente; cero `dangerouslySetInnerHTML` y cero `href` construido con texto crudo del dueño (`linkWhatsApp`/`linkGoogleMaps` siempre anteponen un scheme fijo); el postMessage de la vista previa ya validaba `origin`; los tokens de cancelación son UUID completos (no adivinables); los triggers de `reservas` recalculan precio/duración siempre desde la base real, nunca desde lo que manda el cliente. No es una lista de bugs — es la confirmación de que las decisiones de diseño de las entradas anteriores (RLS antes que UI, `security definer` con `search_path` fijo, tokens opacos, RPCs en vez de SELECT público) están cumpliendo su función.
+
+**2 debilidades reales encontradas y corregidas (no eran solo teóricas):**
+
+1. **Inundación de reservas falsas.** El único freno del INSERT público de `reservas` era por teléfono (5/hora) — un campo de texto autodeclarado, trivial de saltarse variando los dígitos en cada request. Sin cuenta, sin CAPTCHA, cualquiera con un script podía ocupar con reservas falsas toda la agenda real de una barbería (hasta 6 meses hacia adelante) y dejarla sin cupos para clientes de verdad — no es fuga de datos, es sabotaje del producto principal. **Fix:** nuevo trigger `limitar_reservas_por_barberia()` (freno adicional por barbería completa, sin importar el teléfono: máximo 20 reservas nuevas cada 10 minutos) en `supabase/migrations/20260824000000_reforzar_seguridad_reservas.sql`. No reemplaza el freno por teléfono, se suma. **Pendiente real, no resuelto acá:** esto reduce el daño, no lo elimina — un CAPTCHA (Cloudflare Turnstile o hCaptcha) en el formulario público de reserva sería la solución de fondo, pero requiere que Enzo cree una cuenta en ese servicio externo, así que no se implementó sin decidirlo con él primero.
+
+2. **Contraseñas de cuentas de dueño/barbero sin mínimo real.** Los 5 formularios que crean o cambian una contraseña (`PanelBarberos.jsx`, `CambiarPassword.jsx`, y los 3 de `PanelSuperadminBarberiaDetalle.jsx`) solo comprobaban que el campo no estuviera vacío — el mínimo real terminaba siendo el default de Supabase Auth (6 caracteres), insuficiente para cuentas que ven nombre y teléfono de clientes reales y pueden operar la agenda de una barbería. **Fix:** mínimo de 8 caracteres agregado en 2 capas — la Edge Function `gestionar-usuario` (la barrera real: rechaza `crear_dueno`/`crear_barbero`/`resetear_password` con `password` corta sin importar qué mande el cliente) y, para que el aviso sea inmediato y no un error genérico, el mismo chequeo en los 5 puntos del frontend. Probado visualmente con Playwright: una contraseña de 6 caracteres ahora muestra "Mínimo 8 caracteres" en vez de intentar guardar.
+
+**Cómo se probó:** lectura completa y razonada de las ~1500 líneas de `20260819120000_schema.sql` (policies, grants, triggers, funciones) y de la Edge Function completa; `npm run lint` y `npm run build` limpios tras los cambios; grep dirigido para descartar `dangerouslySetInnerHTML`, `eval`, `innerHTML=`, `console.log` de sesión/token, y claves `service_role` en `.env`/`dist/`/historial de git; prueba visual real con Playwright (instalado y desinstalado igual que siempre) contra el backend real como `jluis`, confirmando en pantalla que el aviso de contraseña débil aparece y que no se llega a llamar la Edge Function con una contraseña inválida.
+
+**Archivos afectados:**
+- Nuevo: `supabase/migrations/20260824000000_reforzar_seguridad_reservas.sql` (**Enzo tiene que correrlo en el panel SQL de Supabase, igual que las 2 migraciones anteriores** — no hay conexión directa a la base de datos de producción desde acá).
+- Modificado: `supabase/migrations/20260819120000_schema.sql` (solo el comentario final de pendientes, ninguna instrucción SQL — no reejecutar, ya corrió).
+- Modificado: `supabase/functions/gestionar-usuario/index.ts` (mínimo de contraseña) — **hay que volver a desplegarla** (`supabase functions deploy gestionar-usuario`) para que el fix quede activo en producción.
+- Modificado: `src/components/panel/CambiarPassword.jsx`, `src/pages/panel/PanelBarberos.jsx`, `src/pages/panel/PanelSuperadminBarberiaDetalle.jsx` (mínimo de contraseña, aviso inmediato).
+
+**Pendiente / próximos pasos:**
+- Enzo: correr la migración nueva en el panel SQL de Supabase y redesplegar la Edge Function.
+- Decidir con Enzo si vale la pena un CAPTCHA (Turnstile/hCaptcha) en el formulario público de reserva — requiere cuenta en un servicio externo.
+- Evaluar migrar imágenes (logo, fotos de barbero, banner, imágenes de secciones) de data URL en columnas de texto a Supabase Storage real — no es una fuga de datos, pero sí un problema de rendimiento/costo a mediano plazo (cada visita a la página pública descarga esas imágenes incrustadas en el JSON de la fila, sin caché de navegador ni de CDN posible).
+- Hosting + cabeceras anti-clickjacking: sigue pendiente porque no hay ningún archivo de configuración de hosting en el repo (`firebase.json`/`vercel.json`/`netlify.toml`) — Enzo confirmó que todavía no está decidido dónde se despliega, así que queda pendiente hasta que lo esté (no vale la pena adivinar un archivo de config para un host que después puede cambiar).
+- Seguir recomendando rotar la contraseña de `esabattini` (pendiente desde la entrada (26)).
+
+---
+
+## 2026-08-24 (28) - Antispam por teléfono: de "5 por hora" a enfriamiento de 12 minutos
+
+**Qué se hizo:** Enzo pidió explícitamente cambiar el criterio del freno por teléfono de la entrada (27): en vez de permitir hasta 5 reservas por hora desde el mismo número, que ese número quede bloqueado por completo durante un enfriamiento corto después de reservar — la idea es que si alguien se equivocó o necesita cambiar algo, tenga que llamar directo a la barbería en vez de generar otra reserva encima. Explícito también: no quiere que reservar exija crear una cuenta, tiene que seguir siendo tan accesible como hoy (solo nombre + teléfono).
+
+**Fix:** se reemplazó por completo el bloque de antispam dentro de `validar_disponibilidad_reserva()` (la función ya existía en `20260819120000_schema.sql`, corrida en producción) — de "≥5 reservas en la última hora" a "≥1 reserva en los últimos 12 minutos" con el mismo teléfono. Como todavía no se había corrido la migración de la entrada (27), se agregó este cambio ahí mismo (`20260824000000_reforzar_seguridad_reservas.sql`) como un `create or replace function` completo de `validar_disponibilidad_reserva()` — Postgres no permite reemplazar solo un fragmento de una función, así que se redefine entera (el resto del cuerpo queda idéntico al original). En `20260819120000_schema.sql` se dejó un comentario `[SUPERADO]` junto al bloque viejo, sin tocar el SQL en sí (es el registro histórico de la migración ya corrida).
+
+**Bug real encontrado de paso, y arreglado:** el mensaje de error que ve el cliente en el asistente de reserva (`AsistenteReserva.jsx`) era siempre genérico ("No pudimos confirmar tu reserva. Intenta nuevamente."), sin importar la causa real — así que aunque el trigger dijera exactamente "comunícate directamente con la barbería", el cliente nunca iba a leer eso. Se agregó `mensajeErrorReserva()`: muestra el mensaje real de Postgres solo cuando `error.code === 'P0001'` (el código que Postgres asigna a un `raise exception` propio, que es exactamente el que usan todas las validaciones de negocio de esta tabla — horario no disponible, franja mal alineada, enfriamiento por teléfono, freno por barbería — todas escritas en español a propósito para el cliente); cualquier otro código (por ejemplo el choque de horario de `reservas_sin_solape`, un error de red) sigue mostrando el mensaje genérico, porque esos sí son técnicos y no corresponde exponerlos.
+
+**Cómo se probó:** `npm run lint` y `npm run build` limpios. No se probó en vivo contra la base real porque el trigger nuevo todavía no está corrido (ver pendiente).
+
+**Archivos afectados:**
+- Modificado: `supabase/migrations/20260824000000_reforzar_seguridad_reservas.sql` (todavía sin correr — Enzo la corre directo en el SQL Editor de Supabase).
+- Modificado: `supabase/migrations/20260819120000_schema.sql` (solo un comentario `[SUPERADO]`, ningún cambio de SQL — no reejecutar, ya corrió).
+- Modificado: `src/pages/barberias/components/AsistenteReserva.jsx` (mensaje de error real para el cliente).
+
+**Pendiente / próximos pasos:**
+- Enzo: correr `20260824000000_reforzar_seguridad_reservas.sql` completo (ya incluye el freno por barbería de la (27) + este cambio) en el SQL Editor de Supabase.
+- Los mismos de la entrada (27): redesplegar `gestionar-usuario`, decidir CAPTCHA, migrar imágenes a Storage real, cabeceras de hosting (pendiente de decidir dónde se despliega), rotar la contraseña de `esabattini`.
+
+---
+
+## 2026-08-24 (29) - Celular con formato chileno forzado + el footer ya no salta entre pasos del asistente
+
+**Qué se hizo:** dos pedidos de UX/UI sobre el asistente de reserva pública, probados con Playwright contra `/demo` (datos de mock, cero riesgo de escribir sobre una barbería real):
+
+**1. Teléfono con nomenclatura chilena forzada (`+56 9 0000 0000`).** El campo de celular en "Tus datos" (`PasoDatos.jsx`) ahora muestra "+56 9" como una etiqueta fija, no editable — lo único que el cliente puede escribir son los 8 dígitos siguientes. Cada tecla que no sea un número se descarta al tipear (letras, espacios, guiones, un `+56` de más, un pegado con basura — todo se filtra en el momento, no se avisa recién al enviar) y el campo se autoformatea "1234 5678" a medida que se escribe. `esquemaReserva.js` valida la forma final (`^9\d{8}$`) y además rechaza los 8 dígitos repetidos (90000000, 91111111...) con "Ese número no parece un celular real" — no es una defensa de seguridad (esa ya está en el trigger `normalizar_telefono()` de la base, que igual habría rechazado cualquier formato no chileno), es para que la agenda no se llene de números obviamente falsos que nadie puede usar para llamar a un cliente real.
+
+**2. El footer ya no salta al cambiar de paso.** Bug real reportado por Enzo: cada paso del asistente (Barbero → Servicio → Horario → Tus datos → Confirmado) tiene una altura distinta, y como el `<Footer>` viene justo después en el flujo normal del documento (`VistaBarberia.jsx`), saltaba hacia arriba o abajo en cada paso. En vez de adivinar un alto fijo en píxeles (que quedaría corto o largo según cuántos servicios/barberos tenga cada barbería — pedido explícito de Enzo: que funcione "independiente de qué sección esté primero o no"), se mide con `ResizeObserver` el alto real de cada paso a medida que se visita, y se aplica como `min-height` el más alto visto hasta ese momento — nunca se achica. Se encontró y corrigió de paso un detalle: la barra de progreso ("01/04 — Horario") vivía afuera del contenedor medido y no se muestra en el paso final "Confirmado" — sin moverla adentro de la medición, el conjunto se achicaba por el alto exacto de esa barra aunque el resto tuviera el piso puesto. Ahora todo (barra de progreso + contenido del paso) se mide junto.
+
+**Cómo se probó:** Playwright temporal contra `/demo` — se recorrió el asistente completo (servicio → horario → datos → confirmado) midiendo la posición Y del footer en cada paso; probado específicamente el caso de mayor riesgo (pasar de "Tus datos", el paso más alto, a "Confirmado", el más bajo de todos) y confirmado que el footer no se mueve. Para el teléfono: se probó tipeando basura ("abc 12-34 xy56 78!!990011") y quedó filtrado a solo los primeros 8 dígitos reales; se probó un número con los 8 dígitos iguales y mostró el error correcto sin dejar enviar el formulario; se probó un número válido y confirmó la reserva de prueba normalmente. `npm run lint` y `npm run build` limpios. Playwright instalado y desinstalado igual que siempre, sin dejar rastro en `package.json`/`package-lock.json`.
+
+**Archivos afectados:**
+- `src/pages/barberias/components/PasoDatos.jsx` (input de teléfono con prefijo fijo y formateo en vivo).
+- `src/pages/barberias/components/esquemaReserva.js` (validación ajustada a la nueva forma del campo + rechazo de dígitos repetidos).
+- `src/pages/barberias/components/AsistenteReserva.jsx` (medición de altura mínima con `ResizeObserver`, incluyendo la barra de progreso).
+
+**Pendiente / próximos pasos:** los mismos de las entradas (27)/(28) — nada nuevo generado por este cambio.
+
+---
+
+## 2026-08-24 (30) - Bug real de fuga de color: las estrellas de testimonios seguían el color de marca aunque tuvieran su propio color
+
+**Qué se hizo:** Enzo reportó que al modificar un color en Personalización, "hay partes que se modifican también" — pidiendo probarlo a fondo, ya que cada personalización tiene su propio color independiente. Se armó una prueba con Playwright contra la cuenta real de `jluis`, cambiando colores en el formulario **sin guardar nunca** (la vista previa se actualiza por `postMessage`, así que se pudo probar libremente sin tocar la base de datos real) y leyendo el color computado (`getComputedStyle`) de cada elemento clave del preview antes/después de cada cambio — no evaluando "se ve distinto" a ojo, sino comparando el valor real de CSS.
+
+**Bug real confirmado:** el componente `Estrellas` (las ★★★★★ de los testimonios) tenía la clase `text-cobre` fija — es decir, seguía el "Color de marca" (Identidad) sin importar que la sección de Testimonios tuviera su propio control de "Color del texto". Al cambiar solo el color de marca, las estrellas cambiaban igual, aunque el dueño ya hubiera elegido un color distinto para esa sección — exactamente el reclamo de Enzo. Confirmado con datos reales: color de marca → verde lima, estrellas → verde lima (bug); mismo cambio con "Color del texto" de testimonios ya puesto en azul → estrellas correctamente se quedaron en azul.
+
+**Fix:** `Estrellas` ahora recibe el mismo `color` que ya usa el texto de la reseña (`estiloTexto.color`, el mismo valor de "Color del texto") — mismo patrón de fallback que el resto de la pantalla: con color propio, lo usa; sin él, sigue el color de marca (`var(--color-cobre)`), igual que la frase destacada del carrusel de galería. Se sacó la clase `text-cobre` fija y se pasó a estilo en línea.
+
+**Otros controles de color revisados y confirmados SIN el mismo problema** (aislados correctamente, cada uno con su propio inline style que pisa el color de marca cuando está puesto): color del eslogan, color de las tarjetas de testimonios, frase destacada del carrusel de galería, color del header. Los puntos de paginación del carrusel y las flechas de navegación (‹ › ) sí siguen el color de marca siempre — a propósito, no tienen ningún control propio en el panel (son navegación, no contenido), así que no cuentan como fuga.
+
+**Cómo se probó:** Playwright temporal contra la cuenta real de `jluis`, leyendo `getComputedStyle(...).color` de las estrellas, el texto de la reseña, el eslogan y la frase destacada en 4 momentos: (1) estado original, (2) tras cambiar solo "Color de marca", (3) tras fijarle a testimonios su propio color y volver a cambiar "Color de marca" (testimonios no debía moverse — confirmado), (4) tras quitar el color propio de testimonios (debía volver a seguir el color de marca — confirmado). `npm run lint` y `npm run build` limpios. Ningún cambio se guardó contra la base real — todo se probó solo en la vista previa (sin `.click()` en "Guardar cambios"), así que "Barbería Jose Luis" queda intacta.
+
+**Archivos afectados:**
+- `src/pages/barberias/components/VistaBarberia.jsx` (`Estrellas` ahora recibe y respeta `color`).
+
+**Pendiente / próximos pasos:** ninguno nuevo — si Enzo encuentra otro color que se "contagie", el mismo método (comparar `getComputedStyle` antes/después de un cambio aislado) es la forma de confirmarlo rápido en vez de adivinar por captura de pantalla.
+
+---
+
+## 2026-08-24 (31) - La causa real no era un color "contagiado": los guardados de Personalización pueden perderse en silencio
+
+**Qué se hizo:** Enzo insistió en que el bug seguía — cambió "Color de marca" y la frase destacada de la galería cambió con él, a pesar del fix de la entrada (30). Se armó una prueba de punta a punta (guardar de verdad contra la cuenta real de `jluis`, no solo en la vista previa sin guardar) para reproducirlo tal cual él lo vivió.
+
+**Lo que se encontró NO es lo que se pensaba.** No es un problema de CSS ni de aislamiento de color — el fix de la (30) sigue siendo correcto y necesario, pero había otra causa, más grave, actuando al mismo tiempo:
+
+**Guardar cualquier cambio en Personalización — aunque sea un solo color — puede tardar varios segundos, y si la página se recarga o se cierra antes de que termine, el cambio se pierde sin ningún aviso.** La razón: `personalizacion.secciones` es UNA sola columna jsonb, y las fotos de la galería viven ahí adentro como texto (data URL en base64, no hay Storage real de Supabase todavía — pendiente ya anotado en la entrada (27)). Cada vez que se guarda CUALQUIER cosa — con cambiar un solo color alcanza — se reenvía esa columna completa, con las 4 fotos adentro. Medido de verdad contra el servidor real: **el cuerpo de esa petición pesó 1.610.069 caracteres (~1,6 MB) y tardó 2,6 a 3,1 segundos en completarse.** Si algo interrumpe la página antes de eso (una recarga, cerrar la pestaña, el navegador cortando la conexión), Supabase nunca recibe el cambio completo — y como la interrupción mata también el código que hubiera mostrado el error, nadie ve ningún aviso. Así se explica lo que reportó Enzo: cambia el color de marca, guarda, y en algún momento posterior (otra sesión, otra recarga) la frase destacada aparece como si nunca hubiera tenido su propio color — porque nunca llegó a guardarse de verdad la vez que la puso, no porque el color de marca la haya "contagiado".
+
+**Confirmado con el método correcto:** repitiendo la prueba pero esperando de verdad a que el botón dejara de decir "Guardando…" (en vez de un tiempo fijo adivinado) antes de recargar, el color SÍ persistió correctamente. El bug no es de lógica, es de que 2-3 segundos es fácil no esperarlos.
+
+**Fix aplicado ahora (mitigación, no la solución de fondo):** se agregó un aviso nativo del navegador ("¿seguro que quieres salir? hay cambios sin guardar") mientras el guardado está en curso O mientras hay cambios sin guardar todavía, en `PanelPersonalizacion.jsx`. Esto cubre cerrar la pestaña, recargar o escribir otra URL — las formas reales de cortar el guardado a mitad de camino. No cubre (ni necesita cubrir) navegar entre pestañas del panel: ahí el guardado sigue solo en segundo plano y termina igual, aunque el usuario ya no vea el resultado.
+
+**La solución de fondo, todavía pendiente (requiere decidirlo con Enzo):** migrar las imágenes (logo, fotos de barbero, banner, fotos de galería) de data URL embebida a Storage real de Supabase — así cada guardado de texto/color pesaría un puñado de KB, no megabytes, y el problema desaparece de raíz en vez de solo mitigarse. Ya estaba anotado como pendiente de rendimiento en la entrada (27); ahora se sabe que también es un problema de confiabilidad de guardado, no solo de velocidad — sube su prioridad real.
+
+**De paso:** se le agregó a "Color de la frase destacada" (galería) el mismo botón "✕ Quitar" que ya tenían el color del eslogan y los colores de testimonios — no lo tenía, pura inconsistencia de UI, sin relación con el bug de guardado.
+
+**Limpieza de datos de prueba:** "Barbería Jose Luis" quedó con `texto_resaltado_color` de vuelta en `null` (se había guardado en azul mientras se reproducía el bug) — confirmado y revertido antes de cerrar.
+
+**Limpieza adicional encontrada en esta ronda:** al terminar, `netstat` mostró **11 procesos de `vite` de sesiones anteriores de este mismo día** todavía escuchando en los puertos 5173 a 5183 — cada `TaskStop` de esta conversación había cerrado la tarea del lado del harness, pero no el proceso real de Node del lado de Windows. Se identificaron por el puerto exacto (no se adivinó) y se cerraron los 11 con `taskkill`. Vale la pena que Enzo revise de vez en cuando con `netstat -ano | findstr LISTENING` si nota el equipo lento — sobre todo en sesiones largas como la de hoy.
+
+**Cómo se probó:** Playwright temporal contra la cuenta real de `jluis`, midiendo con precisión el tamaño real del `PATCH` y el tiempo real de respuesta (no una suposición), confirmando primero el bug (guardar + recargar con una espera corta, adivinada) y después el fix (guardar + esperar la señal real de "ya terminé" + recargar). `npm run lint` y `npm run build` limpios. Playwright instalado y desinstalado igual que siempre.
+
+**Archivos afectados:**
+- `src/pages/panel/PanelPersonalizacion.jsx` (aviso de `beforeunload` mientras hay cambios sin guardar o un guardado en curso; botón "quitar" agregado al color de la frase destacada).
+
+**Pendiente / próximos pasos:**
+- Decidir con Enzo la migración a Storage real de Supabase — ya no es solo "para que cargue más rápido", es "para que guardar no falle en silencio".
+- Los mismos de siempre: CAPTCHA en el formulario de reserva, cabeceras de hosting (pendiente de decidir dónde se despliega), rotar la contraseña de `esabattini`.
+
+---
+
+## 2026-08-24 (32) - Migración completa a Storage real de Supabase (logo, fotos, galería)
+
+**Qué se hizo:** Enzo confirmó (verbalmente y confirmó no le genera costo — plan gratuito de Supabase incluye 1GB de Storage + 5GB de egress, muy por encima de lo que usan 2 barberías con un puñado de fotos) avanzar con la solución de fondo de la entrada (31): sacar las imágenes de las columnas de texto y subirlas a un bucket real.
+
+**Cambios de código:**
+- `src/utils/imagenes.js`: `archivoAImagenComprimida()` ahora devuelve un `Blob` (vía `canvas.toBlob`) en vez de un data URL — lo que sigue es subirlo, no guardarlo como texto.
+- Nuevo `src/services/storageImagenes.js`: `subirImagenBarberia(archivo, { barberiaId, ...opciones })` comprime y sube al bucket `imagenes-barberias` bajo la carpeta `{barberia_id}/`, devuelve la URL pública. `borrarImagenBarberia(url)` borra de mejor esfuerzo una imagen anterior (no rompe nada si la URL es un data URL viejo o de otro origen — así la transición es segura mientras conviven datos viejos y nuevos).
+- `PanelPersonalizacion.jsx`: `subirLogo`, `agregarImagenesAGaleria`, `subirImagenDeSeccion` ahora suben de verdad y borran la imagen anterior al reemplazar; `quitarImagenDeGaleria` y el botón "Quitar" del logo también borran el archivo. De paso se le agregó el botón "✕ Quitar" al color de la frase destacada, que no lo tenía (inconsistente con eslogan/testimonios).
+- `PanelBarberos.jsx`: `TarjetaBarbero` recibe `barberiaId` y `subirFoto` sube de verdad, borrando la foto anterior.
+
+**Infraestructura (SQL corrido por Enzo):** `supabase/migrations/20260824000001_storage_imagenes.sql` — bucket `imagenes-barberias` (público para lectura, 5MB máximo por archivo, solo `image/jpeg`) + políticas RLS sobre `storage.objects`: lectura pública, escritura solo dentro de la propia carpeta (`{barberia_id}/...`) o cualquiera para superadmin — mismo criterio de aislamiento por tenant que ya usa cada tabla del esquema.
+
+**Migración de datos existentes:** se escribió y corrió un script de un solo uso (`migrar-imagenes-a-storage-temp.mjs`, ya borrado) que, como superadmin, recorrió las 2 barberías reales, detectó cada campo que todavía era un data URL, lo subió al bucket y reescribió la fila. Resultado: Barbería Golden no tenía nada que migrar (sin logo ni fotos todavía); Barbería Jose Luis tenía 4 fotos de galería + 1 imagen de la sección "Horario de atención", las 5 migradas correctamente. Se confirmó que el script es idempotente (una segunda corrida no encontró nada para migrar) — se puede volver a correr sin riesgo si hiciera falta.
+
+**Resultado medido, no solo esperado:** se probó subiendo un logo de prueba real por la UI (subida a Storage confirmada con un 200), y guardando un cambio: **el `PATCH` a `personalizacion` pasó de 1.610.069 caracteres (~1,6MB, 2,6-3,1 segundos) a 2.316 caracteres, 598 milisegundos.** Se confirmó también que las fotos migradas cargan bien en la página pública real (`/barberia-jose-luis`) apuntando ya a la URL de Storage. Se revirtió el logo de prueba y se confirmó que el archivo viejo se borró de Storage de verdad (no quedó huérfano) — quedaron solo los 5 archivos migrados, ninguno de prueba.
+
+**Cómo se probó:** Playwright temporal + un script Node aparte para la migración de datos (con `ws` como dependencia temporal, necesaria porque `@supabase/supabase-js` intenta levantar un cliente de Realtime que en Node 20 exige un WebSocket nativo — instalado y desinstalado igual que Playwright). `npm run lint` y `npm run build` limpios.
+
+**Encontrado y arreglado de paso — limpieza de procesos zombis:** al terminar, seguía habiendo un proceso de `vite` real escuchando en el puerto 5173 pese a un `TaskStop` ya confirmado — se verificó por puerto con `netstat` y se cerró con `taskkill`. Sumado a los 11 de la entrada (31), son ya 12 procesos huérfanos encontrados este mismo día — vale la pena que, en sesiones largas, Enzo revise de vez en cuando con `netstat -ano | findstr LISTENING` si nota lentitud, hasta que se entienda por qué `TaskStop` no siempre mata el proceso real.
+
+**Archivos afectados:**
+- Nuevo: `src/services/storageImagenes.js`.
+- Nuevo (ya corrido por Enzo): `supabase/migrations/20260824000001_storage_imagenes.sql`.
+- Modificado: `src/utils/imagenes.js`, `src/pages/panel/PanelPersonalizacion.jsx`, `src/pages/panel/PanelBarberos.jsx`.
+- Datos reales migrados: logo/fotos/galería de "Barbería Jose Luis" (ver arriba) — ya no son data URL, son archivos reales en Storage.
+
+**Pendiente / próximos pasos:**
+- Sigue pendiente correr `20260824000000_reforzar_seguridad_reservas.sql` (freno de reservas + enfriamiento por teléfono) si todavía no se corrió — es una migración distinta de esta, no se pisan.
+- Los mismos de siempre: CAPTCHA en el formulario de reserva, cabeceras de hosting, rotar la contraseña de `esabattini`.
+- Investigar por qué `TaskStop` no siempre termina el proceso real de Node/Vite en Windows — no es un problema del proyecto, pero ya generó 12 procesos huérfanos en un solo día.
+
+---
+
+## 2026-08-24 (33) - Editar hora/servicio de una reserva + íconos en Reservas
+
+**Qué se hizo:** Enzo confirmó (con captura real) que el enfriamiento de 12 minutos por teléfono de la (28) funciona en producción — el cliente ve correctamente "Ya registramos una reserva reciente con este número...". Pidió, sobre el panel de "Reservas", poder editar la hora y el servicio de una reserva ya hecha (para cuando el cliente se equivoca y avisa directo a la barbería) en vez de solo poder cancelarla.
+
+**Por qué no era trivial:** los triggers de `reservas` (normalizar teléfono, calcular precio/duración, validar servicio-barbero, validar disponibilidad) solo corrían `before insert` — un `UPDATE` de `fecha_hora`/`servicio_id` pasaba sin recalcular nada ni revalidar disponibilidad. Se agregó `20260824000002_reprogramar_reservas.sql`: 3 triggers nuevos `before update`, con cláusula `WHEN` para que solo se disparen si de verdad cambia `servicio_id` o `fecha_hora` (así cancelar, que solo toca `estado`, no dispara nada de esto). Reutilizan `calcular_datos_reserva()` y `validar_servicio_barbero()` tal cual (no referencian `OLD`, sirven para insert y update); la única función nueva es `validar_reprogramacion_reserva()` — igual a `validar_disponibilidad_reserva()` pero sin el freno antispam por teléfono (acá no aplica, es el dueño arreglando algo) y con un chequeo de choque de horario que da un mensaje legible antes de que lo agarre la restricción `reservas_sin_solape` con un error técnico de Postgres.
+
+**Frontend:** `useReservasBandeja.js` ganó `useServiciosParaReprogramar` (todos los servicios activos de la barbería, incluidos los catálogos propios de cada barbero) y `useReprogramarReserva`. `PanelReservas.jsx` ahora tiene un botón "Editar" junto a "Cancelar" en cada reserva activa, que abre un modal con selector de servicio (filtrado al catálogo real de ESE barbero, propio o compartido) y campos de fecha/hora — el barbero no se puede cambiar ahí (sería otra reserva, no un ajuste). Solo se agregó en el panel del dueño, no en "Mis reservas" del barbero individual (no se pidió ahí).
+
+**Pedido aparte, mismo momento:** Enzo notó que "Editar"/"Cancelar" como texto plano no se distinguían bien — se agregó un ícono (lápiz para editar, reusando `IconoLapiz` ya existente; una X nueva, `IconoX.jsx`, mismo estilo de trazo) antes de cada texto.
+
+**Bug de prueba, no de código — importante para no confundir la próxima vez:** al probar el guardado antes de que Enzo corriera la migración nueva, Supabase devolvió `"range lower bound must be less than or equal to range upper bound"` (código 22000, no uno de los mensajes propios) — exactamente lo esperable SIN los triggers nuevos: `fecha_hora` cambia pero `fecha_hora_fin` se queda con el valor viejo, y como ese valor viejo quedó ANTES de la nueva hora, Postgres no puede construir el rango. Se confirmó que la transacción se revirtió sola (la reserva de prueba, real, de "Enzo Sabattini", quedó intacta) — nada se corrompió, solo faltaba correr la migración.
+
+**Cómo se probó:** Playwright temporal contra la cuenta real de `jluis`, editando de verdad la reserva real de "Enzo Sabattini" — confirmado que el modal se abre, lista el catálogo correcto del barbero, y que sin la migración nueva el guardado se rechaza limpio (sin corromper nada). Falta reprobar el camino feliz (con la migración ya corrida). `npm run lint` y `npm run build` limpios.
+
+**Archivos afectados:**
+- Nuevo: `supabase/migrations/20260824000002_reprogramar_reservas.sql` (**pendiente que Enzo la corra**).
+- Nuevo: `src/components/panel/IconoX.jsx`.
+- Modificado: `src/pages/panel/hooks/useReservasBandeja.js`, `src/pages/panel/PanelReservas.jsx`.
+
+**Pendiente / próximos pasos:**
+- Enzo: correr `20260824000002_reprogramar_reservas.sql` en el SQL Editor.
+- Reprobar el camino feliz de "Editar" una vez corrida esa migración.
+- Evaluar si también quiere "Editar" en el panel individual del barbero (`PanelBarberoReservas.jsx`) — hoy solo está en el del dueño.
+- Los mismos de siempre.
+
+---
+
+## 2026-08-24 (34) - Calendario en Reservas, filtro de canceladas + reactivar, modal de confirmación reutilizable
+
+**Qué se hizo:** pedido grande de Enzo sobre el panel de "Reservas": (1) un calendario visual e interactivo para ver qué días tienen reservas, en vez de una sola lista larga y poco intuitiva; (2) dos paneles — uno con las horas del día elegido, que se actualiza según lo que se toque en el calendario; (3) un filtro para ver solo las canceladas, con opción de reactivarlas por si fue un error; (4) que cualquier acción importante (como cancelar) muestre una tarjeta de confirmación profesional en vez de nada, antes de ejecutarse.
+
+**Calendario (`CalendarioReservas.jsx`, nuevo):** grilla de mes fija en 6 semanas (para no cambiar de alto entre meses), empieza en lunes, con navegación mes anterior/siguiente. Cada día muestra un punto si tiene reservas confirmadas ese día (no la cantidad, alcanza con saber que hay que mirar) y resalta el día de hoy y el seleccionado. El conteo por día se calcula en el cliente a partir de las mismas reservas que ya se cargan para la bandeja — no hace falta una consulta nueva por mes, la barbería no tiene tantas reservas históricas como para que traer todas de una sea un problema.
+
+**Layout de `PanelReservas.jsx` (reescrito):** dos columnas — la lista a la izquierda (como pidió Enzo), el calendario a la derecha, `sticky` para no perderlo de vista al scrollear una lista larga. En mobile el calendario aparece primero (elegir el día antes de ver la lista tiene más sentido ahí), la lista después — mismo contenido, orden visual distinto solo en pantallas chicas (`order-1`/`order-2` con Tailwind).
+
+**Dos vistas con toggle ("Reservas del día" / "Canceladas"):** la vista de día ahora solo muestra reservas CONFIRMADAS de ese día (con Editar/Cancelar) — las canceladas quedaron afuera de esa lista a propósito, resolviendo el "tener todo en la misma lista es poco intuitivo" que ya había mencionado Enzo. La vista de canceladas lista TODAS las canceladas de cualquier fecha (no solo las del día elegido, para poder encontrar cualquiera sin tener que recordar cuándo era) con un botón "Reactivar".
+
+**Reactivar una reserva cancelada — necesitó otro ajuste a la base:** el trigger `trg_reservas_u40_validar_disponibilidad` de la (33) solo revalidaba si cambiaba `servicio_id`/`fecha_hora` — reactivar (`estado`: cancelada → confirmada, sin tocar nada más) no disparaba ninguna revalidación, así que se agregó esa condición al `WHEN` del trigger, y `validar_reprogramacion_reserva()` se ajustó para permitir el caso reactivar (antes exigía `old.estado = 'confirmada'` para CUALQUIER cambio, lo cual bloqueaba reactivar por definición — ahora esa exigencia solo aplica cuando de verdad se reprograma servicio/horario). Así, reactivar revalida que el barbero siga atendiendo ahí y que nadie haya tomado ese mismo horario mientras la reserva estaba cancelada.
+
+**Modal de confirmación reutilizable (`ModalConfirmacion.jsx`, nuevo):** tarjeta con la misma identidad visual de `ModalFormulario` (blur de fondo, animación), botón de confirmar en rojo para lo destructivo (`variante="peligro"`, cancelar) o en color de marca para lo importante-pero-no-destructivo (`variante="normal"`, reactivar) — reemplaza el `window.confirm()` nativo del navegador. Se aplicó a Cancelar y Reactivar en esta pantalla. **No se aplicó todavía en el resto de la app** (dar de baja un barbero, eliminar una cuenta, eliminar una sección de Personalización, etc. — todos siguen con `window.confirm()` nativo) — Enzo pidió esto "por cada acción importante en el flujo", así que el componente ya está listo para reusar ahí, falta decidir si se hace ahora o después.
+
+**Bug de prueba encontrado y aclarado — importante para la próxima vez:** al probar "Editar" cambiando de verdad la hora (18:00 → 19:00, mismo servicio), volvió a aparecer el mismo error de rango que en la (33) ("range lower bound must be less than or equal to range upper bound"). Antes de esto se había probado "Reactivar" y funcionó sin error — pero esa prueba **no demostraba que la migración (33) ya estuviera corrida**: reactivar sin tocar `fecha_hora` nunca ejercita el recálculo (el rango ya era válido de antes, así que pasa igual con o sin el trigger nuevo). La prueba real (cambiar la hora de verdad) confirmó que **`20260824000002_reprogramar_reservas.sql` todavía no está corrida** — ni la primera versión de esa migración, ni la actualizada con soporte para reactivar. Se confirmó que el intento fallido no dejó nada corrupto: la reserva de prueba (real, de "Enzo Sabattini") quedó exactamente en su hora y estado originales.
+
+**Cómo se probó:** Playwright temporal contra la cuenta real de `jluis`, sobre la reserva real de "Enzo Sabattini" — calendario (navegación, punto de "hay reservas", selección de día), toggle de vista, cancelar con el modal de confirmación (capturado, se ve como una tarjeta prolija), reactivar con su propio modal, e intento de editar la hora (reveló que la migración no está corrida, sin corromper datos). `npm run lint` y `npm run build` limpios.
+
+**Archivos afectados:**
+- Nuevo: `src/components/panel/CalendarioReservas.jsx`, `src/components/panel/ModalConfirmacion.jsx`.
+- Modificado: `src/pages/panel/PanelReservas.jsx` (reescrito), `src/pages/panel/hooks/useReservasBandeja.js` (+ `useReactivarReserva`).
+- Modificado (todavía sin correr): `supabase/migrations/20260824000002_reprogramar_reservas.sql` (agregado el soporte para reactivar, ver arriba).
+
+**Pendiente / próximos pasos:**
+- Enzo: correr `20260824000002_reprogramar_reservas.sql` (la versión actualizada, con el soporte de reactivar) — sin eso, "Editar" y "Reactivar" (este último solo cuando el slot esté realmente en disputa) no funcionan de verdad.
+- Decidir si `ModalConfirmacion` se extiende ahora a las demás acciones destructivas de la app (dar de baja barbero, eliminar cuenta, eliminar sección, etc.) o se deja para después.
+- Los mismos de siempre: CAPTCHA, cabeceras de hosting, rotar la contraseña de `esabattini`, si Enzo quiere "Editar" también en el panel del barbero individual.
+
+---
+
+## 2026-08-24 (35) - Reservas usaba solo la mitad de la pantalla en escritorio
+
+**Qué se hizo:** Enzo mostró una captura del calendario nuevo (de la (34)) señalando que quedaba mucho espacio vacío a los costados en una pantalla ancha, y pidió una distribución más profesional.
+
+**Causa real:** `PanelShell.jsx` (el cascarón que comparten los tres paneles) envolvía TODO el contenido en `<main className="mx-auto max-w-4xl ...">` — 896px fijos, sin importar el ancho real de la pantalla. Tiene sentido para pantallas de una sola columna (Barberos, Servicios, Horarios, incluso Personalización, que ya iba apretada ahí) pero dejaba un calendario + lista lado a lado comprimidos en poco más de 800px útiles, con océanos de espacio vacío en un monitor normal.
+
+**Fix:** `PanelShell` ahora acepta una prop `ancho` (`'normal'` = `max-w-4xl` de siempre, `'amplio'` = `max-w-6xl`) — default `'normal'`, así que ninguna otra pantalla cambia. `PanelAdminLayout.jsx` mira la ruta actual (`useLocation()`) y solo le pasa `ancho="amplio"` a `/panel/reservas`.
+
+**De paso, rediseño visual del calendario y la lista** (no solo más ancho, mejor aprovechado):
+- Calendario: celdas más grandes, cada día con reservas muestra un círculo con el NÚMERO real de reservas (no solo un punto) — de un vistazo se ve qué día está más cargado. Encabezado del mes con tipografía de título en vez de versalitas chicas. Botón nuevo "Ir a hoy" para volver de un salto sin tener que navegar mes por mes.
+- Lista: ahora vive en su propia tarjeta (borde + fondo blanco), igual peso visual que el calendario — antes flotaba directo sobre el fondo de la página mientras el calendario sí tenía tarjeta, una asimetría que contribuía a la sensación de espacio mal usado.
+
+**Cómo se probó:** Playwright — captura de escritorio ancho (1600px) confirmando el nuevo layout; captura de `/panel/servicios` confirmando que las demás pantallas del panel siguen exactamente igual (sin ancho amplio); captura mobile (390px) confirmando que el calendario sigue apareciendo primero y la tarjeta se ve bien angosta. `npm run lint` y `npm run build` limpios.
+
+**Archivos afectados:**
+- `src/components/panel/PanelShell.jsx` (prop `ancho`).
+- `src/pages/panel/PanelAdminLayout.jsx` (decide el ancho según la ruta).
+- `src/components/panel/CalendarioReservas.jsx` (rediseño: celdas más grandes, contador real, botón "Ir a hoy").
+- `src/pages/panel/PanelReservas.jsx` (la lista pasa a ser una tarjeta propia, misma jerarquía visual que el calendario).
+
+**Pendiente / próximos pasos:** los mismos de la (34) — nada nuevo generado por este cambio.

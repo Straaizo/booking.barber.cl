@@ -1,15 +1,32 @@
-import { useForm } from 'react-hook-form'
+import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { esquemaDatosCliente } from './esquemaReserva'
 import { BackButton } from '../../../components/common/BackButton'
 import { Button } from '../../../components/common/Button'
 
+// Solo dígitos, máximo 8 (lo que sigue al "9" fijo de todo celular chileno)
+// — cualquier otra tecla (letras, símbolos, un pegado con espacios o +56 de
+// más) se descarta al tipear, en vez de aceptarla y recién avisar al enviar.
+function soloOchoDigitos(texto) {
+  return texto.replace(/\D/g, '').slice(0, 8)
+}
+
+// "12345678" -> "1234 5678", igual al formato +56 9 0000 0000 que ya usa el
+// resto de la plataforma (ver PanelPersonalizacion, WhatsApp, etc.)
+function formatoVisual(ochoDigitos) {
+  return ochoDigitos.length > 4 ? `${ochoDigitos.slice(0, 4)} ${ochoDigitos.slice(4)}` : ochoDigitos
+}
+
 export function PasoDatos({ resumen, onConfirmar, enviando, onVolver }) {
   const {
     register,
     handleSubmit,
+    control,
     formState: { errors },
-  } = useForm({ resolver: zodResolver(esquemaDatosCliente) })
+  } = useForm({
+    resolver: zodResolver(esquemaDatosCliente),
+    defaultValues: { cliente_telefono: '9' },
+  })
 
   return (
     <div>
@@ -40,11 +57,23 @@ export function PasoDatos({ resumen, onConfirmar, enviando, onVolver }) {
 
         <label className="flex flex-col gap-2">
           <span className="versalitas text-xs text-gris-calido-500">Celular</span>
-          <input
-            {...register('cliente_telefono')}
-            type="tel"
-            placeholder="9 1234 5678"
-            className="min-h-11 border-b border-gris-calido-200 bg-transparent py-2 text-base text-negro-barbero outline-none transition-colors focus:border-cobre"
+          <Controller
+            name="cliente_telefono"
+            control={control}
+            render={({ field }) => (
+              <div className="flex min-h-11 items-center gap-2 border-b border-gris-calido-200 py-2 transition-colors focus-within:border-cobre">
+                <span className="numeros-tabulares shrink-0 text-base text-gris-calido-500">+56 9</span>
+                <input
+                  type="tel"
+                  inputMode="numeric"
+                  autoComplete="tel-national"
+                  placeholder="1234 5678"
+                  value={formatoVisual(field.value.slice(1))}
+                  onChange={(evento) => field.onChange(`9${soloOchoDigitos(evento.target.value)}`)}
+                  className="numeros-tabulares min-w-0 flex-1 bg-transparent text-base text-negro-barbero outline-none"
+                />
+              </div>
+            )}
           />
           {errors.cliente_telefono && (
             <span role="alert" className="text-xs text-red-700">

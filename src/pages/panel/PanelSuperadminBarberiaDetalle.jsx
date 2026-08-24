@@ -43,6 +43,12 @@ function textoDiasHasta(dias) {
 const CLASE_INPUT =
   'min-h-11 min-w-0 border-b border-gris-calido-200 bg-transparent py-1 text-negro-barbero outline-none transition-colors focus:border-cobre'
 
+// Mismo mínimo que valida la Edge Function `gestionar-usuario` (fuente de
+// verdad real) — repetido en cada formulario de esta pantalla solo para
+// avisar antes de gastar la llamada al servidor, nunca como el único lugar
+// que lo exige.
+const LARGO_MINIMO_PASSWORD = 8
+
 // Modal genérico para EDITAR una cuenta ya existente (dueño o barbero): solo
 // hay dos cosas que tocar — la contraseña (el dueño siempre la escribe él
 // mismo, nunca una generada al azar) y, como última acción, borrar la cuenta
@@ -50,14 +56,19 @@ const CLASE_INPUT =
 // idéntico, cambia solo el título y a qué mutación apunta cada botón.
 function ModalEditarCuenta({ abierto, onCerrar, titulo, usuario, onGuardarPassword, onEliminar, eliminando }) {
   const [password, setPassword] = useState('')
-  const [estado, setEstado] = useState(null) // 'guardando' | 'guardado' | 'error'
+  const [estado, setEstado] = useState(null) // 'guardando' | 'guardado' | 'error' | 'debil'
 
   async function guardar(evento) {
     evento.preventDefault()
-    if (!password.trim()) return
+    const limpia = password.trim()
+    if (!limpia) return
+    if (limpia.length < LARGO_MINIMO_PASSWORD) {
+      setEstado('debil')
+      return
+    }
     setEstado('guardando')
     try {
-      await onGuardarPassword(password.trim())
+      await onGuardarPassword(limpia)
       setEstado('guardado')
       setPassword('')
     } catch {
@@ -85,6 +96,11 @@ function ModalEditarCuenta({ abierto, onCerrar, titulo, usuario, onGuardarPasswo
           {estado === 'guardando' ? 'Guardando…' : 'Guardar contraseña'}
         </Button>
         {estado === 'guardado' && <p className="text-sm text-verde-barberia">Contraseña actualizada.</p>}
+        {estado === 'debil' && (
+          <p role="alert" className="text-sm text-red-700">
+            Mínimo {LARGO_MINIMO_PASSWORD} caracteres.
+          </p>
+        )}
         {estado === 'error' && (
           <p role="alert" className="text-sm text-red-700">
             No se pudo guardar.
@@ -123,6 +139,10 @@ function SeccionCuentaDueno({ barberiaId }) {
   async function crearCuenta(evento) {
     evento.preventDefault()
     if (!nombre.trim() || !password.trim()) return
+    if (password.trim().length < LARGO_MINIMO_PASSWORD) {
+      setError(`La contraseña debe tener al menos ${LARGO_MINIMO_PASSWORD} caracteres.`)
+      return
+    }
     setError(null)
     try {
       await crear.mutateAsync({ nombre: nombre.trim(), password: password.trim() })
@@ -246,6 +266,10 @@ function FilaBarberoUsuario({ barbero, barberiaId }) {
   async function crear(evento) {
     evento.preventDefault()
     if (!password.trim()) return
+    if (password.trim().length < LARGO_MINIMO_PASSWORD) {
+      setError(`La contraseña debe tener al menos ${LARGO_MINIMO_PASSWORD} caracteres.`)
+      return
+    }
     setError(null)
     try {
       await crearCuenta.mutateAsync({ barberoId: barbero.id, nombre: barbero.nombre, password: password.trim() })
@@ -349,6 +373,10 @@ function BotonNuevoBarbero({ barberiaId, limiteAlcanzado, maxBarberos, planNombr
   async function crear(evento) {
     evento.preventDefault()
     if (!nombre.trim() || !password.trim()) return
+    if (password.trim().length < LARGO_MINIMO_PASSWORD) {
+      setError(`La contraseña debe tener al menos ${LARGO_MINIMO_PASSWORD} caracteres.`)
+      return
+    }
     setError(null)
     try {
       await crearBarbero.mutateAsync({ nombre: nombre.trim(), password: password.trim() })

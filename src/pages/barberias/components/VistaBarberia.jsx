@@ -526,9 +526,16 @@ function IndicadorScroll({ claseTexto }) {
   )
 }
 
-function Estrellas({ cantidad }) {
+// `color` es el mismo "Color del texto" que ya elige el dueño para los
+// testimonios (`colorTexto`/`estiloTexto.color`) — sin pasarlo acá, las
+// estrellas quedaban pegadas al color de marca de todo el sitio (`text-cobre`)
+// sin importar que esa sección tuviera su propio color configurado: cambiar
+// "Color de marca" en Identidad las movía igual, aunque no tuvieran nada que
+// ver entre sí. Mismo patrón de fallback que el resto de la pantalla: sin
+// color propio, sigue el de marca.
+function Estrellas({ cantidad, color }) {
   return (
-    <div aria-hidden="true" className="flex gap-0.5 text-cobre">
+    <div aria-hidden="true" className="flex gap-0.5" style={{ color: color || 'var(--color-cobre)' }}>
       {Array.from({ length: 5 }, (_, i) => (
         <span key={i} className={i < cantidad ? 'opacity-100' : 'opacity-20'}>
           ★
@@ -611,7 +618,7 @@ function CarruselTestimonios({ items, tamano, estiloTexto }) {
           transition={{ duration: 0.3, ease: 'easeInOut' }}
           className="flex flex-col items-center gap-4"
         >
-          <Estrellas cantidad={testimonio.estrellas} />
+          <Estrellas cantidad={testimonio.estrellas} color={estiloTexto.color} />
           <p
             className={`font-light italic leading-relaxed ${
               estiloTexto.fontFamily ? '' : 'font-display'
@@ -660,7 +667,7 @@ function ListaTestimonios({ items, tamano, estiloTexto, colorFondo }) {
           className="flex flex-col gap-3 rounded-lg border border-gris-calido-200 bg-white p-5"
           style={{ backgroundColor: colorFondo || undefined }}
         >
-          <Estrellas cantidad={testimonio.estrellas} />
+          <Estrellas cantidad={testimonio.estrellas} color={estiloTexto.color} />
           <p
             className={`flex-1 font-light italic leading-relaxed ${
               estiloTexto.fontFamily ? '' : 'font-display'
@@ -680,12 +687,6 @@ function ListaTestimonios({ items, tamano, estiloTexto, colorFondo }) {
   )
 }
 
-// Horario de atención del local completo (no de un barbero puntual) — se
-// calcula solo a partir de los `horarios_disponibles` de los barberos
-// activos, nunca se escribe a mano, para que nunca se desincronice de los
-// horarios reales que ya administra cada barbero. No depende del plan (es
-// información básica del negocio, no una sección decorativa) ni se puede
-// reordenar — vive siempre justo antes de la vidriera de servicios.
 // Tabla real (encabezado + filas), no una lista clickeable que imita el
 // paso del asistente de reserva — el pedido explícito fue que se sintiera
 // como el menú/tabla de precios de un negocio real, no como "lo mismo que
@@ -707,30 +708,60 @@ function EncabezadoTabla({ columnas }) {
   )
 }
 
-function SeccionHorario({ barberos }) {
+// El horario en sí se calcula solo a partir de los `horarios_disponibles`
+// de los barberos activos, nunca se escribe a mano, para que nunca se
+// desincronice de los horarios reales que ya administra cada barbero — eso
+// no cambia. Lo que sí es una sección más, reordenable: `posicion` decide
+// si la tabla va sola y centrada ('centro', de siempre) o en una columna
+// con una foto del local al lado ('izquierda'/'derecha', para darle más
+// credibilidad) — mismo patrón que "Imagen y texto".
+function SeccionHorario({ titulo, barberos, posicion, imagen, imagenTamano }) {
   const horarios = (barberos ?? [])
     .filter((b) => b.activo)
     .flatMap((b) => b.horarios_disponibles ?? [])
   const resumen = resumenHorarioSemanal(horarios)
   if (resumen.length === 0) return null
 
+  const conImagen = posicion !== 'centro' && Boolean(imagen)
+
+  const tabla = (
+    <div className="w-full overflow-hidden rounded-md border border-gris-calido-200">
+      <EncabezadoTabla columnas={{ plantilla: '1fr auto', etiquetas: ['Día', 'Horario'] }} />
+      {resumen.map((linea, i) => (
+        <div
+          key={linea.etiqueta}
+          className={`numeros-tabulares grid grid-cols-[1fr_auto] gap-4 px-4 py-3 text-sm text-gris-calido-700 md:text-base ${
+            i % 2 === 1 ? 'bg-gris-calido-100/50' : ''
+          }`}
+        >
+          <span>{linea.etiqueta}</span>
+          <span className="text-right font-medium text-negro-barbero">{linea.horario}</span>
+        </div>
+      ))}
+    </div>
+  )
+
   return (
     <>
-      <SectionRule indice="—" texto="Horario de atención" tono="oscuro" />
-      <div className="mx-auto max-w-md overflow-hidden rounded-md border border-gris-calido-200 px-6 py-8 md:px-10">
-        <EncabezadoTabla columnas={{ plantilla: '1fr auto', etiquetas: ['Día', 'Horario'] }} />
-        {resumen.map((linea, i) => (
-          <div
-            key={linea.etiqueta}
-            className={`numeros-tabulares grid grid-cols-[1fr_auto] gap-4 px-4 py-3 text-sm text-gris-calido-700 md:text-base ${
-              i % 2 === 1 ? 'bg-gris-calido-100/50' : ''
-            }`}
-          >
-            <span>{linea.etiqueta}</span>
-            <span className="text-right font-medium text-negro-barbero">{linea.horario}</span>
-          </div>
-        ))}
-      </div>
+      <SectionRule indice="—" texto={titulo || 'Horario de atención'} tono="oscuro" />
+      {conImagen ? (
+        <div
+          className={`flex flex-col gap-8 px-6 py-8 md:items-center md:gap-10 md:px-10 ${
+            posicion === 'derecha' ? 'md:flex-row-reverse' : 'md:flex-row'
+          }`}
+        >
+          <img
+            src={imagen}
+            alt=""
+            className={`aspect-[4/3] w-full rounded-lg object-cover ${
+              ANCHOS_CARRUSEL_CON_TEXTO[imagenTamano] ?? ANCHOS_CARRUSEL_CON_TEXTO.mediana
+            } ${ALTURAS_CARRUSEL_CON_TEXTO[imagenTamano] ?? ALTURAS_CARRUSEL_CON_TEXTO.mediana}`}
+          />
+          <div className="w-full md:flex-1">{tabla}</div>
+        </div>
+      ) : (
+        <div className="mx-auto max-w-md px-6 py-8 md:px-10">{tabla}</div>
+      )}
     </>
   )
 }
@@ -857,7 +888,16 @@ export function VistaBarberia({ barberia }) {
           // esto en el flujo normal (arriba a la izquierda) en vez de fijo
           // en la esquina.
           <div className={`absolute right-6 top-6 md:right-10 md:top-8 ${claseTexto}`}>
-            <HoverLink href="/" className="font-display text-sm italic tracking-tight opacity-70">
+            {/* Sin la clase `font-display`: esa clase lee `var(--font-display)`,
+                que `estiloMarca` (más arriba) pisa con la tipografía que la
+                barbería elija en "Identidad" — la marca de la plataforma no
+                es de la barbería, no tiene que cambiar con su tipografía.
+                Se fija la pila de Fraunces a mano, igual que `Header.jsx`. */}
+            <HoverLink
+              href="/"
+              className="text-xl font-semibold italic tracking-tight"
+              style={{ fontFamily: '"Fraunces", ui-serif, Georgia, serif' }}
+            >
               booking<span className="text-cobre-texto">.</span>barber.cl
             </HoverLink>
           </div>
@@ -959,10 +999,21 @@ export function VistaBarberia({ barberia }) {
             />
           )
         }
+        if (seccion.tipo === 'horario') {
+          return (
+            <SeccionHorario
+              key={seccion.id}
+              titulo={seccion.titulo}
+              barberos={barberia.barberos}
+              posicion={seccion.posicion}
+              imagen={seccion.imagen}
+              imagenTamano={seccion.imagen_tamano}
+            />
+          )
+        }
         return null
       })}
 
-      {Boolean(personalizacion.mostrar_horario) && <SeccionHorario barberos={barberia.barberos} />}
       {Boolean(personalizacion.mostrar_servicios) && <SeccionServicios servicios={barberia.servicios} />}
 
       <SectionRule indice="—" texto="Reserva tu hora" tono="oscuro" />

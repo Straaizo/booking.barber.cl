@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { PasoServicio } from './PasoServicio'
 import { PasoBarbero } from './PasoBarbero'
@@ -13,6 +13,18 @@ const VARIANTES_PASO = {
   entra: { opacity: 0, x: 20 },
   centro: { opacity: 1, x: 0 },
   sale: { opacity: 0, x: -20 },
+}
+
+// P0001 es el código que Postgres le pone a un `raise exception` sin un
+// ERRCODE explícito — es exactamente el que usan todas nuestras validaciones
+// de negocio en `reservas` (horario no disponible, enfriamiento por
+// teléfono, freno por barbería, etc.), escritas a propósito en español para
+// que el cliente las lea. Cualquier otro código (una violación de
+// constraint, un error de red) trae un mensaje técnico que no corresponde
+// mostrarle a quien está reservando.
+function mensajeErrorReserva(error) {
+  if (error?.code === 'P0001' && error.message) return error.message
+  return 'No pudimos confirmar tu reserva. Intenta nuevamente.'
 }
 
 function ProgresoAsistente({ etiquetas, indiceActivo }) {
@@ -57,6 +69,30 @@ export function AsistenteReserva({ barberia }) {
   const [horario, setHorario] = useState(null)
 
   const crearReserva = useCrearReserva()
+
+  // Cada paso tiene una altura distinta (la grilla de barberos no mide lo
+  // mismo que el formulario de datos, ni que el calendario de horario) —
+  // sin reservar espacio, el <Footer> que viene justo después de este
+  // componente (ver VistaBarberia.jsx) salta hacia arriba o abajo en cada
+  // paso. En vez de adivinar un alto fijo (que quedaría corto o largo según
+  // cuántos servicios/barberos tenga cada barbería), se mide el alto real de
+  // cada paso a medida que se visita y se aplica como mínimo el más alto
+  // visto hasta ahora — nunca se achica, así que el footer deja de moverse
+  // apenas se pasó una vez por el paso más alto, sin importar cuál paso
+  // arranca primero (con 1 solo barbero, el asistente ni pasa por "barbero").
+  const contenedorRef = useRef(null)
+  const [alturaMinima, setAlturaMinima] = useState(0)
+
+  useEffect(() => {
+    const elemento = contenedorRef.current
+    if (!elemento || typeof ResizeObserver === 'undefined') return
+    const observador = new ResizeObserver(([entrada]) => {
+      const alto = entrada.contentRect.height
+      setAlturaMinima((actual) => Math.max(actual, alto))
+    })
+    observador.observe(elemento)
+    return () => observador.disconnect()
+  }, [])
 
   // Si el barbero tiene catálogo propio (lo habilitó el dueño), solo se le
   // ofrecen SUS servicios (`servicio.barbero_id === barbero.id`) — si no,
@@ -131,52 +167,58 @@ export function AsistenteReserva({ barberia }) {
 
   return (
     <div className="border-t-2 border-cobre bg-white/50 px-5 py-7 md:px-7 md:py-9">
-      {paso !== 'confirmado' && (
-        <ProgresoAsistente etiquetas={etiquetasPasos} indiceActivo={indiceActivo} />
-      )}
+      {/* La barra de progreso entra en la misma medición que los pasos: si
+          quedara afuera, el paso "confirmado" (que no la muestra) se
+          achicaría por el alto exacto de la barra sin importar el mínimo
+          reservado más abajo. */}
+      <div ref={contenedorRef} style={{ minHeight: alturaMinima || undefined }}>
+        {paso !== 'confirmado' && (
+          <ProgresoAsistente etiquetas={etiquetasPasos} indiceActivo={indiceActivo} />
+        )}
 
-      <AnimatePresence mode="wait">
-        <motion.div
-          key={paso}
-          variants={VARIANTES_PASO}
-          initial="entra"
-          animate="centro"
-          exit="sale"
-          transition={{ duration: 0.3, ease: EASE_ENTRADA }}
-        >
-          {paso === 'barbero' && (
-            <PasoBarbero barberos={barberosActivos} onSeleccionar={elegirBarbero} />
-          )}
-          {paso === 'servicio' && (
-            <PasoServicio
-              servicios={serviciosDelBarbero}
-              onSeleccionar={elegirServicio}
-              onVolver={hayVariosBarberos ? () => volverA('barbero') : undefined}
-            />
-          )}
-          {paso === 'horario' && (
-            <PasoHorario
-              barbero={barbero}
-              servicio={servicio}
-              onSeleccionar={elegirHorario}
-              onVolver={() => volverA('servicio')}
-            />
-          )}
-          {paso === 'datos' && (
-            <PasoDatos
-              resumen={resumen}
-              enviando={crearReserva.isPending}
-              onConfirmar={confirmar}
-              onVolver={() => volverA('horario')}
-            />
-          )}
-          {paso === 'confirmado' && <Confirmacion resumen={resumen} />}
-        </motion.div>
-      </AnimatePresence>
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={paso}
+            variants={VARIANTES_PASO}
+            initial="entra"
+            animate="centro"
+            exit="sale"
+            transition={{ duration: 0.3, ease: EASE_ENTRADA }}
+          >
+            {paso === 'barbero' && (
+              <PasoBarbero barberos={barberosActivos} onSeleccionar={elegirBarbero} />
+            )}
+            {paso === 'servicio' && (
+              <PasoServicio
+                servicios={serviciosDelBarbero}
+                onSeleccionar={elegirServicio}
+                onVolver={hayVariosBarberos ? () => volverA('barbero') : undefined}
+              />
+            )}
+            {paso === 'horario' && (
+              <PasoHorario
+                barbero={barbero}
+                servicio={servicio}
+                onSeleccionar={elegirHorario}
+                onVolver={() => volverA('servicio')}
+              />
+            )}
+            {paso === 'datos' && (
+              <PasoDatos
+                resumen={resumen}
+                enviando={crearReserva.isPending}
+                onConfirmar={confirmar}
+                onVolver={() => volverA('horario')}
+              />
+            )}
+            {paso === 'confirmado' && <Confirmacion resumen={resumen} />}
+          </motion.div>
+        </AnimatePresence>
+      </div>
 
       {crearReserva.isError && (
         <p className="mt-4 text-sm text-red-700" role="alert">
-          No pudimos confirmar tu reserva. Intenta nuevamente.
+          {mensajeErrorReserva(crearReserva.error)}
         </p>
       )}
     </div>

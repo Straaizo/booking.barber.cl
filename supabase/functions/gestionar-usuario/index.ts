@@ -86,6 +86,17 @@ function usuarioBaseDesdeNombre(nombreCompleto: string) {
   return partes[0] || 'usuario'
 }
 
+// Estas cuentas (dueño/barbero) ven datos reales de clientes (nombre +
+// teléfono) y pueden operar la agenda de una barbería real — un mínimo de
+// 6 caracteres (el default de Supabase Auth) es insuficiente para eso. Se
+// valida acá, no solo en el formulario: el formulario se puede saltar
+// llamando esta función directo con el JWT de una sesión válida.
+const LARGO_MINIMO_PASSWORD = 8
+
+function passwordEsDebil(password: unknown) {
+  return typeof password !== 'string' || password.length < LARGO_MINIMO_PASSWORD
+}
+
 // Genera un `usuario` libre a partir del nombre, revisando contra la tabla
 // real (no contra lo que el cliente cree que existe) — le agrega un número
 // al final (jriquelme2, jriquelme3...) hasta encontrar uno sin usar.
@@ -162,6 +173,9 @@ Deno.serve(async (req) => {
     if (accion === 'crear_dueno') {
       if (!esSuperadmin) return responder({ error: 'No autorizado.' }, 403)
       const { barberiaId, nombre, password } = body
+      if (passwordEsDebil(password)) {
+        return responder({ error: `La contraseña debe tener al menos ${LARGO_MINIMO_PASSWORD} caracteres.` }, 400)
+      }
       const usuario = await generarUsuarioServidor(clienteAdmin, nombre)
 
       const { data: creado, error: errorCrear } = await clienteAdmin.auth.admin.createUser({
@@ -197,6 +211,9 @@ Deno.serve(async (req) => {
       if (!esSuperadmin && !(esDueno && quienLlama.barberia_id === barberiaId)) {
         return responder({ error: 'No autorizado.' }, 403)
       }
+      if (passwordEsDebil(password)) {
+        return responder({ error: `La contraseña debe tener al menos ${LARGO_MINIMO_PASSWORD} caracteres.` }, 400)
+      }
       const usuario = await generarUsuarioServidor(clienteAdmin, nombre)
 
       const { data: creado, error: errorCrear } = await clienteAdmin.auth.admin.createUser({
@@ -229,6 +246,9 @@ Deno.serve(async (req) => {
     // ------------------------------------------------------------------
     if (accion === 'resetear_password') {
       const { usuarioId, password } = body
+      if (passwordEsDebil(password)) {
+        return responder({ error: `La contraseña debe tener al menos ${LARGO_MINIMO_PASSWORD} caracteres.` }, 400)
+      }
 
       if (!esSuperadmin) {
         const { data: objetivo } = await clienteAdmin

@@ -816,6 +816,13 @@ begin
 
   -- Antispam básico. No es una defensa real (el teléfono es autodeclarado),
   -- solo sube el costo del abuso. Ver pendiente de rate limiting.
+  --
+  -- [SUPERADO] Este bloque (5 por hora) quedó reemplazado por un
+  -- enfriamiento de 12 minutos por teléfono — ver el `create or replace
+  -- function` de esta misma función en
+  -- 20260824000000_reforzar_seguridad_reservas.sql. Se deja este texto tal
+  -- cual (es el de la migración original, ya corrida) en vez de reescribirlo
+  -- acá, para no desincronizar este archivo del historial real.
   select count(*) into v_recientes
   from reservas
   where cliente_telefono = new.cliente_telefono
@@ -1474,7 +1481,10 @@ create policy pagos_escritura on pagos
 -- FIN DEL ESQUEMA
 --
 -- Pendientes conocidos (no bloquean la creación del proyecto):
---   - Rate limiting real del INSERT público (hoy solo límite por teléfono)
+--   - Rate limiting real del INSERT público (hoy límite por teléfono +
+--     freno por barbería, ver 20260824000000_reforzar_seguridad_reservas.sql
+--     — sigue sin haber CAPTCHA ni bloqueo por IP, que requieren un servicio
+--     externo (Turnstile/hCaptcha) y no se agregan sin decidirlo con Enzo)
 --   - Canal de notificación de reserva nueva: al definirlo, agregar a
 --     `reservas` las columnas notificado_at / notificacion_error para
 --     poder reintentar envíos fallidos sin perder ninguno

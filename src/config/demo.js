@@ -1,3 +1,5 @@
+import { normalizarPersonalizacion } from '../utils/personalizacion'
+
 // Datos de la barbería demo (/demo) — un tenant que no existe en Supabase.
 // AsistenteReserva y sus hooks (useHorariosDisponibles, useReservasDelDia,
 // useCrearReserva) detectan este ID y responden con datos locales en vez de
@@ -5,6 +7,15 @@
 // completo y genuino sin que dependa de que exista una fila real en la BD.
 export const DEMO_BARBERO_ID = 'demo-barbero-1'
 export const DEMO_BARBERIA_ID = 'demo-barberia-1'
+
+// Lunes a sábado, 10:00–19:00 — igual para todos los días de la demo.
+export const HORARIOS_DEMO = [1, 2, 3, 4, 5, 6].map((diaSemana) => ({
+  id: `demo-horario-${diaSemana}`,
+  dia_semana: diaSemana,
+  hora_inicio: '10:00',
+  hora_fin: '19:00',
+  activo: 1,
+}))
 
 export const BARBERIA_DEMO = {
   id: DEMO_BARBERIA_ID,
@@ -14,12 +25,19 @@ export const BARBERIA_DEMO = {
   direccion: 'Av. Providencia 1234, Providencia',
   logo_url: null,
   estado_id: 1,
-  personalizacion: {
+  plan_id: 2,
+  // Sin pasar por `normalizarPersonalizacion()` acá, la demo se quedaba sin
+  // "Nuestro equipo"/"Horario de atención" (las secciones que cualquier
+  // barbería real recibe automáticamente) ni la vidriera de "Servicios y
+  // precios" — mostrando el producto con menos funciones de las que tiene
+  // de verdad a alguien que todavía no es cliente. Mismo tratamiento que
+  // recibe cualquier barbería real al cargar sus datos.
+  personalizacion: normalizarPersonalizacion({
     color_primario: null,
     eslogan: 'Tradición porteña, cortes de siempre',
     descripcion:
       'Esta es una barbería de ejemplo — reserva una hora como lo haría cualquiera de tus clientes.',
-  },
+  }),
   servicios: [
     {
       id: 'demo-servicio-1',
@@ -52,16 +70,16 @@ export const BARBERIA_DEMO = {
       activo: true,
     },
   ],
-  barberos: [{ id: DEMO_BARBERO_ID, nombre: 'Javier Muñoz', activo: true, intervalo_reserva_minutos: 30 }],
+  barberos: [
+    {
+      id: DEMO_BARBERO_ID,
+      nombre: 'Javier Muñoz',
+      activo: true,
+      intervalo_reserva_minutos: 30,
+      horarios_disponibles: HORARIOS_DEMO,
+    },
+  ],
 }
-
-// Lunes a sábado, 10:00–19:00 — igual para todos los días de la demo.
-export const HORARIOS_DEMO = [1, 2, 3, 4, 5, 6].map((diaSemana) => ({
-  id: `demo-horario-${diaSemana}`,
-  dia_semana: diaSemana,
-  hora_inicio: '10:00',
-  hora_fin: '19:00',
-}))
 
 export function esBarberoDemo(barberoId) {
   return barberoId === DEMO_BARBERO_ID

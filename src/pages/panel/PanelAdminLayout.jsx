@@ -1,4 +1,4 @@
-import { NavLink, Outlet } from 'react-router-dom'
+import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { PanelShell } from '../../components/panel/PanelShell'
 
 const SECCIONES = [
@@ -28,9 +28,16 @@ function PestanaNav({ to, etiqueta }) {
 
 export function PanelAdminLayout() {
   const nav = SECCIONES.map((seccion) => <PestanaNav key={seccion.to} {...seccion} />)
+  // Solo Reservas necesita el ancho amplio (calendario + lista lado a lado)
+  // — el resto son formularios de una columna, más cómodos angostos.
+  const esReservas = useLocation().pathname === '/panel/reservas'
 
   return (
-    <PanelShell titulo="Panel de barbería" nav={<div className="flex gap-6">{nav}</div>}>
+    <PanelShell
+      titulo="Panel de barbería"
+      nav={<div className="flex gap-6">{nav}</div>}
+      ancho={esReservas ? 'amplio' : 'normal'}
+    >
       <Outlet />
     </PanelShell>
   )

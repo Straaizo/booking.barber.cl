@@ -8,7 +8,17 @@ const NOMBRES_ROL = { 1: 'Superadmin', 2: 'Administrador', 3: 'Barbero' }
 // Cascarón compartido por los tres paneles (barbero/admin/superadmin) — barra
 // superior densa con identidad de marca + sesión, y una franja lateral
 // opcional para navegación cuando el panel tiene más de una sección.
-export function PanelShell({ titulo, nav, children }) {
+// `max-w-4xl` es el ancho de siempre — cómodo para formularios de una sola
+// columna (Barberos, Servicios, Horarios). Reservas necesita más: un
+// calendario + una lista de horas lado a lado se ven apretados ahí, con
+// harto espacio vacío sobrando a los costados en una pantalla de escritorio
+// normal.
+const ANCHOS = {
+  normal: 'max-w-4xl',
+  amplio: 'max-w-7xl',
+}
+
+export function PanelShell({ titulo, nav, children, ancho = 'normal' }) {
   const { perfil, cerrarSesion, verComo, cambiarVerComo, barberosParaSelector } = useAuth()
   const navigate = useNavigate()
 
@@ -79,7 +89,7 @@ export function PanelShell({ titulo, nav, children }) {
         </nav>
       )}
 
-      <main className="mx-auto max-w-4xl px-5 py-8 md:px-8 md:py-12">{children}</main>
+      <main className={`mx-auto px-5 py-8 md:px-8 md:py-12 ${ANCHOS[ancho]}`}>{children}</main>
     </div>
   )
 }

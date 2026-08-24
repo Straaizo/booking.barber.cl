@@ -1,8 +1,8 @@
-// Redimensiona una imagen subida por el usuario a un data URL liviano (JPEG),
-// vía un <canvas> fuera de pantalla — nunca agranda, solo achica si excede
-// el máximo. Se usa para guardar fotos en `localStorage` (modo provisorio,
-// sin Storage real de Supabase todavía) sin agotar su cuota de ~5MB con una
-// sola foto de cámara sin comprimir.
+// Redimensiona una imagen subida por el usuario a un JPEG liviano vía un
+// <canvas> fuera de pantalla — nunca agranda, solo achica si excede el
+// máximo. Devuelve un Blob (no un data URL): lo que sigue es subirlo a
+// Storage, no guardarlo como texto — ver `subirImagenBarberia` en
+// `services/storageImagenes.js`.
 export function archivoAImagenComprimida(archivo, { maxAncho = 1200, maxAlto = 1200, calidad = 0.85 } = {}) {
   return new Promise((resolve, reject) => {
     const lector = new FileReader()
@@ -18,7 +18,11 @@ export function archivoAImagenComprimida(archivo, { maxAncho = 1200, maxAlto = 1
         canvas.width = ancho
         canvas.height = alto
         canvas.getContext('2d').drawImage(imagen, 0, 0, ancho, alto)
-        resolve(canvas.toDataURL('image/jpeg', calidad))
+        canvas.toBlob(
+          (blob) => (blob ? resolve(blob) : reject(new Error('No se pudo comprimir la imagen'))),
+          'image/jpeg',
+          calidad
+        )
       }
       imagen.src = lector.result
     }

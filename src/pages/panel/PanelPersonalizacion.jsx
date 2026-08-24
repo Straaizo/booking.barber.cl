@@ -8,7 +8,7 @@ import { ToastGuardado } from '../../components/common/ToastGuardado'
 import { SelectorArchivo } from '../../components/common/SelectorArchivo'
 import { Interruptor } from '../../components/panel/Interruptor'
 import { usePersonalizacionAdmin, useGuardarPersonalizacion } from './hooks/usePersonalizacionAdmin'
-import { archivoAImagenComprimida } from '../../utils/imagenes'
+import { subirImagenBarberia, borrarImagenBarberia } from '../../services/storageImagenes'
 import { FUENTES_DISPONIBLES, asegurarFuenteCargada } from '../../utils/fuentes'
 import { ordenarEquipo } from '../../utils/personalizacion'
 import { puedePersonalizarSecciones } from '../../utils/planes'
@@ -36,7 +36,6 @@ function construirVistaPrevia(barberia, form) {
       whatsapp_color: form.whatsapp_color || null,
       whatsapp_tamano: form.whatsapp_tamano,
       mostrar_servicios: form.mostrar_servicios,
-      mostrar_horario: form.mostrar_horario,
     },
   }
 }
@@ -59,7 +58,6 @@ function formularioDesdeBarberia(barberia) {
     whatsapp_color: p.whatsapp_color ?? '',
     whatsapp_tamano: p.whatsapp_tamano || 'mediana',
     mostrar_servicios: p.mostrar_servicios ?? 1,
-    mostrar_horario: p.mostrar_horario ?? 1,
   }
 }
 
@@ -80,6 +78,16 @@ function nuevaSeccion(tipo) {
     }
   }
   if (tipo === 'equipo') return { id, tipo: 'equipo', titulo: 'Nuestro equipo', estilo: 'grilla' }
+  if (tipo === 'horario') {
+    return {
+      id,
+      tipo: 'horario',
+      titulo: 'Horario de atención',
+      posicion: 'centro',
+      imagen: null,
+      imagen_tamano: 'mediana',
+    }
+  }
   if (tipo === 'testimonios') {
     return {
       id,
@@ -97,6 +105,7 @@ const ETIQUETA_TIPO_SECCION = {
   galeria: 'Galería',
   imagen_texto: 'Imagen y texto',
   equipo: 'Equipo',
+  horario: 'Horario de atención',
   testimonios: 'Testimonios',
 }
 
@@ -202,6 +211,26 @@ export function PanelPersonalizacion() {
   // lo que se ve en la vista previa todavía no es lo que ve un cliente real
   // en la página pública (recién se publica al guardar).
   const hayCambiosSinGuardar = form && formGuardado !== null && JSON.stringify(form) !== formGuardado
+
+  // El "Guardar cambios" de esta pantalla puede tardar varios segundos de
+  // verdad: `secciones` viaja como un solo jsonb con las imágenes de la
+  // galería adentro en base64 (no hay Storage real todavía), así que
+  // cualquier cambio — aunque sea solo un color — reenvía ESE bloque
+  // completo, no solo el campo que se tocó. Cerrar la pestaña, recargar o
+  // navegar afuera de la app mientras esa subida sigue en curso la corta a
+  // mitad de camino sin ningún aviso — el cambio se pierde en silencio, sin
+  // error visible, porque el contexto que hubiera mostrado ese error deja de
+  // existir. Esto NO protege la navegación interna (los links del panel):
+  // ahí el fetch sigue solo, en segundo plano, y de todas formas termina.
+  useEffect(() => {
+    if (!hayCambiosSinGuardar && !guardar.isPending) return
+    function avisar(evento) {
+      evento.preventDefault()
+      evento.returnValue = ''
+    }
+    window.addEventListener('beforeunload', avisar)
+    return () => window.removeEventListener('beforeunload', avisar)
+  }, [hayCambiosSinGuardar, guardar.isPending])
   const equipoOrdenado = form && barberia ? ordenarEquipo(barberia.barberos, form.orden_equipo) : []
   // Galería, imagen+texto y equipo son una función paga desde el plan Equipo
   // — con plan Solo, esta pantalla no deja agregar ni editar secciones (las
@@ -214,8 +243,10 @@ export function PanelPersonalizacion() {
     if (!archivo) return
     setSubiendo(true)
     try {
-      const dataUrl = await archivoAImagenComprimida(archivo, { maxAncho: 400, maxAlto: 400 })
-      setForm((f) => ({ ...f, logo_url: dataUrl }))
+      const urlAnterior = form.logo_url
+      const url = await subirImagenBarberia(archivo, { barberiaId: barberia.id, maxAncho: 400, maxAlto: 400 })
+      setForm((f) => ({ ...f, logo_url: url }))
+      if (urlAnterior) borrarImagenBarberia(urlAnterior)
     } finally {
       setSubiendo(false)
       evento.target.value = ''
@@ -269,7 +300,7 @@ export function PanelPersonalizacion() {
     try {
       const nuevas = await Promise.all(
         archivos.map(async (archivo) => ({
-          url: await archivoAImagenComprimida(archivo, { maxAncho: 1200, maxAlto: 1600 }),
+          url: await subirImagenBarberia(archivo, { barberiaId: barberia.id, maxAncho: 1200, maxAlto: 1600 }),
           tamano: 'normal',
           leyenda: '',
         }))
@@ -301,6 +332,8 @@ export function PanelPersonalizacion() {
   }
 
   function quitarImagenDeGaleria(idSeccion, indice) {
+    const foto = form.secciones.find((s) => s.id === idSeccion)?.imagenes?.[indice]
+    if (foto?.url) borrarImagenBarberia(foto.url)
     setForm((f) => ({
       ...f,
       secciones: f.secciones.map((s) =>
@@ -354,8 +387,10 @@ export function PanelPersonalizacion() {
     if (!archivo) return
     setSubiendo(true)
     try {
-      const dataUrl = await archivoAImagenComprimida(archivo, { maxAncho: 1200, maxAlto: 1200 })
-      actualizarSeccion(id, { imagen: dataUrl })
+      const urlAnterior = form.secciones.find((s) => s.id === id)?.imagen
+      const url = await subirImagenBarberia(archivo, { barberiaId: barberia.id, maxAncho: 1200, maxAlto: 1200 })
+      actualizarSeccion(id, { imagen: url })
+      if (urlAnterior) borrarImagenBarberia(urlAnterior)
     } finally {
       setSubiendo(false)
       evento.target.value = ''
@@ -382,7 +417,6 @@ export function PanelPersonalizacion() {
         whatsapp_color: form.whatsapp_color || null,
         whatsapp_tamano: form.whatsapp_tamano,
         mostrar_servicios: form.mostrar_servicios,
-        mostrar_horario: form.mostrar_horario,
       })
       setFormGuardado(JSON.stringify(form))
       setEstadoToast('ok')
@@ -476,7 +510,10 @@ export function PanelPersonalizacion() {
                 {form.logo_url && (
                   <button
                     type="button"
-                    onClick={() => setForm((f) => ({ ...f, logo_url: null }))}
+                    onClick={() => {
+                      if (form.logo_url) borrarImagenBarberia(form.logo_url)
+                      setForm((f) => ({ ...f, logo_url: null }))
+                    }}
                     className="text-xs text-gris-calido-500 underline-offset-2 hover:text-red-700 hover:underline"
                   >
                     Quitar
@@ -980,6 +1017,18 @@ export function PanelPersonalizacion() {
                                         aria-label="Color de la frase destacada"
                                         className="h-11 w-11 shrink-0 cursor-pointer border border-gris-calido-200 bg-transparent"
                                       />
+                                      {seccion.texto_resaltado_color && (
+                                        <button
+                                          type="button"
+                                          onClick={() =>
+                                            actualizarSeccion(seccion.id, { texto_resaltado_color: null })
+                                          }
+                                          aria-label="Quitar color de la frase destacada"
+                                          className="text-xs text-gris-calido-500 hover:text-red-700"
+                                        >
+                                          ✕
+                                        </button>
+                                      )}
                                     </div>
 
                                     <div className="flex flex-col gap-1">
@@ -1242,6 +1291,96 @@ export function PanelPersonalizacion() {
                         </div>
                       )}
 
+                      {seccion.tipo === 'horario' && (
+                        <div className="flex flex-col gap-3">
+                          <input
+                            type="text"
+                            name="seccion_titulo"
+                            value={seccion.titulo}
+                            onChange={(e) => actualizarSeccion(seccion.id, { titulo: e.target.value })}
+                            placeholder="Título de la sección — ej: Horario de atención"
+                            className="min-h-11 border-b border-gris-calido-200 bg-transparent py-2 text-sm text-negro-barbero outline-none transition-colors focus:border-cobre"
+                          />
+                          <p className="text-xs text-gris-calido-500">
+                            El horario en sí se calcula solo, a partir de los horarios reales de tus
+                            barberos activos — no se edita a mano acá.
+                          </p>
+
+                          <div className="flex flex-col gap-1">
+                            <span className="versalitas text-xs text-gris-calido-500">Posición</span>
+                            <div className="flex gap-2">
+                              {[
+                                ['izquierda', 'Izquierda'],
+                                ['centro', 'Centro'],
+                                ['derecha', 'Derecha'],
+                              ].map(([valor, etiqueta]) => (
+                                <button
+                                  key={valor}
+                                  type="button"
+                                  onClick={() => actualizarSeccion(seccion.id, { posicion: valor })}
+                                  className={`versalitas rounded-md border px-3 py-2 text-xs transition-colors ${
+                                    (seccion.posicion ?? 'centro') === valor
+                                      ? 'border-cobre text-cobre-texto'
+                                      : 'border-gris-calido-200 text-gris-calido-500'
+                                  }`}
+                                >
+                                  {etiqueta}
+                                </button>
+                              ))}
+                            </div>
+                            <span className="text-xs text-gris-calido-500">
+                              "Centro" muestra solo la tabla, sin foto. En "Izquierda"/"Derecha" podés
+                              agregar una foto del local al lado, para darle más credibilidad.
+                            </span>
+                          </div>
+
+                          {(seccion.posicion ?? 'centro') !== 'centro' && (
+                            <>
+                              <div className="flex items-center gap-3">
+                                {seccion.imagen ? (
+                                  <img src={seccion.imagen} alt="" className="h-14 w-14 rounded object-cover" />
+                                ) : (
+                                  <span className="flex h-14 w-14 items-center justify-center rounded border border-gris-calido-200 text-xs text-gris-calido-400">
+                                    Sin foto
+                                  </span>
+                                )}
+                                <SelectorArchivo
+                                  etiqueta="Seleccionar imagen"
+                                  cargando={subiendo}
+                                  onChange={(e) => subirImagenDeSeccion(seccion.id, e)}
+                                />
+                              </div>
+
+                              <div className="flex flex-col gap-1">
+                                <span className="versalitas text-xs text-gris-calido-500">
+                                  Tamaño de la foto
+                                </span>
+                                <div className="flex gap-2">
+                                  {[
+                                    ['chica', 'Chica'],
+                                    ['mediana', 'Mediana'],
+                                    ['grande', 'Grande'],
+                                  ].map(([valor, etiqueta]) => (
+                                    <button
+                                      key={valor}
+                                      type="button"
+                                      onClick={() => actualizarSeccion(seccion.id, { imagen_tamano: valor })}
+                                      className={`versalitas rounded-md border px-3 py-2 text-xs transition-colors ${
+                                        (seccion.imagen_tamano ?? 'mediana') === valor
+                                          ? 'border-cobre text-cobre-texto'
+                                          : 'border-gris-calido-200 text-gris-calido-500'
+                                      }`}
+                                    >
+                                      {etiqueta}
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      )}
+
                       {seccion.tipo === 'testimonios' && (
                         <div className="flex flex-col gap-4">
                           <input
@@ -1482,6 +1621,18 @@ export function PanelPersonalizacion() {
                   + Nuestro equipo
                 </button>
               )}
+              {/* Mismo criterio que "equipo": normalmente ya existe una (se
+                  agrega sola al cargar esta pantalla), este botón solo hace
+                  falta si se la borró a propósito. */}
+              {!form.secciones.some((s) => s.tipo === 'horario') && (
+                <button
+                  type="button"
+                  onClick={() => agregarSeccion('horario')}
+                  className="versalitas rounded-md border border-gris-calido-200 px-3 py-2 text-xs text-gris-calido-700 hover:border-cobre hover:text-cobre-texto"
+                >
+                  + Horario de atención
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => agregarSeccion('testimonios')}
@@ -1495,30 +1646,21 @@ export function PanelPersonalizacion() {
           </section>
 
           <section className="flex flex-col gap-6">
-            <TituloGrupo numero="04">Servicios y horario</TituloGrupo>
+            <TituloGrupo numero="04">Servicios</TituloGrupo>
             <p className="-mt-2 text-xs text-gris-calido-500">
-              Se calculan solos a partir de tus servicios y horarios reales — no se editan a mano acá,
-              solo se pueden ocultar. El encabezado de sus tablas usa el color de marca de arriba.
+              Se calcula sola a partir de tus servicios reales — no se edita a mano acá, solo se puede
+              ocultar. El encabezado de la tabla usa el color de marca de arriba. El horario de
+              atención ahora se agrega/reordena junto a las demás secciones, en "Secciones de la
+              página" más arriba.
             </p>
 
-            <div className="flex flex-wrap gap-8">
-              <div className="flex items-center gap-3">
-                <Interruptor
-                  activo={Boolean(form.mostrar_servicios)}
-                  etiqueta="Mostrar vidriera de servicios y precios"
-                  onCambiar={(valor) => setForm((f) => ({ ...f, mostrar_servicios: valor ? 1 : 0 }))}
-                />
-                <span className="versalitas text-xs text-gris-calido-500">Servicios y precios</span>
-              </div>
-
-              <div className="flex items-center gap-3">
-                <Interruptor
-                  activo={Boolean(form.mostrar_horario)}
-                  etiqueta="Mostrar horario de atención"
-                  onCambiar={(valor) => setForm((f) => ({ ...f, mostrar_horario: valor ? 1 : 0 }))}
-                />
-                <span className="versalitas text-xs text-gris-calido-500">Horario de atención</span>
-              </div>
+            <div className="flex items-center gap-3">
+              <Interruptor
+                activo={Boolean(form.mostrar_servicios)}
+                etiqueta="Mostrar vidriera de servicios y precios"
+                onCambiar={(valor) => setForm((f) => ({ ...f, mostrar_servicios: valor ? 1 : 0 }))}
+              />
+              <span className="versalitas text-xs text-gris-calido-500">Servicios y precios</span>
             </div>
           </section>
 

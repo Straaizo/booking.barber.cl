@@ -6,7 +6,7 @@ import { Button } from '../../components/common/Button'
 import { Interruptor } from '../../components/panel/Interruptor'
 import { CambiarPassword } from '../../components/panel/CambiarPassword'
 import { SelectorArchivo } from '../../components/common/SelectorArchivo'
-import { archivoAImagenComprimida } from '../../utils/imagenes'
+import { subirImagenBarberia, borrarImagenBarberia } from '../../services/storageImagenes'
 import { useBarberiaAdmin } from './hooks/useBarberiaAdmin'
 import {
   useBarberosAdmin,
@@ -18,11 +18,15 @@ import {
   useDesactivarCatalogoPropio,
 } from './hooks/useBarberosAdmin'
 
+// Mismo mínimo que valida la Edge Function `gestionar-usuario`.
+const LARGO_MINIMO_PASSWORD = 8
+
 // Foto + especialidad de cada barbero se muestran tal cual en la página
 // pública, en la sección "Nuestro equipo" (ver VistaBarberia.jsx) — por eso
 // viven acá, junto al resto de los datos del barbero, y no en Personalización.
 function TarjetaBarbero({
   barbero,
+  barberiaId,
   onCambiar,
   onCambiarCatalogoPropio,
   cambiandoCatalogo,
@@ -37,8 +41,10 @@ function TarjetaBarbero({
     if (!archivo) return
     setSubiendo(true)
     try {
-      const dataUrl = await archivoAImagenComprimida(archivo, { maxAncho: 500, maxAlto: 500 })
-      onCambiar({ foto_url: dataUrl })
+      const urlAnterior = barbero.foto_url
+      const url = await subirImagenBarberia(archivo, { barberiaId, maxAncho: 500, maxAlto: 500 })
+      onCambiar({ foto_url: url })
+      if (urlAnterior) borrarImagenBarberia(urlAnterior)
     } finally {
       setSubiendo(false)
       evento.target.value = ''
@@ -204,6 +210,12 @@ export function PanelBarberos() {
   async function agregarBarbero(evento) {
     evento.preventDefault()
     if (!nombreNuevo.trim() || !passwordNueva.trim()) return
+    // Mismo mínimo que exige la Edge Function — se avisa acá antes de gastar
+    // la llamada al servidor, nunca como el único lugar que lo exige.
+    if (passwordNueva.trim().length < LARGO_MINIMO_PASSWORD) {
+      setErrorEnvio(`La contraseña debe tener al menos ${LARGO_MINIMO_PASSWORD} caracteres.`)
+      return
+    }
     setErrorEnvio(null)
     try {
       const nuevo = await crearBarbero.mutateAsync({ nombre: nombreNuevo.trim(), password: passwordNueva.trim() })
@@ -264,6 +276,7 @@ export function PanelBarberos() {
               <TarjetaBarbero
                 key={barbero.id}
                 barbero={barbero}
+                barberiaId={perfil.barberia_id}
                 onCambiar={(cambios) => cambiarBarbero(barbero, cambios)}
                 onCambiarCatalogoPropio={(valor) => alternarCatalogoPropio(barbero.id, valor)}
                 cambiandoCatalogo={cambiandoCatalogoId === barbero.id}
