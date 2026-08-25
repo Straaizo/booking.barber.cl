@@ -27,6 +27,7 @@ function construirVistaPrevia(barberia, form) {
       color_primario: form.color_primario || null,
       color_header: form.color_header || null,
       fuente_display: form.fuente_display,
+      tema: form.tema,
       eslogan: form.eslogan,
       eslogan_color: form.eslogan_color || null,
       descripcion: form.descripcion,
@@ -49,6 +50,7 @@ function formularioDesdeBarberia(barberia) {
     color_primario: p.color_primario ?? '',
     color_header: p.color_header ?? '',
     fuente_display: p.fuente_display || 'fraunces',
+    tema: p.tema || 'claro',
     eslogan: p.eslogan ?? '',
     eslogan_color: p.eslogan_color ?? '',
     descripcion: p.descripcion ?? '',
@@ -408,6 +410,7 @@ export function PanelPersonalizacion() {
         color_primario: form.color_primario || null,
         color_header: form.color_header || null,
         fuente_display: form.fuente_display,
+        tema: form.tema,
         eslogan: form.eslogan,
         eslogan_color: form.eslogan_color || null,
         descripcion: form.descripcion,
@@ -572,7 +575,7 @@ export function PanelPersonalizacion() {
             </div>
 
             <label className="flex flex-col gap-2">
-              <span className="versalitas text-xs text-gris-calido-500">Tipografía de títulos</span>
+              <span className="versalitas text-xs text-gris-calido-500">Tipografía del nombre de tu barbería</span>
               <select
                 name="fuente_display"
                 value={form.fuente_display}
@@ -590,6 +593,24 @@ export function PanelPersonalizacion() {
                 ))}
               </select>
             </label>
+
+            <div className="flex flex-col gap-3">
+              <div className="flex items-center gap-3">
+                <Interruptor
+                  activo={form.tema === 'oscuro'}
+                  etiqueta="Modo oscuro de la página pública"
+                  onCambiar={(valor) => setForm((f) => ({ ...f, tema: valor ? 'oscuro' : 'claro' }))}
+                />
+                <span className="versalitas text-xs text-gris-calido-500">Modo oscuro</span>
+              </div>
+              {form.tema === 'oscuro' && (
+                <ul className="flex flex-col gap-1 border-l-2 border-cobre/30 pl-4 text-xs text-gris-calido-500">
+                  <li>Usa fotos con buen contraste: en fondo oscuro, una foto muy oscura se pierde.</li>
+                  <li>Si eliges un color de marca, prueba tonos algo más claros — se ven mejor sobre fondo oscuro.</li>
+                  <li>El color del header y el color de marca siguen siendo independientes de esto.</li>
+                </ul>
+              )}
+            </div>
           </section>
 
           <section className="flex flex-col gap-6">
@@ -1008,7 +1029,7 @@ export function PanelPersonalizacion() {
                                       <input
                                         type="color"
                                         name="galeria_texto_resaltado_color"
-                                        value={seccion.texto_resaltado_color || '#a85c32'}
+                                        value={seccion.texto_resaltado_color || '#1c1b19'}
                                         onChange={(e) =>
                                           actualizarSeccion(seccion.id, {
                                             texto_resaltado_color: e.target.value,

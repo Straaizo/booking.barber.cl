@@ -17,13 +17,13 @@ export function Confirmacion({ resumen }) {
       <TextReveal
         texto="¡Reserva confirmada!"
         as="h2"
-        className="font-display text-2xl font-light tracking-tight text-negro-barbero md:text-3xl"
+        className="font-display text-2xl font-light tracking-tight text-[var(--pb-texto)] md:text-3xl"
       />
 
-      <p className="max-w-sm border-t border-cobre/25 pt-4 text-sm text-gris-calido-700">
+      <p className="max-w-sm border-t border-cobre/25 pt-4 text-sm text-[var(--pb-texto-secundario)]">
         {resumen}
       </p>
-      <p className="versalitas text-xs text-gris-calido-400">
+      <p className="versalitas text-xs text-[var(--pb-texto-sutil)]">
         Te esperamos. Cualquier cambio, contacta directamente a la barbería.
       </p>
     </div>

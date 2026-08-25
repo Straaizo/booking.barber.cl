@@ -8,7 +8,7 @@ export function PasoBarbero({ barberos, onSeleccionar, onVolver }) {
   return (
     <div>
       {onVolver && <BackButton onClick={onVolver} />}
-      <h2 className={`font-display mb-1 text-xl font-light tracking-tight text-negro-barbero md:text-2xl ${onVolver ? 'mt-3' : ''}`}>
+      <h2 className={`font-display mb-1 text-xl font-light tracking-tight text-[var(--pb-texto)] md:text-2xl ${onVolver ? 'mt-3' : ''}`}>
         Elige un barbero
       </h2>
 
@@ -19,13 +19,13 @@ export function PasoBarbero({ barberos, onSeleccionar, onVolver }) {
             type="button"
             onClick={() => onSeleccionar(barbero)}
             whileTap={{ scale: 0.99 }}
-            className="group relative flex min-h-16 items-center border-b border-gris-calido-200 py-4 text-left transition-colors first:border-t first:border-t-gris-calido-200 hover:bg-cobre/5"
+            className="group relative flex min-h-16 items-center border-b border-[var(--pb-borde)] py-4 text-left transition-colors first:border-t first:border-t-[var(--pb-borde)] hover:bg-cobre/5"
           >
             <span
               aria-hidden="true"
               className="absolute inset-y-0 left-0 w-0.5 scale-y-0 bg-cobre transition-transform duration-300 ease-entrada group-hover:scale-y-100"
             />
-            <span className="font-display pl-3 text-base font-normal text-negro-barbero md:text-lg">
+            <span className="font-display pl-3 text-base font-normal text-[var(--pb-texto)] md:text-lg">
               {barbero.nombre}
             </span>
           </motion.button>

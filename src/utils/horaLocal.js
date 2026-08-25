@@ -46,6 +46,19 @@ export function hoyEnSantiago() {
   return diaSantiagoComoFechaLocal(new Date())
 }
 
+// El lunes de la semana que contiene `fecha` (convención chilena: la semana
+// empieza en lunes, no domingo) — un marcador de día puro, no un instante,
+// así que no hace falta pasar por Santiago acá; `fecha` ya debería serlo
+// (ej: el resultado de `hoyEnSantiago()`).
+export function inicioDeSemanaLunes(fecha) {
+  const dia = fecha.getDay() // 0 = domingo
+  const desplazamiento = dia === 0 ? 6 : dia - 1
+  const resultado = new Date(fecha)
+  resultado.setHours(0, 0, 0, 0)
+  resultado.setDate(fecha.getDate() - desplazamiento)
+  return resultado
+}
+
 // Convierte una hora de pared en Chile (los campos sueltos que ya escribió
 // alguien en un formulario: año, mes, día, hora, minuto) al instante UTC
 // real que representa — lo opuesto de `horaMinutoEnSantiago`. Hace falta

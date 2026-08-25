@@ -2,19 +2,16 @@ import { motion } from 'framer-motion'
 import { BackButton } from '../../../components/common/BackButton'
 import { formatoCLP, ofertaVigente } from '../../../utils/formatos'
 
-// `onVolver` es opcional: cuando hay un solo barbero (se auto-selecciona sin
-// mostrar ese paso), este termina siendo el primer paso del asistente y no
-// tiene a dónde volver.
 export function PasoServicio({ servicios, onSeleccionar, onVolver }) {
   return (
     <div>
-      {onVolver && <BackButton onClick={onVolver} />}
-      <h2 className={`font-display mb-1 text-xl font-light tracking-tight text-negro-barbero md:text-2xl ${onVolver ? 'mt-3' : ''}`}>
+      <BackButton onClick={onVolver} />
+      <h2 className="font-display mt-3 mb-1 text-xl font-light tracking-tight text-[var(--pb-texto)] md:text-2xl">
         Elige un servicio
       </h2>
 
       {servicios.length === 0 && (
-        <p className="mt-4 text-sm text-gris-calido-700">
+        <p className="mt-4 text-sm text-[var(--pb-texto-secundario)]">
           Este barbero no tiene servicios disponibles por ahora.
         </p>
       )}
@@ -28,32 +25,32 @@ export function PasoServicio({ servicios, onSeleccionar, onVolver }) {
               type="button"
               onClick={() => onSeleccionar(servicio)}
               whileTap={{ scale: 0.99 }}
-              className="group relative flex min-h-16 items-center justify-between gap-4 border-b border-gris-calido-200 py-4 text-left transition-colors first:border-t first:border-t-gris-calido-200 hover:bg-cobre/5"
+              className="group relative flex min-h-16 items-center justify-between gap-4 border-b border-[var(--pb-borde)] py-4 text-left transition-colors first:border-t first:border-t-[var(--pb-borde)] hover:bg-cobre/5"
             >
               <span
                 aria-hidden="true"
                 className="absolute inset-y-0 left-0 w-0.5 scale-y-0 bg-cobre transition-transform duration-300 ease-entrada group-hover:scale-y-100"
               />
               <span className="pl-3">
-                <span className="font-display block text-base font-normal text-negro-barbero md:text-lg">
+                <span className="font-display block text-base font-normal text-[var(--pb-texto)] md:text-lg">
                   {servicio.nombre}
                 </span>
-                <span className="versalitas mt-0.5 block text-xs text-gris-calido-500">
+                <span className="versalitas mt-0.5 block text-xs text-[var(--pb-texto-terciario)]">
                   {servicio.duracion_minutos} min
                 </span>
               </span>
               <span className="numeros-tabulares shrink-0 pr-1 text-right">
                 {enOferta ? (
                   <>
-                    <span className="block text-xs text-gris-calido-400 line-through">
+                    <span className="block text-xs text-[var(--pb-texto-sutil)] line-through">
                       {formatoCLP(servicio.precio_clp)}
                     </span>
-                    <span className="block text-base font-semibold text-cobre-texto">
+                    <span className="block text-base font-semibold text-[var(--pb-acento-texto)]">
                       {formatoCLP(servicio.precio_oferta)}
                     </span>
                   </>
                 ) : (
-                  <span className="block text-base font-semibold text-negro-barbero">
+                  <span className="block text-base font-semibold text-[var(--pb-texto)]">
                     {formatoCLP(servicio.precio_clp)}
                   </span>
                 )}

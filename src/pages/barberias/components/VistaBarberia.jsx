@@ -20,14 +20,14 @@ import { resumenHorarioSemanal } from '../../../utils/horarios'
 // una portada entre el resto — el orden que la barbería elige en el panel es
 // directamente el orden de lectura de la grilla. Cada foto es clicable y
 // abre en grande (`LightboxGaleria`), con navegación por teclado.
-function SeccionGaleria({ seccion, nombreBarberia }) {
+function SeccionGaleria({ seccion, nombreBarberia, esOscuro }) {
   const [fotoAbierta, setFotoAbierta] = useState(null)
   const imagenes = seccion.imagenes ?? []
   if (imagenes.length === 0) return null
 
   return (
     <>
-      <SectionRule indice="—" texto={seccion.titulo || 'Galería'} tono="oscuro" />
+      <SectionRule indice="—" texto={seccion.titulo || 'Galería'} tono={esOscuro ? 'claro' : 'oscuro'} />
       {seccion.estilo === 'carrusel' ? (
         <CarruselGaleria
           imagenes={imagenes}
@@ -205,7 +205,7 @@ function CarruselGaleria({
             type="button"
             onClick={() => ir((indice - 1 + imagenes.length) % imagenes.length, -1)}
             aria-label="Foto anterior"
-            className="text-lg text-gris-calido-400 transition-colors hover:text-cobre-texto"
+            className="text-lg text-[var(--pb-texto-sutil)] transition-colors hover:text-[var(--pb-acento-texto)]"
           >
             ‹
           </button>
@@ -217,7 +217,7 @@ function CarruselGaleria({
                 onClick={() => ir(i, i > indice ? 1 : -1)}
                 aria-label={`Ver foto ${i + 1}`}
                 className={`h-1.5 w-1.5 rounded-full transition-colors ${
-                  i === indice ? 'bg-cobre' : 'bg-gris-calido-300'
+                  i === indice ? 'bg-cobre' : 'bg-[var(--pb-borde)]'
                 }`}
               />
             ))}
@@ -226,7 +226,7 @@ function CarruselGaleria({
             type="button"
             onClick={() => ir((indice + 1) % imagenes.length, 1)}
             aria-label="Foto siguiente"
-            className="text-lg text-gris-calido-400 transition-colors hover:text-cobre-texto"
+            className="text-lg text-[var(--pb-texto-sutil)] transition-colors hover:text-[var(--pb-acento-texto)]"
           >
             ›
           </button>
@@ -247,7 +247,7 @@ function CarruselGaleria({
     >
       {imagenYControles}
       <p
-        className={`min-w-0 flex-1 break-words leading-relaxed text-negro-barbero ${
+        className={`min-w-0 flex-1 break-words leading-relaxed text-[var(--pb-texto)] ${
           textoFuente ? '' : 'font-display'
         } ${TAMANOS_TEXTO_CARRUSEL[textoTamano] ?? TAMANOS_TEXTO_CARRUSEL.mediana} ${
           textoCursiva ? 'italic' : ''
@@ -263,7 +263,7 @@ function CarruselGaleria({
                 TAMANOS_TEXTO_CARRUSEL[textoResaltadoTamano] ?? TAMANOS_TEXTO_CARRUSEL.grande
               }`}
               style={{
-                color: textoResaltadoColor || 'var(--color-cobre)',
+                color: textoResaltadoColor || 'var(--pb-texto)',
                 fontFamily: textoResaltadoFuente ? pilaFuente(textoResaltadoFuente) : undefined,
               }}
             >
@@ -284,17 +284,17 @@ function CarruselGaleria({
 // (`seccion.tipo === 'equipo'`, ver el `secciones.map` de VistaBarberia) para
 // que cada barbería pueda ubicarla donde quiera — antes o después de sus
 // fotos de trabajo, por ejemplo — en vez de vivir fija siempre en el mismo lugar.
-function SeccionEquipo({ titulo, barberos, ordenEquipo, estilo }) {
+function SeccionEquipo({ titulo, barberos, ordenEquipo, estilo, esOscuro }) {
   const equipo = ordenarEquipo(barberos, ordenEquipo)
   if (equipo.length === 0) return null
 
   if (estilo === 'carrusel') {
-    return <CarruselEquipo titulo={titulo} equipo={equipo} />
+    return <CarruselEquipo titulo={titulo} equipo={equipo} esOscuro={esOscuro} />
   }
 
   return (
     <>
-      <SectionRule indice="—" texto={titulo || 'Nuestro equipo'} tono="oscuro" />
+      <SectionRule indice="—" texto={titulo || 'Nuestro equipo'} tono={esOscuro ? 'claro' : 'oscuro'} />
       {/* `flex-wrap` + centrado, no `grid` de columnas fijas — con pocos
           barberos (1 o 2) una grilla de 3-4 columnas los deja pegados a un
           costado con un vacío enorme al lado; así siempre quedan
@@ -315,9 +315,9 @@ function SeccionEquipo({ titulo, barberos, ordenEquipo, estilo }) {
               </span>
             )}
             <div>
-              <p className="text-sm font-medium text-negro-barbero">{barbero.nombre}</p>
+              <p className="text-sm font-medium text-[var(--pb-texto)]">{barbero.nombre}</p>
               {barbero.especialidad && (
-                <p className="mt-1 text-xs text-gris-calido-500">{barbero.especialidad}</p>
+                <p className="mt-1 text-xs text-[var(--pb-texto-terciario)]">{barbero.especialidad}</p>
               )}
             </div>
           </div>
@@ -332,7 +332,7 @@ function SeccionEquipo({ titulo, barberos, ordenEquipo, estilo }) {
 // competir por atención con el resto. Autoplay cada 4.5s (se reinicia solo
 // al desmontar/montar, no hace falta pausarlo al interactuar: el click en
 // una flecha o un punto ya deja al usuario exactamente donde eligió ir).
-function CarruselEquipo({ titulo, equipo }) {
+function CarruselEquipo({ titulo, equipo, esOscuro }) {
   const [indice, setIndice] = useState(0)
   const [direccion, setDireccion] = useState(1)
 
@@ -354,7 +354,7 @@ function CarruselEquipo({ titulo, equipo }) {
 
   return (
     <>
-      <SectionRule indice="—" texto={titulo || 'Nuestro equipo'} tono="oscuro" />
+      <SectionRule indice="—" texto={titulo || 'Nuestro equipo'} tono={esOscuro ? 'claro' : 'oscuro'} />
       <div className="mx-auto flex max-w-sm flex-col items-center gap-6 px-6 py-10">
         <div className="relative h-64 w-64 overflow-hidden">
           <AnimatePresence initial={false} mode="wait">
@@ -378,9 +378,9 @@ function CarruselEquipo({ titulo, equipo }) {
                 </span>
               )}
               <div>
-                <p className="text-base font-medium text-negro-barbero">{barbero.nombre}</p>
+                <p className="text-base font-medium text-[var(--pb-texto)]">{barbero.nombre}</p>
                 {barbero.especialidad && (
-                  <p className="mt-1 text-sm text-gris-calido-500">{barbero.especialidad}</p>
+                  <p className="mt-1 text-sm text-[var(--pb-texto-terciario)]">{barbero.especialidad}</p>
                 )}
               </div>
             </motion.div>
@@ -393,7 +393,7 @@ function CarruselEquipo({ titulo, equipo }) {
               type="button"
               onClick={() => ir((indice - 1 + equipo.length) % equipo.length, -1)}
               aria-label="Barbero anterior"
-              className="text-lg text-gris-calido-400 transition-colors hover:text-cobre-texto"
+              className="text-lg text-[var(--pb-texto-sutil)] transition-colors hover:text-[var(--pb-acento-texto)]"
             >
               ‹
             </button>
@@ -405,7 +405,7 @@ function CarruselEquipo({ titulo, equipo }) {
                   onClick={() => ir(i, i > indice ? 1 : -1)}
                   aria-label={`Ver a ${b.nombre}`}
                   className={`h-1.5 w-1.5 rounded-full transition-colors ${
-                    i === indice ? 'bg-cobre' : 'bg-gris-calido-300'
+                    i === indice ? 'bg-cobre' : 'bg-[var(--pb-borde)]'
                   }`}
                 />
               ))}
@@ -414,7 +414,7 @@ function CarruselEquipo({ titulo, equipo }) {
               type="button"
               onClick={() => ir((indice + 1) % equipo.length, 1)}
               aria-label="Barbero siguiente"
-              className="text-lg text-gris-calido-400 transition-colors hover:text-cobre-texto"
+              className="text-lg text-[var(--pb-texto-sutil)] transition-colors hover:text-[var(--pb-acento-texto)]"
             >
               ›
             </button>
@@ -477,12 +477,12 @@ function BurbujaWhatsApp({ telefono, nombreBarberia, color, tamano }) {
   )
 }
 
-function SeccionImagenTexto({ seccion }) {
+function SeccionImagenTexto({ seccion, esOscuro }) {
   if (!seccion.imagen && !seccion.titulo && !seccion.texto) return null
   const imagenADerecha = seccion.posicion_imagen === 'derecha'
   return (
     <>
-      <SectionRule indice="—" texto={seccion.titulo || 'Nuestro espacio'} tono="oscuro" />
+      <SectionRule indice="—" texto={seccion.titulo || 'Nuestro espacio'} tono={esOscuro ? 'claro' : 'oscuro'} />
       <div
         className={`flex flex-col gap-6 px-6 py-10 md:items-center md:gap-10 md:px-10 ${
           imagenADerecha ? 'md:flex-row-reverse' : 'md:flex-row'
@@ -496,7 +496,7 @@ function SeccionImagenTexto({ seccion }) {
           />
         )}
         {seccion.texto && (
-          <p className="min-w-0 flex-1 break-words text-sm leading-relaxed text-gris-calido-700 md:text-base">
+          <p className="min-w-0 flex-1 break-words text-sm leading-relaxed text-[var(--pb-texto-secundario)] md:text-base">
             {seccion.texto}
           </p>
         )}
@@ -527,15 +527,12 @@ function IndicadorScroll({ claseTexto }) {
 }
 
 // `color` es el mismo "Color del texto" que ya elige el dueño para los
-// testimonios (`colorTexto`/`estiloTexto.color`) — sin pasarlo acá, las
-// estrellas quedaban pegadas al color de marca de todo el sitio (`text-cobre`)
-// sin importar que esa sección tuviera su propio color configurado: cambiar
-// "Color de marca" en Identidad las movía igual, aunque no tuvieran nada que
-// ver entre sí. Mismo patrón de fallback que el resto de la pantalla: sin
-// color propio, sigue el de marca.
+// testimonios (`colorTexto`/`estiloTexto.color`). Sin color propio, el
+// fallback es un neutro fijo (no `--color-cobre`): así cambiar "Color de
+// marca" en Identidad nunca mueve las estrellas si el dueño no las tocó.
 function Estrellas({ cantidad, color }) {
   return (
-    <div aria-hidden="true" className="flex gap-0.5" style={{ color: color || 'var(--color-cobre)' }}>
+    <div aria-hidden="true" className="flex gap-0.5" style={{ color: color || 'var(--pb-texto)' }}>
       {Array.from({ length: 5 }, (_, i) => (
         <span key={i} className={i < cantidad ? 'opacity-100' : 'opacity-20'}>
           ★
@@ -560,7 +557,7 @@ const TAMANOS_TESTIMONIO = {
   enorme: 'text-2xl md:text-3xl',
 }
 
-function SeccionTestimonios({ titulo, items, estilo, tamano, fuente, colorTexto, colorFondo }) {
+function SeccionTestimonios({ titulo, items, estilo, tamano, fuente, colorTexto, colorFondo, esOscuro }) {
   useEffect(() => {
     if (fuente) asegurarFuenteCargada(fuente)
   }, [fuente])
@@ -574,7 +571,7 @@ function SeccionTestimonios({ titulo, items, estilo, tamano, fuente, colorTexto,
 
   return (
     <>
-      <SectionRule indice="—" texto={titulo || 'Lo que dicen nuestros clientes'} tono="oscuro" />
+      <SectionRule indice="—" texto={titulo || 'Lo que dicen nuestros clientes'} tono={esOscuro ? 'claro' : 'oscuro'} />
       {estilo === 'lista' ? (
         <ListaTestimonios items={items} tamano={tamano} estiloTexto={estiloTexto} colorFondo={colorFondo} />
       ) : (
@@ -622,7 +619,7 @@ function CarruselTestimonios({ items, tamano, estiloTexto }) {
           <p
             className={`font-light italic leading-relaxed ${
               estiloTexto.fontFamily ? '' : 'font-display'
-            } ${estiloTexto.color ? '' : 'text-negro-barbero'} ${
+            } ${estiloTexto.color ? '' : 'text-[var(--pb-texto)]'} ${
               TAMANOS_TESTIMONIO[tamano] ?? TAMANOS_TESTIMONIO.mediana
             }`}
             style={estiloTexto}
@@ -630,7 +627,7 @@ function CarruselTestimonios({ items, tamano, estiloTexto }) {
             “{testimonio.texto}”
           </p>
           {testimonio.nombre && (
-            <p className="versalitas text-xs text-gris-calido-500">{testimonio.nombre}</p>
+            <p className="versalitas text-xs text-[var(--pb-texto-terciario)]">{testimonio.nombre}</p>
           )}
         </motion.div>
       </AnimatePresence>
@@ -644,7 +641,7 @@ function CarruselTestimonios({ items, tamano, estiloTexto }) {
               onClick={() => ir(i, i > indice ? 1 : -1)}
               aria-label={`Ver testimonio ${i + 1}`}
               className={`h-1.5 w-1.5 rounded-full transition-colors ${
-                i === indice ? 'bg-cobre' : 'bg-gris-calido-300'
+                i === indice ? 'bg-cobre' : 'bg-[var(--pb-borde)]'
               }`}
             />
           ))}
@@ -664,14 +661,14 @@ function ListaTestimonios({ items, tamano, estiloTexto, colorFondo }) {
       {items.map((testimonio) => (
         <div
           key={testimonio.id}
-          className="flex flex-col gap-3 rounded-lg border border-gris-calido-200 bg-white p-5"
+          className="flex flex-col gap-3 rounded-lg border border-[var(--pb-borde)] bg-[var(--pb-superficie)] p-5"
           style={{ backgroundColor: colorFondo || undefined }}
         >
           <Estrellas cantidad={testimonio.estrellas} color={estiloTexto.color} />
           <p
             className={`flex-1 font-light italic leading-relaxed ${
               estiloTexto.fontFamily ? '' : 'font-display'
-            } ${estiloTexto.color ? '' : 'text-negro-barbero'} ${
+            } ${estiloTexto.color ? '' : 'text-[var(--pb-texto)]'} ${
               TAMANOS_TESTIMONIO[tamano] ?? TAMANOS_TESTIMONIO.mediana
             }`}
             style={estiloTexto}
@@ -679,7 +676,7 @@ function ListaTestimonios({ items, tamano, estiloTexto, colorFondo }) {
             “{testimonio.texto}”
           </p>
           {testimonio.nombre && (
-            <p className="versalitas text-xs text-gris-calido-500">{testimonio.nombre}</p>
+            <p className="versalitas text-xs text-[var(--pb-texto-terciario)]">{testimonio.nombre}</p>
           )}
         </div>
       ))}
@@ -699,7 +696,7 @@ function EncabezadoTabla({ columnas }) {
       {columnas.etiquetas.map((etiqueta, i) => (
         <span
           key={etiqueta}
-          className={`versalitas text-xs text-gris-calido-600 ${i > 0 ? 'text-right' : ''}`}
+          className={`versalitas text-xs text-[var(--pb-texto-secundario)] ${i > 0 ? 'text-right' : ''}`}
         >
           {etiqueta}
         </span>
@@ -715,7 +712,7 @@ function EncabezadoTabla({ columnas }) {
 // si la tabla va sola y centrada ('centro', de siempre) o en una columna
 // con una foto del local al lado ('izquierda'/'derecha', para darle más
 // credibilidad) — mismo patrón que "Imagen y texto".
-function SeccionHorario({ titulo, barberos, posicion, imagen, imagenTamano }) {
+function SeccionHorario({ titulo, barberos, posicion, imagen, imagenTamano, esOscuro }) {
   const horarios = (barberos ?? [])
     .filter((b) => b.activo)
     .flatMap((b) => b.horarios_disponibles ?? [])
@@ -725,17 +722,17 @@ function SeccionHorario({ titulo, barberos, posicion, imagen, imagenTamano }) {
   const conImagen = posicion !== 'centro' && Boolean(imagen)
 
   const tabla = (
-    <div className="w-full overflow-hidden rounded-md border border-gris-calido-200">
+    <div className="w-full overflow-hidden rounded-md border border-[var(--pb-borde)]">
       <EncabezadoTabla columnas={{ plantilla: '1fr auto', etiquetas: ['Día', 'Horario'] }} />
       {resumen.map((linea, i) => (
         <div
           key={linea.etiqueta}
-          className={`numeros-tabulares grid grid-cols-[1fr_auto] gap-4 px-4 py-3 text-sm text-gris-calido-700 md:text-base ${
-            i % 2 === 1 ? 'bg-gris-calido-100/50' : ''
+          className={`numeros-tabulares grid grid-cols-[1fr_auto] gap-4 px-4 py-3 text-sm text-[var(--pb-texto-secundario)] md:text-base ${
+            i % 2 === 1 ? 'bg-[var(--pb-superficie-sutil)]' : ''
           }`}
         >
           <span>{linea.etiqueta}</span>
-          <span className="text-right font-medium text-negro-barbero">{linea.horario}</span>
+          <span className="text-right font-medium text-[var(--pb-texto)]">{linea.horario}</span>
         </div>
       ))}
     </div>
@@ -743,7 +740,7 @@ function SeccionHorario({ titulo, barberos, posicion, imagen, imagenTamano }) {
 
   return (
     <>
-      <SectionRule indice="—" texto={titulo || 'Horario de atención'} tono="oscuro" />
+      <SectionRule indice="—" texto={titulo || 'Horario de atención'} tono={esOscuro ? 'claro' : 'oscuro'} />
       {conImagen ? (
         <div
           className={`flex flex-col gap-8 px-6 py-8 md:items-center md:gap-10 md:px-10 ${
@@ -770,15 +767,15 @@ function SeccionHorario({ titulo, barberos, posicion, imagen, imagenTamano }) {
 // con encabezado, no una lista clickeable que imita el paso del asistente
 // (eso generaba la sensación de "ya vi esto" apenas se llegaba a reservar).
 // Un solo link al final ("Reservar tu hora →"), no uno por fila.
-function SeccionServicios({ servicios }) {
+function SeccionServicios({ servicios, esOscuro }) {
   const activos = (servicios ?? []).filter((s) => s.activo)
   if (activos.length === 0) return null
 
   return (
     <>
-      <SectionRule indice="—" texto="Servicios y precios" tono="oscuro" />
+      <SectionRule indice="—" texto="Servicios y precios" tono={esOscuro ? 'claro' : 'oscuro'} />
       <div className="mx-auto max-w-lg px-6 py-8 md:px-10">
-        <div className="overflow-hidden rounded-md border border-gris-calido-200">
+        <div className="overflow-hidden rounded-md border border-[var(--pb-borde)]">
           <EncabezadoTabla
             columnas={{ plantilla: '1fr auto auto', etiquetas: ['Servicio', 'Duración', 'Precio'] }}
           />
@@ -788,27 +785,27 @@ function SeccionServicios({ servicios }) {
               <div
                 key={servicio.id}
                 className={`numeros-tabulares grid grid-cols-[1fr_auto_auto] items-center gap-4 px-4 py-3 ${
-                  i % 2 === 1 ? 'bg-gris-calido-100/50' : ''
+                  i % 2 === 1 ? 'bg-[var(--pb-superficie-sutil)]' : ''
                 }`}
               >
-                <span className="font-display truncate text-base font-normal text-negro-barbero md:text-lg">
+                <span className="font-display truncate text-base font-normal text-[var(--pb-texto)] md:text-lg">
                   {servicio.nombre}
                 </span>
-                <span className="text-right text-xs text-gris-calido-500 md:text-sm">
+                <span className="text-right text-xs text-[var(--pb-texto-terciario)] md:text-sm">
                   {servicio.duracion_minutos} min
                 </span>
                 <span className="text-right">
                   {enOferta ? (
                     <>
-                      <span className="block text-xs text-gris-calido-400 line-through">
+                      <span className="block text-xs text-[var(--pb-texto-sutil)] line-through">
                         {formatoCLP(servicio.precio_clp)}
                       </span>
-                      <span className="block text-base font-semibold text-cobre-texto">
+                      <span className="block text-base font-semibold text-[var(--pb-acento-texto)]">
                         {formatoCLP(servicio.precio_oferta)}
                       </span>
                     </>
                   ) : (
-                    <span className="block text-base font-semibold text-negro-barbero">
+                    <span className="block text-base font-semibold text-[var(--pb-texto)]">
                       {formatoCLP(servicio.precio_clp)}
                     </span>
                   )}
@@ -840,6 +837,7 @@ export function VistaBarberia({ barberia }) {
   // depender de que alguien vuelva a guardar el formulario.
   const secciones = puedePersonalizarSecciones(barberia.plan_id) ? personalizacion.secciones ?? [] : []
   const fuenteElegida = personalizacion.fuente_display || 'fraunces'
+  const esOscuro = personalizacion.tema === 'oscuro'
   // La vista previa en vivo del panel (ver PreviewBarberia.jsx) renderiza
   // este mismo componente dentro de un <iframe> en la ruta `/_preview-barberia`
   // — la marca de agua de la plataforma no tiene sentido ahí, solo en la
@@ -855,7 +853,6 @@ export function VistaBarberia({ barberia }) {
       '--color-cobre': personalizacion.color_primario,
       '--color-cobre-oscuro': oscurecerHex(personalizacion.color_primario),
     }),
-    '--font-display': pilaFuente(fuenteElegida),
   }
 
   // Si eligió un color de header claro, el texto (pensado para el
@@ -867,7 +864,7 @@ export function VistaBarberia({ barberia }) {
   const claseContacto = headerClaro ? 'text-gris-calido-700' : 'text-gris-calido-200'
 
   return (
-    <div className="min-h-screen bg-hueso" style={estiloMarca}>
+    <div className="min-h-screen bg-[var(--pb-fondo)]" data-tema={esOscuro ? 'oscuro' : 'claro'} style={estiloMarca}>
       <header
         className={`relative overflow-hidden px-6 pb-12 pt-10 md:px-10 md:pb-16 md:pt-14 ${claseTexto} ${personalizacion.color_header ? '' : 'bg-negro-barbero'}`}
         style={personalizacion.color_header ? { backgroundColor: personalizacion.color_header } : undefined}
@@ -888,11 +885,10 @@ export function VistaBarberia({ barberia }) {
           // esto en el flujo normal (arriba a la izquierda) en vez de fijo
           // en la esquina.
           <div className={`absolute right-6 top-6 md:right-10 md:top-8 ${claseTexto}`}>
-            {/* Sin la clase `font-display`: esa clase lee `var(--font-display)`,
-                que `estiloMarca` (más arriba) pisa con la tipografía que la
-                barbería elija en "Identidad" — la marca de la plataforma no
-                es de la barbería, no tiene que cambiar con su tipografía.
-                Se fija la pila de Fraunces a mano, igual que `Header.jsx`. */}
+            {/* La marca de la plataforma no es de la barbería: se fija la
+                pila de Fraunces a mano en vez de la clase `font-display`,
+                igual que `Header.jsx`, para no depender de que nadie cambie
+                ese token global más adelante. */}
             <HoverLink
               href="/"
               className="text-xl font-semibold italic tracking-tight"
@@ -917,10 +913,16 @@ export function VistaBarberia({ barberia }) {
           )}
 
           <div className="mt-5 md:mt-0">
+            {/* La tipografía elegida en "Tipografía de títulos" (Identidad)
+                solo aplica acá — al nombre de la barbería — y no como
+                variable CSS global: si pisara `--font-display`, cambiaría
+                de paso cualquier otro título de la página (secciones,
+                testimonios, el asistente de reserva) que nadie pidió tocar. */}
             <TextReveal
               texto={barberia.nombre}
               as="h1"
               className="font-display text-3xl font-light leading-tight tracking-tight md:text-5xl"
+              style={{ fontFamily: pilaFuente(fuenteElegida) }}
             />
             {personalizacion.eslogan && (
               <ScrollReveal delay={0.1}>
@@ -969,10 +971,17 @@ export function VistaBarberia({ barberia }) {
 
       {secciones.map((seccion) => {
         if (seccion.tipo === 'galeria') {
-          return <SeccionGaleria key={seccion.id} seccion={seccion} nombreBarberia={barberia.nombre} />
+          return (
+            <SeccionGaleria
+              key={seccion.id}
+              seccion={seccion}
+              nombreBarberia={barberia.nombre}
+              esOscuro={esOscuro}
+            />
+          )
         }
         if (seccion.tipo === 'imagen_texto') {
-          return <SeccionImagenTexto key={seccion.id} seccion={seccion} />
+          return <SeccionImagenTexto key={seccion.id} seccion={seccion} esOscuro={esOscuro} />
         }
         if (seccion.tipo === 'equipo') {
           return (
@@ -982,6 +991,7 @@ export function VistaBarberia({ barberia }) {
               barberos={barberia.barberos}
               ordenEquipo={personalizacion.orden_equipo}
               estilo={seccion.estilo}
+              esOscuro={esOscuro}
             />
           )
         }
@@ -996,6 +1006,7 @@ export function VistaBarberia({ barberia }) {
               fuente={seccion.fuente}
               colorTexto={seccion.color_texto}
               colorFondo={seccion.color_fondo}
+              esOscuro={esOscuro}
             />
           )
         }
@@ -1008,20 +1019,23 @@ export function VistaBarberia({ barberia }) {
               posicion={seccion.posicion}
               imagen={seccion.imagen}
               imagenTamano={seccion.imagen_tamano}
+              esOscuro={esOscuro}
             />
           )
         }
         return null
       })}
 
-      {Boolean(personalizacion.mostrar_servicios) && <SeccionServicios servicios={barberia.servicios} />}
+      {Boolean(personalizacion.mostrar_servicios) && (
+        <SeccionServicios servicios={barberia.servicios} esOscuro={esOscuro} />
+      )}
 
-      <SectionRule indice="—" texto="Reserva tu hora" tono="oscuro" />
+      <SectionRule indice="—" texto="Reserva tu hora" tono={esOscuro ? 'claro' : 'oscuro'} />
 
       <main id="reservar" className="mx-auto max-w-lg px-6 py-10 md:py-14">
         {personalizacion.descripcion && (
           <ScrollReveal>
-            <p className="mb-8 text-center text-sm leading-relaxed text-gris-calido-700 md:text-base">
+            <p className="mb-8 text-center text-sm leading-relaxed text-[var(--pb-texto-secundario)] md:text-base">
               {personalizacion.descripcion}
             </p>
           </ScrollReveal>

@@ -48,13 +48,13 @@ function renderPalabras(palabras) {
 // Revela un titular palabra por palabra con máscara (overflow-hidden), no un
 // fade plano. Con prefers-reduced-motion activo, el texto aparece completo sin
 // máscara ni desplazamiento — solo se anima cuando animar no cuesta claridad.
-export function TextReveal({ texto, as: Elemento = 'h1', className = '', delay = 0 }) {
+export function TextReveal({ texto, as: Elemento = 'h1', className = '', delay = 0, style }) {
   const palabras = tokenizar(texto)
   const prefiereReducido = usePrefersReducedMotion()
 
   if (prefiereReducido) {
     return (
-      <Elemento className={className}>
+      <Elemento className={className} style={style}>
         {palabras.map(({ texto: palabraTexto, esItalica }, indice) => (
           <span key={indice} className={esItalica ? 'font-display italic' : ''}>
             {palabraTexto}
@@ -73,7 +73,7 @@ export function TextReveal({ texto, as: Elemento = 'h1', className = '', delay =
       viewport={{ once: true, margin: '-80px' }}
       transition={{ delayChildren: delay }}
     >
-      <Elemento className={className}>{renderPalabras(palabras)}</Elemento>
+      <Elemento className={className} style={style}>{renderPalabras(palabras)}</Elemento>
     </motion.div>
   )
 }

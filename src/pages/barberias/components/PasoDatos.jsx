@@ -31,22 +31,22 @@ export function PasoDatos({ resumen, onConfirmar, enviando, onVolver }) {
   return (
     <div>
       <BackButton onClick={onVolver} />
-      <h2 className="font-display mb-4 mt-3 text-xl font-light tracking-tight text-negro-barbero md:text-2xl">
+      <h2 className="font-display mb-4 mt-3 text-xl font-light tracking-tight text-[var(--pb-texto)] md:text-2xl">
         Tus datos
       </h2>
 
-      <div className="border-l-2 border-cobre/40 py-1 pl-4 text-sm text-gris-calido-700">
+      <div className="border-l-2 border-cobre/40 py-1 pl-4 text-sm text-[var(--pb-texto-secundario)]">
         {resumen}
       </div>
 
       <form onSubmit={handleSubmit(onConfirmar)} className="mt-8 flex flex-col gap-6">
         <label className="flex flex-col gap-2">
-          <span className="versalitas text-xs text-gris-calido-500">Nombre</span>
+          <span className="versalitas text-xs text-[var(--pb-texto-terciario)]">Nombre</span>
           <input
             {...register('cliente_nombre')}
             type="text"
             placeholder="Tu nombre"
-            className="min-h-11 border-b border-gris-calido-200 bg-transparent py-2 text-base text-negro-barbero outline-none transition-colors focus:border-cobre"
+            className="min-h-11 border-b border-[var(--pb-borde)] bg-transparent py-2 text-base text-[var(--pb-texto)] outline-none transition-colors focus:border-cobre"
           />
           {errors.cliente_nombre && (
             <span role="alert" className="text-xs text-red-700">
@@ -56,13 +56,13 @@ export function PasoDatos({ resumen, onConfirmar, enviando, onVolver }) {
         </label>
 
         <label className="flex flex-col gap-2">
-          <span className="versalitas text-xs text-gris-calido-500">Celular</span>
+          <span className="versalitas text-xs text-[var(--pb-texto-terciario)]">Celular</span>
           <Controller
             name="cliente_telefono"
             control={control}
             render={({ field }) => (
-              <div className="flex min-h-11 items-center gap-2 border-b border-gris-calido-200 py-2 transition-colors focus-within:border-cobre">
-                <span className="numeros-tabulares shrink-0 text-base text-gris-calido-500">+56 9</span>
+              <div className="flex min-h-11 items-center gap-2 border-b border-[var(--pb-borde)] py-2 transition-colors focus-within:border-cobre">
+                <span className="numeros-tabulares shrink-0 text-base text-[var(--pb-texto-terciario)]">+56 9</span>
                 <input
                   type="tel"
                   inputMode="numeric"
@@ -70,7 +70,7 @@ export function PasoDatos({ resumen, onConfirmar, enviando, onVolver }) {
                   placeholder="1234 5678"
                   value={formatoVisual(field.value.slice(1))}
                   onChange={(evento) => field.onChange(`9${soloOchoDigitos(evento.target.value)}`)}
-                  className="numeros-tabulares min-w-0 flex-1 bg-transparent text-base text-negro-barbero outline-none"
+                  className="numeros-tabulares min-w-0 flex-1 bg-transparent text-base text-[var(--pb-texto)] outline-none"
                 />
               </div>
             )}

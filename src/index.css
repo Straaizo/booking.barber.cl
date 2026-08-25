@@ -36,6 +36,39 @@ body {
   color: var(--color-negro-barbero);
 }
 
+/* Tokens del "modo oscuro" de la página pública de una barbería
+   (Personalización → Identidad → tema). Deliberadamente separados de
+   --color-hueso/--color-negro-barbero/--color-gris-calido-*: esos los usa
+   también el header (contraste según `color_header`, independiente del
+   tema general), y las clases utilitarias del sitio (bg-hueso, text-
+   negro-barbero, etc.) resuelven directo a esas variables — pisarlas acá
+   habría cambiado el header sin que nadie lo pidiera. `--pb-*` vive solo
+   en `VistaBarberia.jsx` (y sus subcomponentes de sección + el asistente
+   de reserva), vía clases arbitrarias `bg-[var(--pb-*)]`. */
+:root {
+  --pb-fondo: var(--color-hueso);
+  --pb-superficie: #ffffff;
+  --pb-superficie-sutil: var(--color-gris-calido-100);
+  --pb-texto: var(--color-negro-barbero);
+  --pb-texto-secundario: var(--color-gris-calido-700);
+  --pb-texto-terciario: var(--color-gris-calido-500);
+  --pb-texto-sutil: var(--color-gris-calido-400);
+  --pb-borde: var(--color-gris-calido-200);
+  --pb-acento-texto: var(--color-cobre-texto);
+}
+
+[data-tema='oscuro'] {
+  --pb-fondo: #14120f;
+  --pb-superficie: #201d18;
+  --pb-superficie-sutil: #2a251e;
+  --pb-texto: #f3eee3;
+  --pb-texto-secundario: #c8c0b2;
+  --pb-texto-terciario: #9c9384;
+  --pb-texto-sutil: #726b5d;
+  --pb-borde: #383228;
+  --pb-acento-texto: var(--color-cobre-claro);
+}
+
 /* El botón flotante de "Reservar hora" y la vidriera de servicios saltan a
    #reservar por ancla — con esto el salto es deslizante en vez de abrupto. */
 html {

@@ -3859,3 +3859,239 @@ Todo esto vive dentro del jsonb `secciones` (igual que `posicion_imagen` de "Ima
 - `src/pages/panel/PanelReservas.jsx` (la lista pasa a ser una tarjeta propia, misma jerarquía visual que el calendario).
 
 **Pendiente / próximos pasos:** los mismos de la (34) — nada nuevo generado por este cambio.
+
+---
+
+## 2026-08-25 (36) - Calendario tipo línea de tiempo (Google Calendar/Fresha) + 2 bugs reales encontrados con Playwright
+
+**Qué se hizo:** Enzo pidió llevar el calendario mucho más lejos — que fuera como el panel de Personalización (dividido en 2 secciones, una angosta y una grande dominante) y que el calendario en sí fuera mucho más grande y detallado, no solo un número por día — pidiendo inspirarse en cómo lo hacen páginas profesionales de hoy.
+
+**Rediseño de fondo — de grilla de mes a línea de tiempo semanal:** se investigó cómo lo resuelven Google Calendar, Fresha, Square Appointments y Cal.com (los sistemas de reserva reales más parecidos a este) — todos usan una línea de tiempo por hora con las citas como bloques posicionados en su horario real, no una grilla de mes con un número. `CalendarioReservas.jsx` se reescribió completo:
+- 7 columnas (lun-dom) en escritorio, con las horas en el eje vertical y cada reserva como un bloque real, posicionado y dimensionado según su hora y duración de verdad.
+- Cuando dos reservas se cruzan en el tiempo (dos barberos a la misma hora), se ubican en "carriles" lado a lado — mismo algoritmo que usa cualquier calendario real para este problema.
+- Línea roja de "ahora" en la columna de hoy (como Google Calendar), franja de hoy con un tinte sutil en toda la columna (no solo la cabecera), botón "Hoy" para volver de un salto, y auto-scroll inicial centrado en la hora actual en vez de arrancar siempre a las 08:00.
+- En mobile, un solo día a la vez con flechas para cambiarlo (7 columnas no entran en una pantalla angosta).
+- Layout general: el mismo patrón que Personalización — la lista angosta (420px) a la izquierda, el calendario como la columna grande y dominante (`minmax(0,1fr)`) a la derecha; el contenedor de Reservas pasó de `max-w-6xl` a `max-w-7xl` para darle más aire a la semana completa.
+- La lista ganó una fila de resumen (ingreso estimado del día + hora de la próxima/primera reserva) — antes quedaba muy corta comparada con el calendario, ahora tiene más peso visual propio.
+
+**2 bugs reales encontrados probando con Playwright (no solo mirando el código) — este es justo el motivo por el que Enzo pidió usar Playwright para esto:**
+
+1. **Los bloques de las reservas aparecían varias horas más abajo de su hora real.** Causa: cada columna de día tenía su PROPIA cabecera "sticky" con un alto real (texto + círculo + padding), y la columna de horas tenía un espaciador "sticky" aparte adivinando 52px de alto — en la práctica no coincidían, así que las horas de la columna de la izquierda quedaban desalineadas de las líneas de la grilla de la derecha, cada vez más a medida que se bajaba. Fix: una sola fila de cabecera compartida (`CabeceraDia` para cada día + un hueco vacío para la columna de horas, todo en la MISMA fila) — es imposible que se desalineen si es literalmente la misma fila.
+2. **La columna de horas (08:00, 09:00...) no se veía en absoluto** — colapsada a 8px de ancho. Causa: el texto de cada hora vivía en un `<span>` con `position: absolute` para centrarlo sobre la línea — un elemento con posición absoluta no le aporta ancho a su contenedor, así que la columna entera colapsaba a solo el padding. Fix: el texto vuelve al flujo normal (aporta su ancho real) y se usa `transform: translateY` (que no afecta el cálculo de layout, solo el dibujo) para centrarlo visualmente sobre la línea.
+
+**Falsa alarma aclarada de paso:** se sospechó primero que había un bug de zona horaria (la máquina de prueba mostrando una hora distinta a la de Chile) — resultó que la máquina YA corre en hora de Chile (`GMT-0400`, confirmado con `new Date()` en Node); lo que se leyó como "18:00" en una captura anterior en realidad decía "05:00 p.m." (= 17:00), un error de lectura, no un bug. Aun así, se dejó el endurecimiento a horario de Chile fijo (`src/utils/horaLocal.js`, ver más abajo) como refuerzo válido para cuando el panel se mire desde otro huso horario — no corregía un bug real en este entorno, pero tampoco está de más.
+
+**De paso — horario de Chile fijo, no el del dispositivo:** se creó `src/utils/horaLocal.js` con `horaMinutoEnSantiago`, `claveFechaSantiago`, `hoyEnSantiago`, `diaSantiagoComoFechaLocal` y `santiagoAFechaUTC` — todo lo que antes usaba `new Date().getHours()`/`.toLocaleTimeString()` sin fijar huso (en `CalendarioReservas.jsx` y `PanelReservas.jsx`, incluida la fecha/hora que se prellena y se guarda al "Editar" una reserva) ahora pasa por Chile explícitamente. Se deja pendiente extenderlo al resto de la app (`AsistenteReserva.jsx`, `Confirmacion.jsx`, etc., que todavía confían en que el dispositivo esté en hora de Chile) — no se tocó ahí para no ampliar el alcance de este cambio sin que Enzo lo pida.
+
+**Aviso sobre el repo:** el último commit de Enzo ("ACT: 24-08-2026 - Cambios") barrió, junto con todo el trabajo real de la sesión, 2 scripts de prueba temporales (`qa-check-estado-temp.mjs`, `qa-crear-reservas-prueba-temp.mjs`) y dejó `playwright`/`ws` en `package.json` como dependencias — probablemente porque el commit se hizo a mitad de una ronda de pruebas, antes de la limpieza de siempre. Ya se borraron los scripts y se desinstalaron esas dependencias en el árbol de trabajo — falta que Enzo lo incluya en su próximo commit para que quede reflejado en el historial.
+
+**Cómo se probó:** Playwright, otra vez, con la reserva real de "Enzo Sabattini" (lun 24 ago, 17:00) — clic en el bloque abre "Editar" con la fecha/hora correcta ya prellenada; captura de escritorio, mobile, y con scroll manual dentro del calendario para confirmar que el bloque quedó exactamente sobre la línea de las 17:00 (antes de los 2 fixes, aparecía varias horas más abajo). `npm run lint` y `npm run build` limpios en cada paso.
+
+**Archivos afectados:**
+- Nuevo: `src/utils/horaLocal.js`.
+- Reescrito: `src/components/panel/CalendarioReservas.jsx` (mes → línea de tiempo semanal).
+- Modificado: `src/pages/panel/PanelReservas.jsx` (resumen del día, huso horario), `src/components/panel/PanelShell.jsx` (`max-w-7xl`).
+
+**Pendiente / próximos pasos:**
+- Extender `utils/horaLocal.js` al resto de la app si Enzo lo pide (no es urgente, el dispositivo real de cualquier usuario de esto está en Chile).
+- Que Enzo incluya en su próximo commit la limpieza de `playwright`/`ws` de `package.json` y los 2 scripts de prueba que quedaron en el commit anterior.
+- Los mismos de siempre.
+
+---
+
+## 2026-08-25 (37) - Las dos tarjetas de Reservas quedaban con alturas muy distintas
+
+**Qué se hizo:** Enzo mandó una captura señalando que, con pocas reservas, la tarjeta de la lista quedaba mucho más baja que la del calendario — un bloque de espacio vacío grande al lado, sensación de layout descuidado ("queda espacio", "todo muy encima de lo otro").
+
+**Causa:** el grid de las dos columnas tenía `lg:items-start` — cada tarjeta tomaba solo el alto de SU propio contenido, así que un día con 1 reserva (tarjeta angosta y corta) quedaba muy por debajo del calendario (alto fijo, siempre grande). Fix directo: `lg:items-start` → `lg:items-stretch`, para que ambas tarjetas siempre midan lo mismo — el alto de la más alta de las dos.
+
+**Además, no solo igualar el alto — usarlo con algo útil:** se agregó una sección "Próximas reservas" debajo de la lista del día elegido, mostrando hasta 4 reservas confirmadas futuras de CUALQUIER día (no solo el elegido, excluyendo las que ya se ven arriba para no repetirlas) — clickeable, salta directo a ese día en el calendario. Con solo 1 reserva real cargada (y ya en el pasado), no hay datos para probarla visualmente todavía, pero con reservas reales futuras esa sección deja de estar vacía sola, sin depender de que ambas tarjetas encajen por casualidad.
+
+**Cómo se probó:** Playwright, captura de escritorio confirmando que ambas tarjetas ahora terminan exactamente en la misma línea, con y sin una reserva real seleccionada. `npm run lint` y `npm run build` limpios.
+
+**Archivos afectados:**
+- `src/pages/panel/PanelReservas.jsx` (`items-stretch`, sección "Próximas reservas").
+
+**Pendiente / próximos pasos:** los mismos de la (36).
+
+---
+
+## 2026-08-25 (38) - "Cancelar" se cortaba en la lista + calendario más ancho que alto
+
+**Qué se hizo:** Enzo mandó una captura donde el botón "CANCELAR" de la fila de una reserva aparecía literalmente cortado contra el borde de la tarjeta ("CANCEL"), y pidió separar los elementos al máximo (tipo `justify-between`) y que el calendario quedara más estirado que largo.
+
+**Causa real del corte:** `FilaReservaActiva`/`FilaReservaCancelada` seguían con la grilla de 4 columnas (`hora / cliente / servicio / acciones` lado a lado) de cuando la lista era la columna ANCHA de la pantalla, antes de las entradas (34)-(35). Con la lista ya angosta (420px, al lado del calendario grande), esa grilla de 4 columnas simplemente no entra — "Editar" y "Cancelar" lado a lado no tienen dónde ponerse y el segundo se corta.
+
+**Fix:** ambas filas pasan de grilla horizontal a bloques apilados — hora + precio en una línea (`justify-between`), cliente + teléfono, servicio + barbero, y por último Editar/Cancelar (o Reactivar) en su propia línea, separados al máximo con `justify-between` — nunca les falta ancho, sin importar cuán angosta quede la columna.
+
+**Calendario más ancho que alto:** se redujo `PX_POR_HORA` (64→52) y `ALTO_VISIBLE` (560→440) en `CalendarioReservas.jsx` — mismo ancho de 7 columnas, pero notablemente menos alto. Como la lista usa `items-stretch` (de la (37)) para igualar el alto del calendario, esto también achica la tarjeta de la lista — la sección completa de Reservas queda más compacta y "ancha" en conjunto, no solo el calendario.
+
+**Cómo se probó:** Playwright — captura de escritorio confirmando que "CANCELAR" ya no se corta (con harto espacio de sobra a los costados), y mobile confirmando que las filas apiladas se siguen viendo bien angostas. `npm run lint` y `npm run build` limpios.
+
+**Archivos afectados:**
+- `src/pages/panel/PanelReservas.jsx` (filas apiladas con `justify-between`).
+- `src/components/panel/CalendarioReservas.jsx` (`PX_POR_HORA`/`ALTO_VISIBLE` más chicos).
+
+**Pendiente / próximos pasos:** los mismos de siempre.
+
+---
+
+## 2026-08-25 (39) - "Primera" no era relevante + separar de verdad, no con un gap chico
+
+**Qué se hizo:** Enzo no entendía para qué servía el dato "Primera" en la fila de estadísticas del día, y señaló que pedir "separar más" no significaba un gap un poco más grande — quería una vista más amplia de todo en general.
+
+**Fix:** se sacó "Primera"/"Próxima" (la hora de la siguiente reserva — un dato puntual, no una vista general) y se puso en su lugar **"Reservas esta semana"** (cuántas reservas confirmadas hay entre el lunes y el domingo que contiene el día elegido) — un número que sí da una idea de la carga de la semana completa, no de un solo punto en el tiempo. Esa fila de estadísticas ahora se muestra SIEMPRE (antes solo aparecía si el día elegido tenía reservas) — así "Reservas esta semana" sigue siendo útil incluso en un día vacío, en vez de desaparecer justo cuando más ayuda a tener contexto.
+
+Para la separación: los dos datos ("Ingreso del día" y "Reservas esta semana") pasan de un `gap-6` fijo a `justify-between` de verdad — quedan cada uno en un extremo de la tarjeta, no solo "un poco más separados".
+
+**De paso:** `inicioDeSemanaLunes()` (que ya existía adentro de `CalendarioReservas.jsx`, para saber qué semana mostrar) se movió a `utils/horaLocal.js` para poder reusarla acá también, en vez de duplicarla.
+
+**Cómo se probó:** Playwright — captura con el día 24 (con la reserva real) mostrando "Ingreso del día $10.000" y "Reservas esta semana: 1" bien separados a los extremos; captura de "Hoy" (25, vacío) confirmando que la fila de estadísticas sigue mostrándose y "Reservas esta semana" sigue en 1 (cuenta la del lunes, misma semana). `npm run lint` y `npm run build` limpios.
+
+**Archivos afectados:**
+- `src/pages/panel/PanelReservas.jsx` (nuevo cálculo `reservasSemana`, fila de estadísticas rediseñada).
+- `src/utils/horaLocal.js` (+ `inicioDeSemanaLunes`, movida desde `CalendarioReservas.jsx`).
+- `src/components/panel/CalendarioReservas.jsx` (importa `inicioDeSemanaLunes` en vez de definirla).
+
+**Pendiente / próximos pasos:** los mismos de siempre.
+
+---
+
+## 2026-08-25 (40) - Tipografía muy fina en los títulos chicos de Reservas
+
+**Qué se hizo:** Enzo notó que la tipografía usada en esta sección se veía muy delgada, difícil de leer bien.
+
+**Diagnóstico:** el título del día ("Lunes, 24 de Agosto") y el rango del calendario ("24 – 30 Ago 2026") usaban `font-display font-light` — la serif fina (Fraunces) que el sitio usa para títulos grandes y editoriales. Se ve bien en un título grande de página, pero en un rótulo chico dentro de una pantalla con harta información (números, horas, nombres) pierde peso visual y se lee débil.
+
+**Por qué NO se tocó el título "Reservas" de arriba:** ese mismo patrón (`font-display text-2xl font-light`) lo usan TODAS las pantallas del panel (Barberos, Servicios, Horarios, Personalización, etc.) para su título principal — cambiarlo solo en Reservas rompería la consistencia con el resto del panel sin que Enzo lo haya pedido. Los dos textos que sí se cambiaron son específicos de esta pantalla (no existen en ninguna otra), así que no generan esa inconsistencia.
+
+**Fix:** ambos títulos pasan a la tipografía sans normal del panel (sin `font-display`, que cae solo a `--font-sans`/Archivo) con `font-semibold` en vez de `font-light` — mismo tamaño, mucho más peso visual.
+
+**Cómo se probó:** Playwright, captura confirmando que ambos títulos se leen claramente más gruesos, sin afectar el título "Reservas" ni ninguna otra pantalla del panel. `npm run lint` y `npm run build` limpios.
+
+**Archivos afectados:**
+- `src/pages/panel/PanelReservas.jsx` (título del día).
+- `src/components/panel/CalendarioReservas.jsx` (rango del calendario).
+
+**Pendiente / próximos pasos:** los mismos de siempre.
+
+---
+
+## 2026-08-25 (41) - "Color de marca" seguía arrastrando textos que tienen su propio color
+
+**Qué se hizo:** Enzo reportó que, en Personalización, cambiar "Color de marca" volvía a cambiar el color de otros textos que también son personalizables por su cuenta — esta vez la "frase destacada" de la galería, mostrada en captura tornándose del mismo naranja recién elegido para la marca.
+
+**Diagnóstico:** el mismo patrón de fondo que ya había aparecido antes con las estrellas de testimonios (ver entrada 30): cuando el dueño no elige un color propio para un campo, el fallback en el render es `var(--color-cobre)` — la variable CSS reactiva al color de marca — en vez de un color neutro fijo. Eso hace que cualquier campo sin color propio "siga" visualmente a la marca, aunque conceptualmente sea un campo independiente. Se encontraron 2 lugares con este fallback en `VistaBarberia.jsx`: la frase destacada del carrusel de galería (línea 266) y las estrellas de testimonios (línea 538, que en la entrada 30 recibió un `color` prop pero mantuvo el mismo fallback problemático por debajo). Un tercer uso de `var(--color-cobre)` (el glow radial decorativo del header, línea 875) es intencional — es cromo de marca, no texto personalizable — y no se tocó.
+
+**Fix:** ambos fallbacks pasan de `var(--color-cobre)` a `var(--color-negro-barbero)` (`#1c1b19`), el mismo neutro que ya usan correctamente el eslogan y el texto de las citas de testimonios. Así, sin un color propio elegido, estos campos quedan fijos en negro-barbero sin importar qué tan seguido cambie "Color de marca". De paso, el swatch por defecto del picker de "Frase destacada" en `PanelPersonalizacion.jsx` se actualizó de `#a85c32` (el cobre de marca) a `#1c1b19`, para que el color que se ve en el selector coincida con el que realmente se renderiza cuando no se ha elegido nada.
+
+**Cómo se probó:** Playwright contra la cuenta real de `jluis`, usando la vista previa en vivo del propio panel (`/_preview-barberia`, dentro del iframe de Personalización). Se leyó el color computado de la frase destacada y de las estrellas antes y después de forzar un cambio real de `--color-cobre` (confirmado en el DOM: `#a85c32` → `#ff5900`, el mismo naranja de la captura de Enzo) — ambos textos se mantuvieron en `rgb(28, 27, 25)` (`#1c1b19`) sin moverse. `npm run lint` y `npm run build` limpios.
+
+**Archivos afectados:**
+- `src/pages/barberias/components/VistaBarberia.jsx` (frase destacada de galería, estrellas de testimonios).
+- `src/pages/panel/PanelPersonalizacion.jsx` (swatch por defecto del picker de frase destacada).
+
+**Pendiente / próximos pasos:** los mismos de siempre — no se revisaron otros campos personalizables fuera de `VistaBarberia.jsx` por si tienen el mismo patrón (no se encontró ningún otro uso de `var(--color-cobre)` en el resto de `src/` al momento de este fix, pero vale la pena tenerlo en mente si vuelve a aparecer una queja similar en otra sección).
+
+---
+
+## 2026-08-25 (42) - El paso "Elige un barbero" del asistente de reserva se saltaba con un solo barbero
+
+**Qué se hizo:** Enzo pidió que el flujo de reserva pública siempre parta eligiendo barbero primero — recordando que cada barbero puede tener su propio catálogo de servicios (el switch "usa catálogo propio" en Barberos), no necesariamente el de la barbería.
+
+**Diagnóstico:** `AsistenteReserva.jsx` ya elegía el barbero antes que el servicio (para poder filtrar el catálogo correcto), pero solo mostraba ese paso cuando había más de un barbero activo (`hayVariosBarberos`). Con un solo barbero (como la cuenta de prueba de Enzo, "Miguel Diaz") se auto-seleccionaba en silencio y el asistente arrancaba directo en "Elige un servicio" — el filtrado por catálogo seguía funcionando bien, pero nunca quedaba explícito ante el cliente final quién lo iba a atender.
+
+**Fix:** se sacó la condición `hayVariosBarberos`. El asistente ahora siempre arranca en el paso "Elige un barbero" y siempre son 4 pasos (Barbero → Servicio → Horario → Tus datos), sin importar cuántos barberos activos tenga la barbería. `PasoServicio` ahora siempre recibe su botón "← Volver" hacia barbero (antes era condicional).
+
+**Cómo se probó:** Playwright contra la página pública real de la cuenta de prueba (`/barberia-jose-luis`, un solo barbero activo) — se confirmó que el primer paso muestra "Elige un barbero" (01/04) con "Miguel Diaz" como única opción, y que al elegirlo pasa a "Elige un servicio" (02/04) mostrando su catálogo real y el botón "← Volver" funcionando. `npm run lint` y `npm run build` limpios.
+
+**Archivos afectados:**
+- `src/pages/barberias/components/AsistenteReserva.jsx` (se sacó `hayVariosBarberos`, secuencia de pasos fija).
+- `src/pages/barberias/components/PasoServicio.jsx` (`onVolver` ya no es opcional).
+
+**Pendiente / próximos pasos:** los mismos de siempre.
+
+---
+
+## 2026-08-25 (43) - El card del asistente seguía cambiando de alto entre pasos (footer saltando)
+
+**Qué se hizo:** Enzo mandó 2 capturas mostrando el mismo paso ("Elige un barbero", 01/04) con dos altos de card bien distintos — uno ajustado, otro con un hueco vacío enorme abajo — y pidió dejar el tamaño del formulario fijo de una vez.
+
+**Diagnóstico real:** el mecanismo que reservaba el alto (`ResizeObserver` + `Math.max` sobre el alto ya visto) medía y JAMÁS achicaba — el resultado dependía del **historial de navegación**, no del paso actual: recién llegado a "Elige un barbero" el card medía su alto real (corto); pero si antes se había pasado por "Elige día y hora" (el paso más alto, con la grilla de horas), el mínimo quedaba pegado en ese alto para siempre, y volver a "Elige un barbero" mostraba ese mismo paso corto ahora con un hueco vacío gigante abajo — exactamente las 2 capturas que mandó Enzo, tomadas en momentos distintos de la misma sesión de navegación.
+
+**Fix:** se sacó el `ResizeObserver`/`alturaMinima` completo. En su lugar:
+1. Un alto mínimo **fijo** en el contenedor (`min-h-[600px] md:min-h-[520px]`) — medido con Playwright contra el paso real más alto de la cuenta de prueba (día con más horas disponibles: ~408px de contenido + ~61px de la barra de progreso + padding ≈ 520–600px según viewport). Fijo de verdad: no depende de qué pasos se visitaron ni en qué orden.
+2. La barra de progreso ("01/04 · Barbero") queda anclada arriba siempre, y el contenido del paso actual se centra verticalmente (`flex flex-1 flex-col justify-center`) en el espacio restante — así un paso corto (un solo barbero, por ejemplo) no deja todo el hueco vacío pegado abajo como un error, sino repartido arriba y abajo, mientras el paso más alto (el calendario de horas) llena naturalmente ese mismo espacio.
+
+**Cómo se probó:** Playwright contra `/barberia-jose-luis` — se midió el alto del card completo en cada paso (barbero → servicio → horario, probando los 14 días disponibles → volver a servicio → volver a barbero): **594px en los 7 pasos medidos, sin una sola variación**, incluso después de haber visitado el paso más alto. Capturas confirmando que "Elige un barbero" ya no queda con el hueco pegado abajo, sino centrado. `npm run lint` y `npm run build` limpios.
+
+**Archivos afectados:**
+- `src/pages/barberias/components/AsistenteReserva.jsx` (se sacó el `ResizeObserver`/`useRef`/`alturaMinima`; alto fijo + centrado vertical del paso activo).
+
+**Pendiente / próximos pasos:** los mismos de siempre. El alto fijo se calibró contra la cuenta de prueba (3 servicios, horarios de ejemplo) — una barbería con muchísimos más servicios o muchas más horas disponibles por día podría necesitar más espacio; el `min-h` es un piso, no un techo, así que el contenedor crece igual sin cortar contenido, solo dejaría de ser "perfectamente fijo" en ese caso extremo.
+
+---
+
+## 2026-08-25 (44) - El contenido del asistente quedó centrado verticalmente; Enzo lo quería arriba
+
+**Qué se hizo:** en la entrada anterior (43), al fijar el alto del asistente se centró el contenido de cada paso en el espacio disponible (`justify-center`) para que un paso corto no dejara todo el hueco vacío pegado abajo. Enzo pidió lo contrario: mantener el mismo alto fijo, pero con el contenido arriba, no al centro — es donde el ojo llega primero (UX: el usuario escanea de arriba hacia abajo, no desde la mitad de un bloque).
+
+**Fix:** se sacó `flex flex-1 flex-col justify-center` del `motion.div` de cada paso — vuelve a fluir normal, pegado justo debajo de la barra de progreso. El hueco vacío de un paso corto (ej. "Elige un barbero" con un solo barbero) queda abajo del todo, no repartido — que es exactamente el resultado que Enzo pidió ver.
+
+**Cómo se probó:** Playwright contra `/barberia-jose-luis` — se confirmó que el alto del card sigue fijo en 594px en barbero/servicio/horario/vuelta (idéntico a la entrada 43, el alto no se tocó) y que visualmente "Elige un barbero" queda con el título y la lista pegados arriba, igual a la captura que mandó Enzo. `npm run lint` y `npm run build` limpios.
+
+**Archivos afectados:**
+- `src/pages/barberias/components/AsistenteReserva.jsx` (se sacó el centrado vertical del paso activo).
+
+**Pendiente / próximos pasos:** los mismos de siempre.
+
+---
+
+## 2026-08-25 (45) - Auditoría completa de "Personalización": tipografía de títulos con fuga global + verificación del resto
+
+**Qué se hizo:** Enzo reportó que "Tipografía de títulos" seguía cambiando cosas fuera de lo esperado, y pidió una auditoría completa de toda la sección Personalización (tipografía + color de marca) probada con Playwright, no solo parches puntuales.
+
+**Bug real encontrado — tipografía:** `estiloMarca` (en `VistaBarberia.jsx`) pisaba la variable CSS global `--font-display` con la fuente elegida en "Tipografía de títulos". Como esa variable la usa la clase `font-display` en TODA la página (el nombre de la barbería, pero también "Nuestro equipo", "Lo que dicen nuestros clientes", los avatares-iniciales del equipo, cada encabezado del asistente de reserva — "Elige un barbero", "Elige un servicio", etc.), elegir una tipografía para "el título" en realidad se la aplicaba a absolutamente todo lo que usara esa clase. Ya había una defensa puntual para la marca de la plataforma (`booking.barber.cl`, fijada a mano a Fraunces) pero nada protegía al resto de los títulos propios de la barbería.
+
+**Fix:** se sacó `'--font-display': pilaFuente(fuenteElegida)` de `estiloMarca` — ya no pisa nada global. La tipografía elegida se aplica ahora con un `style={{ fontFamily: ... }}` puntual, solo en el `<h1>` del nombre de la barbería (agregando soporte de `style` a `TextReveal`, que no lo tenía). El resto de los títulos de la página vuelve a depender siempre de la Fraunces global, sin importar qué se elija ahí. Se renombró la etiqueta del selector de "Tipografía de títulos" a **"Tipografía del nombre de tu barbería"**, para que el alcance quede claro desde el propio formulario y no vuelva a interpretarse como "toda la tipografía de títulos del sitio".
+
+**Color de marca — no se encontró ningún bug nuevo:** se armó un script de auditoría con Playwright que compara el color/fondo/borde computado de 13 elementos de texto personalizable (eslogan, título, cada encabezado de sección, texto y estrellas de testimonios, frase destacada de galería, nombre de barbero en equipo, precios, botón de WhatsApp) antes y después de cambiar "Color de marca" a un naranja fuerte. El único elemento que cambió fue el avatar-inicial decorativo del equipo (letra grande dentro de un círculo, sin foto) — que es cromo de marca legítimo, sin selector de color propio, igual que el ícono de la barbería en el header. "Lo que dicen nuestros clientes" (el ejemplo que dio Enzo) ya había quedado resuelto en la entrada 41 de esta misma bitácora; la auditoría confirma que sigue resuelto y que no quedó ningún otro punto suelto.
+
+**Cómo se probó:** Playwright, dos rondas. (1) Selector "Tipografía del nombre de tu barbería" → Bricolage Grotesque: el `<h1>` del nombre cambió de fuente, pero "Elige un barbero" (asistente) y la marca de la plataforma se mantuvieron en Fraunces. (2) Auditoría de 13 elementos antes/después de un cambio real de `--color-cobre` (`#a85c32` → `#ff5900`): 0 diferencias salvo el avatar decorativo esperado. `npm run lint` y `npm run build` limpios.
+
+**Archivos afectados:**
+- `src/pages/barberias/components/VistaBarberia.jsx` (se sacó el override global de `--font-display`, se aplica solo al `<h1>` del nombre).
+- `src/components/animations/TextReveal.jsx` (nuevo prop `style`, pasado al elemento final).
+- `src/pages/panel/PanelPersonalizacion.jsx` (etiqueta del selector renombrada).
+
+**Pendiente / próximos pasos:** los mismos de siempre.
+
+---
+
+## 2026-08-25 (46) - Modo oscuro para la página pública (Personalización → Identidad)
+
+**Qué se hizo:** Enzo pidió evaluar si convenía ofrecer un modo oscuro para la página pública de cada barbería, solo dentro del ámbito de Personalización, con textos de guía cuando se active. Se evaluó, se recomendó seguir adelante (tratándolo como su propio trabajo, no un toggle trivial), y con el visto bueno se implementó completo.
+
+**Diseño:** se agregaron 9 tokens CSS nuevos y dedicados (`--pb-fondo`, `--pb-superficie`, `--pb-superficie-sutil`, `--pb-texto`, `--pb-texto-secundario`, `--pb-texto-terciario`, `--pb-texto-sutil`, `--pb-borde`, `--pb-acento-texto`) en `index.css`, con su set de valores oscuros bajo el selector `[data-tema='oscuro']`. Deliberadamente NO se reusaron los tokens compartidos del sitio (`--color-hueso`, `--color-negro-barbero`, `--color-gris-calido-*`) — esos los usa también el header para su propio contraste automático según `color_header` (independiente del tema general de la página); pisarlos habría cambiado el header sin que nadie lo pidiera. Con tokens `--pb-*` aparte, el header queda completamente afuera del tema y sigue funcionando exactamente igual que antes.
+
+**Alcance:** el nuevo campo `personalizacion.tema` ('claro' | 'oscuro', default 'claro') controla un atributo `data-tema` en el div raíz de `VistaBarberia`. Se migraron a los tokens `--pb-*` TODOS los textos/fondos/bordes de: galería (texto + controles del carrusel), equipo (nombre/especialidad/carrusel), imagen y texto, testimonios (carrusel y lista, tarjetas y estrellas), horario de atención, servicios y precios, la descripción final, y el asistente de reserva completo (`AsistenteReserva` + los 4 `Paso*` + `Confirmacion` + `BackButton`, que viven en la misma página pública). Cada `SectionRule` (el rótulo "— Nombre de sección") ahora recibe `tono={esOscuro ? 'claro' : 'oscuro'}` en vez de tener `tono="oscuro"` fijo, reusando el mecanismo de contraste que ya existía en ese componente.
+
+**De paso, 2 bugs latentes encontrados y corregidos** (mismo patrón que el de la entrada 41, pero de CSS, no de color de marca): `text-gris-calido-600` (encabezado de tablas de precio/horario) y `bg-gris-calido-300` (puntos inactivos de los carruseles de galería/equipo/testimonios) no correspondían a ningún tono realmente definido (solo existen 100/200/400/500/700) — Tailwind los descartaba en silencio, dejando esos puntos invisibles y esa etiqueta sin color explícito. Se migraron a los tokens nuevos de paso.
+
+**Panel:** nuevo interruptor "Modo oscuro de la página pública" en Identidad, justo debajo de la tipografía del nombre. Al activarlo aparecen 3 tips cortos (fotos con buen contraste, colores de marca algo más claros, recordatorio de que el color del header sigue siendo independiente) — la guía que pidió Enzo.
+
+**Migración pendiente (bloqueante):** se agregó `supabase/migrations/20260825000000_agregar_tema_publico.sql` (`alter table personalizacion add column tema text not null default 'claro' check (tema in ('claro','oscuro'))`). **Enzo tiene que correrla antes de que este código llegue a producción** — se confirmó en vivo que, sin la columna, tanto el panel de Personalización como la página pública de CUALQUIER barbería devuelven 400 (`column personalizacion_1.tema does not exist`) porque ambas queries ya piden esa columna. Se encontró además que la CLI de Supabase (ya vinculada al proyecto: `Barber-booking`, ref `ykynoteuuyyjbgfqnacr`) muestra TODAS las migraciones del repo como no aplicadas en su tabla de tracking (`supabase migration list`), aunque el sitio ya funciona con columnas de migraciones viejas (`eslogan_color`, etc.) — es decir, Enzo las corre a mano en el SQL Editor y esa tabla de tracking nunca se actualiza; no se usó `supabase db push` para no arriesgar un desajuste con ese historial.
+
+**Cómo se probó:** Playwright, con la cuenta real (`/barberia-jose-luis`). Como la columna `tema` todavía no existe en la base real, se interceptó la respuesta de red (misma request, sin pedir `tema`) y se inyectó `tema: 'oscuro'` a mano en el JSON antes de que llegara a la página — así se probó el render completo sin tocar la base de datos. Capturas confirmando: header sin cambios (como se esperaba), galería/testimonios/horario/equipo con fondo y textos oscuros coherentes, fila alterna de la tabla de horario visible, y los 3 primeros pasos del asistente (barbero → servicio con oferta destacada → horario con grilla de horas) totalmente legibles. `npm run lint` y `npm run build` limpios.
+
+**Archivos afectados:**
+- `supabase/migrations/20260825000000_agregar_tema_publico.sql` (nuevo, pendiente de correr).
+- `src/index.css` (9 tokens `--pb-*` + su set oscuro).
+- `src/pages/barberias/components/VistaBarberia.jsx` (todas las secciones + `data-tema` + fix de los 2 tonos muertos).
+- `src/pages/barberias/components/AsistenteReserva.jsx`, `PasoBarbero.jsx`, `PasoServicio.jsx`, `PasoHorario.jsx`, `PasoDatos.jsx`, `Confirmacion.jsx`.
+- `src/components/common/BackButton.jsx` (confirmado de uso exclusivo del asistente antes de tocarlo).
+- `src/pages/panel/PanelPersonalizacion.jsx` (interruptor + tips + wiring de guardado/preview).
+- `src/pages/panel/hooks/usePersonalizacionAdmin.js`, `src/pages/barberias/hooks/useBarberiaPorSlug.js` (columna `tema` en el select).
+- `src/utils/personalizacion.js` (default `tema: 'claro'`).
+
+**Pendiente / próximos pasos:** correr la migración antes de deployar. `Loader.jsx` (el ícono de "Cargando…" que usa `PasoHorario`) no se tocó — es un componente compartido con todo el panel administrativo, y su texto (`text-gris-calido-700`) puede leerse algo apagado sobre fondo oscuro por los pocos segundos que tarda en cargar; no se justificó bifurcarlo para esto. El resto de los pendientes, los mismos de siempre.

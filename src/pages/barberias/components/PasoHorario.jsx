@@ -76,7 +76,7 @@ export function PasoHorario({ barbero, servicio, onSeleccionar, onVolver }) {
     return (
       <div>
         <BackButton onClick={onVolver} />
-        <p className="mt-4 text-sm text-gris-calido-700">
+        <p className="mt-4 text-sm text-[var(--pb-texto-secundario)]">
           Este barbero no tiene horarios disponibles por ahora.
         </p>
       </div>
@@ -86,7 +86,7 @@ export function PasoHorario({ barbero, servicio, onSeleccionar, onVolver }) {
   return (
     <div>
       <BackButton onClick={onVolver} />
-      <h2 className="font-display mb-4 mt-3 text-xl font-light tracking-tight text-negro-barbero md:text-2xl">
+      <h2 className="font-display mb-4 mt-3 text-xl font-light tracking-tight text-[var(--pb-texto)] md:text-2xl">
         Elige día y hora
       </h2>
 
@@ -101,7 +101,7 @@ export function PasoHorario({ barbero, servicio, onSeleccionar, onVolver }) {
               className={`versalitas min-h-11 shrink-0 rounded-full border px-4 text-xs capitalize transition-colors duration-200 ${
                 activa
                   ? 'border-cobre bg-cobre text-hueso'
-                  : 'border-gris-calido-200 text-gris-calido-700 hover:border-cobre/50'
+                  : 'border-[var(--pb-borde)] text-[var(--pb-texto-secundario)] hover:border-cobre/50'
               }`}
             >
               {formatoFechaCorta(dia)}
@@ -130,7 +130,7 @@ export function PasoHorario({ barbero, servicio, onSeleccionar, onVolver }) {
             key="empty"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="mt-6 text-sm text-gris-calido-700"
+            className="mt-6 text-sm text-[var(--pb-texto-secundario)]"
           >
             No quedan horas disponibles ese día.
           </motion.p>
@@ -149,7 +149,7 @@ export function PasoHorario({ barbero, servicio, onSeleccionar, onVolver }) {
                 type="button"
                 onClick={() => onSeleccionar({ fecha: fechaActiva, hora })}
                 whileTap={{ scale: 0.96 }}
-                className="numeros-tabulares flex min-h-11 items-center justify-center rounded-md border border-gris-calido-200 text-sm font-medium text-negro-barbero transition-colors duration-200 hover:border-cobre hover:bg-cobre/5"
+                className="numeros-tabulares flex min-h-11 items-center justify-center rounded-md border border-[var(--pb-borde)] text-sm font-medium text-[var(--pb-texto)] transition-colors duration-200 hover:border-cobre hover:bg-cobre/5"
               >
                 {hora}
               </motion.button>

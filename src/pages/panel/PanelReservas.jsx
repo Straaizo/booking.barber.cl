@@ -22,6 +22,7 @@ import {
   diaSantiagoComoFechaLocal,
   hoyEnSantiago,
   santiagoAFechaUTC,
+  inicioDeSemanaLunes,
 } from '../../utils/horaLocal'
 
 // El negocio corre siempre en hora de Chile — estas dos SIEMPRE la fijan
@@ -149,10 +150,25 @@ function ModalReprogramarReserva({ reserva, servicios, onGuardar, onCerrar }) {
   )
 }
 
+// Filas apiladas en vez de una grilla de 4 columnas — esta lista vive en la
+// columna ANGOSTA (420px) al lado del calendario grande, no en una columna
+// ancha como al principio. La vieja grilla de 4 columnas (hora / cliente /
+// servicio / acciones lado a lado) necesitaba mucho más ancho del que tiene
+// acá: el botón "Cancelar" quedaba cortado contra el borde de la tarjeta.
+// Acá cada dato tiene su propia línea, y las 2 acciones se separan al máximo
+// con `justify-between` en vez de ir amontonadas — nunca les falta espacio,
+// sin importar cuán angosta quede la columna.
 function FilaReservaActiva({ reserva, onEditar, onPedirCancelar }) {
   return (
-    <div className="grid grid-cols-2 items-center gap-x-4 gap-y-2 border-b border-gris-calido-200 py-5 md:grid-cols-[5rem_1fr_1fr_auto]">
-      <span className="numeros-tabulares text-sm font-medium text-negro-barbero">{formatoHora(reserva.fecha_hora)}</span>
+    <div className="flex flex-col gap-2 border-b border-gris-calido-200 py-4">
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="numeros-tabulares text-sm font-medium text-negro-barbero">
+          {formatoHora(reserva.fecha_hora)}
+        </span>
+        <span className="numeros-tabulares text-xs text-gris-calido-500">
+          {formatoCLP(reserva.servicios?.precio_clp ?? 0)}
+        </span>
+      </div>
 
       <div>
         <span className="block font-medium text-negro-barbero">{reserva.cliente_nombre}</span>
@@ -161,14 +177,12 @@ function FilaReservaActiva({ reserva, onEditar, onPedirCancelar }) {
         </HoverLink>
       </div>
 
-      <div className="col-span-2 md:col-span-1">
+      <div>
         <span className="block text-sm text-negro-barbero">{reserva.servicios?.nombre}</span>
-        <span className="versalitas block text-xs text-gris-calido-500">
-          {reserva.barberos?.nombre} · {formatoCLP(reserva.servicios?.precio_clp ?? 0)}
-        </span>
+        <span className="versalitas block text-xs text-gris-calido-500">{reserva.barberos?.nombre}</span>
       </div>
 
-      <div className="flex items-center justify-end gap-4 text-right md:justify-start md:text-left">
+      <div className="mt-1 flex items-center justify-between">
         <button
           type="button"
           onClick={onEditar}
@@ -192,22 +206,22 @@ function FilaReservaActiva({ reserva, onEditar, onPedirCancelar }) {
 
 function FilaReservaCancelada({ reserva, onPedirReactivar, reactivando }) {
   return (
-    <div className="grid grid-cols-2 items-center gap-x-4 gap-y-2 border-b border-gris-calido-200 py-5 md:grid-cols-[9rem_1fr_1fr_auto] md:opacity-70">
-      <span className="numeros-tabulares text-sm text-gris-calido-700">{formatoFechaHora(reserva.fecha_hora)}</span>
+    <div className="flex flex-col gap-2 border-b border-gris-calido-200 py-4 opacity-70">
+      <span className="numeros-tabulares text-xs text-gris-calido-500">{formatoFechaHora(reserva.fecha_hora)}</span>
 
       <div>
         <span className="block font-medium text-gris-calido-400 line-through">{reserva.cliente_nombre}</span>
         <span className="text-xs text-gris-calido-500">{reserva.cliente_telefono}</span>
       </div>
 
-      <div className="col-span-2 md:col-span-1">
+      <div>
         <span className="block text-sm text-gris-calido-500 line-through">{reserva.servicios?.nombre}</span>
         <span className="versalitas block text-xs text-gris-calido-400">
           {reserva.barberos?.nombre} · {formatoCLP(reserva.servicios?.precio_clp ?? 0)}
         </span>
       </div>
 
-      <div className="text-right md:text-left">
+      <div className="mt-1">
         <button
           type="button"
           onClick={onPedirReactivar}
@@ -252,6 +266,35 @@ export function PanelReservas() {
       .filter((r) => r.estado === 'cancelada')
       .sort((a, b) => new Date(b.fecha_hora) - new Date(a.fecha_hora))
   }, [reservas])
+
+  // Cuenta confirmadas de la semana que contiene el día elegido (lunes a
+  // domingo) — un número que da una idea de la carga de la semana completa,
+  // no solo del día puntual. Reemplaza a "Primera" (la hora de la próxima
+  // reserva), que Enzo no sentía relevante ahí.
+  const reservasSemana = useMemo(() => {
+    if (!reservas) return 0
+    const inicio = inicioDeSemanaLunes(diaSeleccionado)
+    const fin = new Date(inicio.getFullYear(), inicio.getMonth(), inicio.getDate() + 7)
+    return reservas.filter((r) => {
+      if (r.estado !== 'confirmada') return false
+      const dia = diaSantiagoComoFechaLocal(new Date(r.fecha_hora))
+      return dia >= inicio && dia < fin
+    }).length
+  }, [reservas, diaSeleccionado])
+
+  // Las próximas reservas en general (no solo las del día elegido) — llena
+  // con algo útil el espacio que sobra cuando el día tiene pocas o ninguna,
+  // en vez de dejarlo en blanco nomás. Se excluyen las que ya se ven arriba
+  // (las del día elegido) para no repetir la misma reserva dos veces.
+  const proximasReservas = useMemo(() => {
+    if (!reservas) return []
+    const idsDelDia = new Set(reservasDelDia.map((r) => r.id))
+    const ahora = new Date()
+    return reservas
+      .filter((r) => r.estado === 'confirmada' && new Date(r.fecha_hora) > ahora && !idsDelDia.has(r.id))
+      .sort((a, b) => new Date(a.fecha_hora) - new Date(b.fecha_hora))
+      .slice(0, 4)
+  }, [reservas, reservasDelDia])
 
   async function confirmarCancelacion() {
     if (!reservaCancelando) return
@@ -325,22 +368,49 @@ export function PanelReservas() {
       )}
 
       {reservas && (
-        <div className="mt-8 grid gap-8 lg:grid-cols-[420px_minmax(0,1fr)] lg:items-start">
+        <div className="mt-8 grid gap-8 lg:grid-cols-[420px_minmax(0,1fr)] lg:items-stretch">
           {/* Columna izquierda: la lista — angosta, como el formulario de
               Personalización — según la vista, el día elegido o todas las
               canceladas. En mobile va primero el calendario (se elige el día
-              antes de ver algo), acá abajo por orden CSS. */}
-          <div className="order-2 rounded-lg border border-gris-calido-200 bg-white p-6 lg:order-1">
+              antes de ver algo), acá abajo por orden CSS. `items-stretch` (no
+              `items-start`) para que esta tarjeta tenga la misma altura que
+              el calendario — antes, con un día corto, quedaba mucho más baja
+              y quedaba flotando un bloque de vacío al lado, en vez de sentirse
+              como dos paneles equivalentes. */}
+          <div className="order-2 flex flex-col rounded-lg border border-gris-calido-200 bg-white p-6 lg:order-1">
             {vista === 'dia' && (
               <>
-                <div className="flex items-baseline justify-between gap-3 border-b border-gris-calido-100 pb-4">
-                  <h2 className="font-display text-xl font-light capitalize tracking-tight text-negro-barbero">
+                <div className="flex items-baseline justify-between gap-3">
+                  {/* Sin `font-display`: la serif fina (Fraunces) se ve bien
+                      como título grande de página, pero acá — un título
+                      chico en una pantalla con harta información — se lee
+                      débil. La tipografía normal del panel (sans, con más
+                      peso) se ve más clara. */}
+                  <h2 className="text-xl font-semibold capitalize tracking-tight text-negro-barbero">
                     {esHoy ? 'Hoy' : diaSeleccionado.toLocaleDateString('es-CL', { weekday: 'long', day: 'numeric', month: 'long' })}
                   </h2>
                   <span className="versalitas numeros-tabulares text-xs text-gris-calido-500">
                     {reservasDelDia.length} reserva{reservasDelDia.length === 1 ? '' : 's'}
                   </span>
                 </div>
+
+                {/* Siempre visible (no solo con reservas ese día) — da una
+                    vista más amplia de la semana completa, no solo del día
+                    puntual elegido. Separados a los extremos de la tarjeta
+                    con `justify-between`, no con un simple gap chico. */}
+                <div className="mt-4 flex items-baseline justify-between border-b border-gris-calido-100 pb-4">
+                  <div>
+                    <span className="versalitas block text-[10px] text-gris-calido-500">Ingreso del día</span>
+                    <span className="numeros-tabulares text-lg font-medium text-negro-barbero">
+                      {formatoCLP(reservasDelDia.reduce((total, r) => total + (r.servicios?.precio_clp ?? 0), 0))}
+                    </span>
+                  </div>
+                  <div className="text-right">
+                    <span className="versalitas block text-[10px] text-gris-calido-500">Reservas esta semana</span>
+                    <span className="numeros-tabulares text-lg font-medium text-negro-barbero">{reservasSemana}</span>
+                  </div>
+                </div>
+
                 {reservasDelDia.length === 0 ? (
                   <p className="py-10 text-center text-sm text-gris-calido-500">No hay reservas confirmadas ese día.</p>
                 ) : (
@@ -353,6 +423,32 @@ export function PanelReservas() {
                         onPedirCancelar={() => setReservaCancelando(reserva)}
                       />
                     ))}
+                  </div>
+                )}
+
+                {proximasReservas.length > 0 && (
+                  <div className="mt-8">
+                    <h3 className="versalitas text-xs text-gris-calido-500">Próximas reservas</h3>
+                    <div className="mt-2 flex flex-col divide-y divide-gris-calido-100">
+                      {proximasReservas.map((reserva) => (
+                        <button
+                          key={reserva.id}
+                          type="button"
+                          onClick={() => setDiaSeleccionado(diaSantiagoComoFechaLocal(new Date(reserva.fecha_hora)))}
+                          className="flex items-center gap-3 py-2.5 text-left transition-colors hover:bg-cobre/5"
+                        >
+                          <span className="numeros-tabulares shrink-0 text-xs text-gris-calido-500">
+                            {formatoFechaHora(reserva.fecha_hora)}
+                          </span>
+                          <span className="min-w-0 flex-1 truncate text-sm text-negro-barbero">
+                            {reserva.cliente_nombre}
+                          </span>
+                          <span className="versalitas shrink-0 text-xs text-gris-calido-400">
+                            {reserva.barberos?.nombre}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 )}
               </>

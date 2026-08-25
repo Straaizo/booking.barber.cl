@@ -4,7 +4,7 @@ export function BackButton({ onClick }) {
     <button
       type="button"
       onClick={onClick}
-      className="w-fit text-sm text-gris-calido-700 underline-offset-2 hover:underline"
+      className="w-fit text-sm text-[var(--pb-texto-secundario)] underline-offset-2 hover:underline"
     >
       ← Volver
     </button>

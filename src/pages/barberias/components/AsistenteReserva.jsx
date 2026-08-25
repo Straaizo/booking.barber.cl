@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { PasoServicio } from './PasoServicio'
 import { PasoBarbero } from './PasoBarbero'
@@ -31,15 +31,15 @@ function ProgresoAsistente({ etiquetas, indiceActivo }) {
   const total = etiquetas.length
   return (
     <div className="mb-8">
-      <div className="versalitas mb-3 flex justify-between text-xs text-gris-calido-500">
+      <div className="versalitas mb-3 flex justify-between text-xs text-[var(--pb-texto-terciario)]">
         <span>
-          <span className="numeros-tabulares text-cobre-texto">{String(indiceActivo + 1).padStart(2, '0')}</span>
+          <span className="numeros-tabulares text-[var(--pb-acento-texto)]">{String(indiceActivo + 1).padStart(2, '0')}</span>
           {' / '}
           <span className="numeros-tabulares">{String(total).padStart(2, '0')}</span>
         </span>
         <span>{etiquetas[indiceActivo]}</span>
       </div>
-      <div className="h-px w-full bg-gris-calido-200">
+      <div className="h-px w-full bg-[var(--pb-borde)]">
         <motion.div
           className="h-px bg-cobre"
           initial={false}
@@ -54,45 +54,19 @@ function ProgresoAsistente({ etiquetas, indiceActivo }) {
 export function AsistenteReserva({ barberia }) {
   const barberosActivos = barberia.barberos.filter((barbero) => barbero.activo)
   const serviciosActivos = barberia.servicios.filter((servicio) => servicio.activo)
-  const hayVariosBarberos = barberosActivos.length > 1
 
   // El barbero se elige primero (no el servicio) porque cada barbero puede
   // ofrecer un catálogo de servicios distinto — recién con el barbero
   // elegido se sabe qué servicios corresponde mostrar en el paso siguiente.
-  // Con un solo barbero se auto-selecciona y ese paso ni se muestra, pero el
-  // filtrado de servicios sigue aplicando igual.
-  const [paso, setPaso] = useState(hayVariosBarberos ? 'barbero' : 'servicio')
-  const [barbero, setBarbero] = useState(
-    barberosActivos.length === 1 ? barberosActivos[0] : null
-  )
+  // Este paso se muestra siempre, aunque la barbería tenga un solo barbero:
+  // deja claro desde el principio quién atiende, en vez de asumirlo en
+  // silencio.
+  const [paso, setPaso] = useState('barbero')
+  const [barbero, setBarbero] = useState(null)
   const [servicio, setServicio] = useState(null)
   const [horario, setHorario] = useState(null)
 
   const crearReserva = useCrearReserva()
-
-  // Cada paso tiene una altura distinta (la grilla de barberos no mide lo
-  // mismo que el formulario de datos, ni que el calendario de horario) —
-  // sin reservar espacio, el <Footer> que viene justo después de este
-  // componente (ver VistaBarberia.jsx) salta hacia arriba o abajo en cada
-  // paso. En vez de adivinar un alto fijo (que quedaría corto o largo según
-  // cuántos servicios/barberos tenga cada barbería), se mide el alto real de
-  // cada paso a medida que se visita y se aplica como mínimo el más alto
-  // visto hasta ahora — nunca se achica, así que el footer deja de moverse
-  // apenas se pasó una vez por el paso más alto, sin importar cuál paso
-  // arranca primero (con 1 solo barbero, el asistente ni pasa por "barbero").
-  const contenedorRef = useRef(null)
-  const [alturaMinima, setAlturaMinima] = useState(0)
-
-  useEffect(() => {
-    const elemento = contenedorRef.current
-    if (!elemento || typeof ResizeObserver === 'undefined') return
-    const observador = new ResizeObserver(([entrada]) => {
-      const alto = entrada.contentRect.height
-      setAlturaMinima((actual) => Math.max(actual, alto))
-    })
-    observador.observe(elemento)
-    return () => observador.disconnect()
-  }, [])
 
   // Si el barbero tiene catálogo propio (lo habilitó el dueño), solo se le
   // ofrecen SUS servicios (`servicio.barbero_id === barbero.id`) — si no,
@@ -103,12 +77,8 @@ export function AsistenteReserva({ barberia }) {
       )
     : []
 
-  const secuenciaPasos = hayVariosBarberos
-    ? ['barbero', 'servicio', 'horario', 'datos']
-    : ['servicio', 'horario', 'datos']
-  const etiquetasPasos = hayVariosBarberos
-    ? ['Barbero', 'Servicio', 'Horario', 'Tus datos']
-    : ['Servicio', 'Horario', 'Tus datos']
+  const secuenciaPasos = ['barbero', 'servicio', 'horario', 'datos']
+  const etiquetasPasos = ['Barbero', 'Servicio', 'Horario', 'Tus datos']
   const indiceActivo = secuenciaPasos.indexOf(paso)
 
   function elegirBarbero(barberoElegido) {
@@ -157,21 +127,27 @@ export function AsistenteReserva({ barberia }) {
   if (serviciosActivos.length === 0) {
     return (
       <div className="border-t border-cobre/25 py-10 text-center">
-        <p className="font-display text-xl font-light text-negro-barbero">
+        <p className="font-display text-xl font-light text-[var(--pb-texto)]">
           Esta barbería aún no tiene servicios publicados.
         </p>
-        <p className="mt-2 text-sm text-gris-calido-700">Vuelve a intentarlo más tarde.</p>
+        <p className="mt-2 text-sm text-[var(--pb-texto-secundario)]">Vuelve a intentarlo más tarde.</p>
       </div>
     )
   }
 
   return (
-    <div className="border-t-2 border-cobre bg-white/50 px-5 py-7 md:px-7 md:py-9">
-      {/* La barra de progreso entra en la misma medición que los pasos: si
-          quedara afuera, el paso "confirmado" (que no la muestra) se
-          achicaría por el alto exacto de la barra sin importar el mínimo
-          reservado más abajo. */}
-      <div ref={contenedorRef} style={{ minHeight: alturaMinima || undefined }}>
+    <div className="border-t-2 border-cobre bg-[var(--pb-superficie)]/50 px-5 py-7 md:px-7 md:py-9">
+      {/* Alto fijo (medido contra el paso más alto real: "Elige día y hora"
+          con varios horarios disponibles) en vez de uno que crece según qué
+          pasos se visitaron — con el enfoque anterior, volver a un paso
+          corto después de haber visto uno alto lo dejaba con un hueco vacío
+          enorme, porque el mínimo nunca se achicaba. Uno fijo es siempre
+          igual sin importar el orden de navegación. El contenido de cada
+          paso queda arriba (no centrado en el alto disponible): es donde el
+          ojo llega primero, justo debajo de la barra de progreso — un paso
+          corto (ej. un solo barbero) deja el resto del espacio fijo vacío
+          abajo, en vez de forzar todo al medio. */}
+      <div className="min-h-[600px] md:min-h-[520px]">
         {paso !== 'confirmado' && (
           <ProgresoAsistente etiquetas={etiquetasPasos} indiceActivo={indiceActivo} />
         )}
@@ -192,7 +168,7 @@ export function AsistenteReserva({ barberia }) {
               <PasoServicio
                 servicios={serviciosDelBarbero}
                 onSeleccionar={elegirServicio}
-                onVolver={hayVariosBarberos ? () => volverA('barbero') : undefined}
+                onVolver={() => volverA('barbero')}
               />
             )}
             {paso === 'horario' && (

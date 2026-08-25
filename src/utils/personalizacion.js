@@ -133,6 +133,7 @@ export function normalizarPersonalizacion(personalizacion) {
     color_primario: null,
     color_header: null,
     fuente_display: 'fraunces',
+    tema: 'claro',
     eslogan: '',
     // `null` = el eslogan usa el contraste automático de siempre según el
     // color del header; un valor explícito lo independiza.
