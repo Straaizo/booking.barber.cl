@@ -4,6 +4,7 @@ import { PanelShell } from '../../components/panel/PanelShell'
 const SECCIONES = [
   { to: '/admin', etiqueta: 'Barberías', fin: true },
   { to: '/admin/planes', etiqueta: 'Planes' },
+  { to: '/admin/novedades', etiqueta: 'Novedades' },
 ]
 
 function PestanaNav({ to, etiqueta, fin }) {

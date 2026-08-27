@@ -15,7 +15,7 @@ export function FounderSpots() {
 
   return (
     <section className="bg-negro-barbero px-6 py-20 text-hueso md:px-10 md:py-28">
-      <SectionRule indice="— 05" texto="Cupos fundadores" tono="claro" />
+      <SectionRule indice="— 06" texto="Cupos fundadores" tono="claro" />
 
       <div className="mt-14 grid grid-cols-12 gap-x-6">
         <div className="col-span-12 md:col-span-5">

@@ -176,7 +176,7 @@ export function TeamPanels() {
 
   return (
     <section className="px-6 py-20 md:px-10 md:py-28">
-      <SectionRule indice="— 02" texto="Tu equipo, su panel" tono="oscuro" />
+      <SectionRule indice="— 03" texto="Tu equipo, su panel" tono="oscuro" />
 
       <ScrollReveal className="mt-14 max-w-2xl">
         <h2 className="font-display text-3xl font-light leading-tight tracking-tight md:text-5xl">

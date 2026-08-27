@@ -4095,3 +4095,154 @@ Para la separación: los dos datos ("Ingreso del día" y "Reservas esta semana")
 - `src/utils/personalizacion.js` (default `tema: 'claro'`).
 
 **Pendiente / próximos pasos:** correr la migración antes de deployar. `Loader.jsx` (el ícono de "Cargando…" que usa `PasoHorario`) no se tocó — es un componente compartido con todo el panel administrativo, y su texto (`text-gris-calido-700`) puede leerse algo apagado sobre fondo oscuro por los pocos segundos que tarda en cargar; no se justificó bifurcarlo para esto. El resto de los pendientes, los mismos de siempre.
+
+---
+
+## 2026-08-25 (47) - Plan Solo fuera de la venta + candado real por sección según el plan
+
+**Qué se hizo:** Enzo pidió sacar el plan Solo de la tabla de precios del landing (sentía que tenía poco alcance comercial) y evaluar qué agregar/quitar en vez de sumar un tercer plan solo para "no dejarlo vacío". Al revisar el código se encontró que **"Personalización de marca" ya se vendía como exclusivo de Estudio en esa misma tabla, pero no había ningún candado real** — `puedePersonalizarSecciones()` daba el mismo resultado para Equipo y Estudio, así que cualquier barbería en Equipo ya tenía acceso completo a todo. Se lo planteé a Enzo con esa evidencia; eligió no tocar el modo oscuro (le pareció poco diferenciador, "toda página web hoy en día lo trae") y en cambio: separar las secciones de personalización entre los dos planes + agregar soporte prioritario como beneficio de Estudio.
+
+**Landing (`Pricing.jsx`, `FAQ.jsx`):** se sacó el plan Solo de `PLANES`/`FILAS` (queda Equipo/Estudio, tabla de 2 columnas — se verificó con Playwright que no se ve vacía ni desbalanceada, ni en desktop ni en mobile). La pregunta del FAQ "¿Sirve si tengo un solo barbero?" ya no menciona un plan que dejó de listarse — ahora explica que Equipo permite hasta 3, así que partir solo no es impedimento. Se agregó la fila "Soporte prioritario" (solo Estudio) y se renombró "Personalización de marca" a "Galería, imagen y texto, testimonios" — más preciso ahora que sí hay un candado real detrás.
+
+**El candado real (`utils/planes.js`):** `puedePersonalizarSecciones()` (todo-o-nada) se complementó con `seccionDisponibleParaPlan(tipoSeccion, planId)`, que separa las secciones en 2 grupos:
+- **Desde Equipo** (operativas, vienen con tener más de un barbero): Equipo (mostrar el team) y Horario de atención.
+- **Desde Estudio** (de marca, más elaboradas — fotos, texto libre, reseñas con color/tipografía propios): Galería, Imagen y texto, Testimonios.
+
+La identidad básica (color de marca, color de header, tipografía del nombre, tema claro/oscuro, eslogan, WhatsApp) sigue sin restricción para cualquier plan — eso no cambió.
+
+**Dónde se aplica:**
+- `VistaBarberia.jsx`: en vez de mostrar TODAS las secciones o NINGUNA según el plan, ahora filtra `secciones` una por una con `seccionDisponibleParaPlan` — si una barbería en Equipo tiene una Galería guardada de cuando estaba en Estudio (o baja de plan), esa sección deja de mostrarse en la página pública al instante, sin depender de que alguien vuelva a guardar el formulario (mismo criterio que ya existía para el gate anterior).
+- `PanelPersonalizacion.jsx`: nuevo `IconoCandado.jsx` (mismo patrón que `IconoX`/`IconoLapiz`). Las secciones de tipo bloqueado ya no desaparecen del editor — quedan visibles pero con candado, "Disponible desde el plan Estudio" en vez del resumen, sin poder abrirse a editar (pero sí reordenar/eliminar). Los botones "+ Galería de fotos", "+ Imagen y texto", "+ Testimonios" pasan por un nuevo `BotonAgregarSeccion` que muestra candado + tooltip en vez de agregar cuando el plan no alcanza. Nota corta con candado arriba de la lista, recordando qué secciones son de Estudio.
+
+**Por qué mostrar la sección bloqueada en vez de ocultarla del todo:** mismo criterio que ya usaba el aviso de plan Solo ("si ya tenías secciones armadas, siguen guardadas") — un dueño que baja de Estudio a Equipo no pierde su Galería en silencio, la ve ahí, sabe que existe y qué plan la destraba, en vez de preguntarse qué pasó con su contenido.
+
+**Cómo se probó:** Playwright contra la cuenta real de prueba (`jluis`, plan Equipo) — capturas confirmando: Galería y Testimonios con candado y texto "Disponible desde el plan Estudio" en el editor; Horario y Equipo normales, expandibles; los 3 botones de agregar sección bloqueados en el estilo punteado; y la vista previa en vivo (mismo componente que la página pública) ya NO muestra Galería ni "Lo que dicen nuestros clientes" para esta cuenta — solo Horario, Equipo y Reserva. `npm run lint` y `npm run build` limpios.
+
+**Archivos afectados:**
+- `src/pages/Home/components/Pricing.jsx` (2 planes, filas nuevas/renombradas).
+- `src/pages/Home/components/FAQ.jsx` (respuesta sobre barbero único, ya no menciona el plan Solo).
+- `src/utils/planes.js` (nuevo `seccionDisponibleParaPlan`).
+- `src/pages/barberias/components/VistaBarberia.jsx` (filtro por sección en vez de todo-o-nada).
+- `src/pages/panel/PanelPersonalizacion.jsx` (UI del candado, `BotonAgregarSeccion`).
+- `src/components/panel/IconoCandado.jsx` (nuevo).
+
+**Pendiente / próximos pasos:** el plan Solo se sacó de la landing pero sigue existiendo en `planes` (id 1) por si alguna barbería vieja lo tiene contratado — no se tocó nada de esa tabla ni de `PanelSuperadminPlanes.jsx`. Si en algún momento aparece una función nueva de verdad (multi-sucursal, reportes, etc.), ahí sí tendría sentido evaluar un tercer plan — no antes. Los mismos pendientes de siempre.
+
+---
+
+## 2026-08-25 (48) - Ajuste del reparto Equipo/Estudio: Galería vuelve a Equipo con tope de fotos, notificaciones pasan a Estudio
+
+**Qué se hizo:** revisión de la entrada anterior (47) con Enzo. Dos correcciones: (1) "Notificación por correo" y "Notificación automática por WhatsApp" no deberían listarse como incluidas en ningún plan todavía — no están construidas, `services/eventosReserva.js` es un stub que solo hace `console.info` — así que se reposicionan como beneficio de Estudio a futuro, no de Equipo. (2) Galería no debería ser exclusiva de Estudio como quedó en la entrada 47 — Enzo prefiere que se quede en Equipo pero con un tope de fotos, para que la diferencia sea de cantidad, no de acceso.
+
+**Fix (`utils/planes.js`):** `galeria` se movió de vuelta a `SECCIONES_DESDE_EQUIPO` (queda junto a equipo/horario). Nueva función `maxFotosGaleria(planId)`: `6` en Equipo, `Infinity` en Estudio (sin inventar un número "enorme" para simular ilimitado). Imagen y texto, y testimonios siguen exclusivas de Estudio — esas no se tocaron.
+
+**Tope de fotos, aplicado en 2 capas (`PanelPersonalizacion.jsx`):**
+1. Antes de subir: `agregarImagenesAGaleria` recorta la selección al cupo real restante ANTES de llamar a `subirImagenBarberia` — si a una barbería en Equipo con 4 fotos le seleccionan 10 más, solo sube 2 (hasta completar 6) y avisa cuántas quedaron afuera, en vez de subir las 10 al storage para descartar 8 después.
+2. En la UI: contador "4 / 6" junto al botón (`Number.isFinite(tope)` — en Estudio, `Infinity` no es finito, así que ahí no se muestra ningún contador, coherente con "sin tope"). Al llegar al máximo, el botón "Agregar fotos" se reemplaza por el mismo patrón de candado que ya usa `BotonAgregarSeccion`, con el mensaje "Llegaste al máximo de fotos de tu plan (6). El plan Estudio no tiene tope."
+
+**Landing (`Pricing.jsx`):** la fila que antes decía "Galería, imagen y texto, testimonios" (todo agrupado, todo Estudio) se separó en 3 filas reales: "Galería de fotos" (Hasta 6 / Ilimitada — ya no es un check/cruz, es una comparación de cantidad), "Imagen y texto, testimonios" (exclusivo Estudio) y "Notificación por correo y WhatsApp" (exclusivo Estudio, movida desde donde estaba antes disponible en ambos planes).
+
+**Cómo se probó:** Playwright contra la cuenta real (`jluis`, plan Equipo, 4 fotos ya cargadas en su galería) — confirmado que "GALERÍA" aparece desbloqueada y editable en el panel (antes tenía candado), la vista previa en vivo la vuelve a mostrar, "TESTIMONIOS" sigue con candado sin cambios, y el contador junto al botón de subir muestra "4 / 6" correctamente. `npm run lint` y `npm run build` limpios.
+
+**Archivos afectados:**
+- `src/utils/planes.js` (`galeria` vuelve a Equipo, nuevo `maxFotosGaleria`).
+- `src/pages/panel/PanelPersonalizacion.jsx` (tope aplicado antes de subir + contador/candado en la UI).
+- `src/pages/Home/components/Pricing.jsx` (filas reordenadas y separadas).
+
+**Pendiente / próximos pasos:** cuando se construya la notificación real por WhatsApp/correo, falta agregar el chequeo de plan (`planId === PLAN_ESTUDIO`) en el punto donde se dispare — hoy no hay nada que gatear porque `onReservaCreada` no hace nada real todavía. Se le explicó a Enzo (fuera de código, en el chat) el approach recomendado para esa integración cuando llegue el momento: WhatsApp Cloud API oficial de Meta (ya lo anticipaba el comentario en `eventosReserva.js`) con un solo número de WhatsApp Business centralizado de la plataforma (no uno por barbería, para no pedirle a cada dueño que configure su propia cuenta de Meta Business), disparado desde una Edge Function de Supabase — nunca desde el navegador. Los mismos pendientes de siempre.
+
+---
+
+## 2026-08-25 (49) - Nueva sección "Novedades": carrusel en el landing + administración desde el superadmin
+
+**Qué se hizo:** Enzo pidió revisar la estructura del landing (todavía quedan los 10 cupos fundadores configurados a mano en `config/fundadores.js`) y agregar una sección tipo carrusel con las actualizaciones/funcionalidades nuevas de la plataforma, administrable desde el panel de superadmin (agregar/quitar/ocultar).
+
+**Tabla nueva (`supabase/migrations/20260825000001_agregar_novedades.sql`):** `novedades` (`titulo`, `descripcion`, `etiqueta` opcional para un badge tipo "Nuevo", `fecha`, `orden`, `activo`) — mismo patrón `activo` que ya usa `planes` (ARREGLO 6: ocultar sin borrar). Políticas RLS calcadas de `barberias_*`: público (`anon`) solo ve `activo=1`; cualquier autenticado ve las activas, pero el superadmin (`rol_id = 1` vía `mi_perfil()`) ve todas — necesario para poder reactivar una que ocultó; insert/update/delete solo para superadmin.
+
+**Al revisar el catálogo de RLS existente se encontró que `planes` nunca tuvo políticas de insert/update** (solo `cat_planes_lectura`, de solo lectura) — es decir, `PanelSuperadminPlanes.jsx` probablemente esté fallando en producción hoy al crear/editar un plan. No se tocó nada de eso (fuera del pedido de esta conversación), pero quedó anotado como pendiente a revisar.
+
+**Superadmin (`/admin/novedades`, nuevo tab en `PanelSuperadminLayout.jsx`):** `PanelSuperadminNovedades.jsx` + `FilaNovedad.jsx` (mismo patrón guardar-al-perder-foco que `FilaPlan.jsx`, con `Interruptor` para "visible en el landing" en vez de un booleano suelto) + formulario para crear una nueva al final. Cada fila tiene título, etiqueta opcional, fecha, orden (manual, número) y descripción, más un botón "Eliminar" — a diferencia de `planes` (que no se borran), una novedad sí es desechable.
+
+**Landing (`Novedades.jsx`, entre "La competencia real" y "Planes" — pensado como prueba social de que el producto sigue vivo justo antes de pedir la decisión de compra):** carrusel de una tarjeta a la vez, mismo lenguaje visual que los carruseles de testimonios/equipo de la página pública de cada barbería (autoplay 6s, flechas, puntos). Si no hay novedades activas (o la tabla todavía no existe — no se ha corrido la migración), la sección no se renderiza — nunca se ve un hueco vacío o un error en el landing público. `fecha` se formatea a mano (mes+año) armando la fecha en hora local a partir del string "AAAA-MM-DD", nunca `new Date(fechaISO)` directo — mismo cuidado de zona horaria que ya se aplicó en `utils/horaLocal.js` esta sesión.
+
+**De paso, mismo bug de clase muerta que ya apareció 2 veces esta sesión:** al copiar el patrón de puntos del carrusel se iba a repetir `bg-gris-calido-300` (no existe, sería invisible) — se corrigió a `bg-gris-calido-200` antes de terminar.
+
+**Renumeración:** al insertar la sección nueva como "— 04", Planes pasó de "— 04" a "— 05", Cupos fundadores de "— 05" a "— 06", y Preguntas frecuentes de "— 06" a "— 07".
+
+**Cómo se probó:** Playwright — el landing sin la migración corrida no revienta (0 errores de página, la sección Novedades simplemente no se monta); el panel `/admin/novedades` (con la cuenta real de superadmin) muestra el tab nuevo, el título, la descripción, el aviso de error esperado ("No pudimos cargar las novedades") y el formulario de creación, todo renderizando bien antes de que exista la tabla. `npm run lint` y `npm run build` limpios.
+
+**Archivos afectados:**
+- `supabase/migrations/20260825000001_agregar_novedades.sql` (nuevo, pendiente de correr).
+- `src/pages/panel/hooks/useNovedadesSuperadmin.js`, `src/pages/panel/components/FilaNovedad.jsx`, `src/pages/panel/PanelSuperadminNovedades.jsx` (nuevos).
+- `src/pages/panel/PanelSuperadminLayout.jsx`, `src/routes/AppRouter.jsx` (tab + ruta nueva).
+- `src/pages/Home/hooks/useNovedadesPublicas.js`, `src/pages/Home/components/Novedades.jsx` (nuevos).
+- `src/pages/Home/Home.jsx`, `Pricing.jsx`, `FounderSpots.jsx`, `FAQ.jsx` (inserción + renumeración de secciones).
+
+**Pendiente / próximos pasos:** correr la migración antes de deployar (mismo aviso de siempre). Revisar si `planes` de verdad necesita políticas de insert/update — sospecha sin confirmar, no se tocó. La revisión completa del landing (simplificar según buenas prácticas de UX/marketing) se planteó pero no se ejecutó todavía — se le devolvió a Enzo una recomendación puntual (cortar "La competencia real" por redundante con "Beneficios", achicar el FAQ) para que la confirme antes de tocar contenido de marketing que es decisión suya. Tampoco se tocó `config/fundadores.js` (los 2 cupos ya marcados como ocupados) — quedó pendiente confirmar con Enzo si ese número sigue siendo correcto.
+
+---
+
+## 2026-08-25 (50) - `planes` no tenía policy de insert/update (confirmado, con fix) + landing recortado
+
+**Qué se hizo:** Enzo confirmó los 2 cortes propuestos en la entrada anterior (sacar "La competencia real", achicar el FAQ) y pidió confirmar directamente la sospecha sobre `planes`.
+
+**`planes` sin insert/update — confirmado en vivo, no era solo sospecha.** Con la cuenta real de superadmin, cambiar el precio de un plan en `/admin/planes` devuelve un 406 de PostgREST: `"Cannot coerce the result to a single JSON object"` — la firma clásica de un `UPDATE` que RLS filtró a 0 filas antes de que `.select().single()` intentara leer el resultado. `planes` tiene RLS activo desde el esquema original pero solo llegó a tener `cat_planes_lectura` (solo lectura); nunca se agregó política de insert/update, así que el formulario "Crear plan"/editar precio de `PanelSuperadminPlanes.jsx` viene fallando en silencio desde que existe esa pantalla. Se probó con un cambio de precio real (revertido después — como ambos intentos fallaron por el mismo motivo, no llegó a tocar la base de todas formas).
+
+**Fix (`supabase/migrations/20260825000002_planes_insert_update_superadmin.sql`):** políticas `planes_insert_superadmin`/`planes_update_superadmin`, calcadas de `barberias_insert_superadmin`/`barberias_update` (mismo `(select rol_id from mi_perfil()) = 1`). Sin política de `delete` a propósito — un plan no se borra, se retira con `activo = 0`, mismo criterio "ARREGLO 6" que ya usa esa columna.
+
+**Landing recortado:** se eliminó `NotebookVsApp.jsx` completo (sin otras referencias en el código, confirmado antes de borrar) — era la sección más redundante, repetía los mismos puntos de "Beneficios" como tabla comparativa. El FAQ bajó de 6 a 5 preguntas — se sacó "¿Sirve si tengo un solo barbero?", la más situacional y ya cubierta por la fila "Barberos: Hasta 3" de la tabla de precios; se mantuvieron las 5 que reducen fricción/miedo real de compra (instalar algo, cuenta de clientes, cambiar precios, dejar de pagar, probar antes de pagar). Renumeración de secciones: Novedades pasa de "— 04" a "— 03", Planes de "— 05" a "— 04", Cupos fundadores vuelve a "— 05" (neto sin cambio respecto a antes de la entrada 49), Preguntas frecuentes de "— 07" a "— 06".
+
+**Cómo se probó:** Playwright — 0 errores de página en el landing, numeración de secciones confirmada (01, 02, 04, 05, 06 — el 03 de Novedades no aparece en la lista porque la sección todavía no se monta sin la tabla creada, no es un bug), y las 5 preguntas del FAQ confirmadas una por una en pantalla. El bug de `planes` se reprodujo primero (para confirmar el diagnóstico) antes de escribir el fix. `npm run lint` y `npm run build` limpios.
+
+**Archivos afectados:**
+- `supabase/migrations/20260825000002_planes_insert_update_superadmin.sql` (nuevo, pendiente de correr).
+- `src/pages/Home/components/NotebookVsApp.jsx` (eliminado).
+- `src/pages/Home/Home.jsx`, `Pricing.jsx`, `FAQ.jsx` (corte + renumeración).
+
+**Pendiente / próximos pasos:** ~~correr las 2 migraciones pendientes~~ — Enzo las corrió; verificado en vivo (Playwright, cuenta real): cambiar un precio en `/admin/planes` ahora devuelve 200 y "Guardado" (antes 406), precios revertidos a sus valores originales (5000/6000/7000) después de probar; se creó una novedad de prueba desde `/admin/novedades`, apareció correctamente en el carrusel del landing con su fecha/etiqueta, y se eliminó al terminar de verificar — sin dejar datos de prueba. ~~Sigue sin confirmar si `CUPOS_OCUPADOS = 2`~~ — Enzo confirmó: 0 barberías fundadoras cerradas todavía, siguen los 10 cupos disponibles (ver entrada 51). Los mismos pendientes de siempre.
+
+---
+
+## 2026-08-27 (51) - Auditoría del landing: FAQ más arriba, cupos en 0, y la sección "Así se ve" dejó de sentirse vacía
+
+**Qué se hizo:** Enzo pidió revisar toda la página de inicio con foco en reglas de UX/UI y que se vea bien en todos los dispositivos — sensación de que "se ve algo plana... sin tanto detalle o colores que identifiquen la marca". Aprovechó para confirmar 2 cosas: las barberías fundadoras todavía no existen (los 10 cupos siguen disponibles, no 8) y que el FAQ debería subir más arriba, ya que pocas personas recorren la página entera y conviene resolver dudas temprano.
+
+**Cambios directos, sin ambigüedad:**
+- `config/fundadores.js`: `CUPOS_OCUPADOS` de `2` a `0`.
+- FAQ se movió de última posición (antes de Cupos fundadores) a justo después de "Así se ve, de verdad" — la demo muestra el producto, el FAQ resuelve la desconfianza inmediatamente después, antes de que la persona siga bajando (o se vaya). Renumeración: FAQ "— 06"→"— 02", Tu equipo "— 02"→"— 03", Novedades "— 04" se mantiene con ese número (ya venía después de Tu equipo), Planes "— 05" sin cambio, Cupos fundadores sin cambio.
+
+**Auditoría visual (Playwright, las 7 secciones reales, en mobile/tablet/desktop):** no se encontró ningún bug de responsividad real — cero overflow horizontal, ningún texto apretado ni layout roto en ningún ancho probado (375/390/820/1440px). La sensación de "plana" no era un bug de UX, era real pero puntual: la sección "Así se ve, de verdad" (`LiveDemo.jsx`) tenía casi el doble del espacio necesario, completamente vacío y sin ningún color de marca.
+
+**Diagnóstico concreto de esa sección:** el marco de celular (`PhoneMockup.jsx`) reserva un alto mínimo fijo pensado para la pantalla más alta de las 5 que muestra (barbero/servicio/horario/datos/confirmado) — medido con Playwright, esa altura real es 284px, pero el piso estaba fijado en 448px (mobile) / 496px (desktop): casi el doble, dejando ~160-210px de espacio muerto dentro del teléfono en TODAS las pantallas, no solo en la más corta. Además el fondo de toda la sección era un solo tono plano sin ningún acento de color.
+
+**Fix:**
+- `PhoneMockup.jsx`: el piso baja a 320px/352px (`min-h-[20rem] md:min-h-[22rem]`) — margen real sobre el contenido más alto medido (284px), no un número inventado.
+- `LiveDemo.jsx`: se agregó el mismo acento radial de `--color-cobre` que ya usa el header de cada barbería (`VistaBarberia.jsx`) detrás del teléfono — mismo lenguaje visual ya establecido en el sitio, no un elemento nuevo inventado. Padding vertical de la sección reducido (`py-20 md:py-28` → `py-16 md:py-24`) para que el vacío alrededor no vuelva a acumularse.
+
+**Cómo se probó:** Playwright — se midió el alto real de las 5 pantallas del teléfono antes de decidir el nuevo piso (no a ojo), se recorrieron las 7 secciones reales en 4 anchos de pantalla distintos confirmando cero bugs de layout, y se comparó la sección "Así se ve" antes/después. `npm run lint` y `npm run build` limpios.
+
+**Archivos afectados:**
+- `src/config/fundadores.js` (`CUPOS_OCUPADOS` a 0).
+- `src/pages/Home/Home.jsx`, `FAQ.jsx`, `TeamPanels.jsx`, `Pricing.jsx`, `FounderSpots.jsx` (reorden + renumeración).
+- `src/components/common/PhoneMockup.jsx`, `src/pages/Home/components/LiveDemo.jsx` (piso real + acento de color).
+
+**Pendiente / próximos pasos:** el resto del landing (FAQ, Planes) se dejó sin más color a propósito — son secciones de texto/comparación donde el diseño plano es lo correcto (menos ruido visual al leer una tabla de precios o un acordeón), no una falla. Si Enzo quiere una pasada de color más agresiva en el resto de la página, es una decisión de dirección visual que conviene confirmar antes de tocar más secciones — no se avanzó sobre eso sin su ok. Los mismos pendientes de siempre.
+
+---
+
+## 2026-08-27 (52) - FAQ ahora es la primera sección tras el hero, con autoplay y pausa por hover
+
+**Qué se hizo:** Enzo pidió ir un paso más allá de la entrada anterior: que el FAQ aparezca apenas se empiece a bajar la página (no después de la demo), y que se muestre solo — cada pregunta se despliega en secuencia automática cada 4 segundos, mostrando de entrada todo lo que hay para preguntar. Si el usuario pasa el mouse por encima de cualquiera, esa se despliega y la secuencia se detiene ahí mismo; al sacar el mouse, sigue avanzando desde esa misma pregunta, no desde el principio.
+
+**Posición:** `FAQ` pasó a ser la primera sección después del `Hero` (antes iba después de "Así se ve, de verdad"). Renumeración: Preguntas frecuentes "— 02"→"— 01", Así se ve "— 01"→"— 02" — el resto de la secuencia (Tu equipo "— 03", Novedades "— 04", Planes "— 05", Cupos fundadores "— 06") no se mueve, solo estas dos intercambiaron lugar y número.
+
+**Autoplay + pausa por hover (`FAQ.jsx`):** `indiceAuto` es la posición real de la secuencia (nunca la toca el hover, la mueve el intervalo o un click); `enPausa` se activa con `onMouseEnter` sobre cualquier pregunta — el intervalo deja de correr mientras el mouse siga encima (sin importar cuánto tiempo pase) — y se desactiva con `onMouseLeave`. Al soltar el mouse, la secuencia sigue avanzando desde `indiceAuto` tal cual quedó — nunca reinicia en la primera ni salta a otra — porque el hover mueve `indiceAuto` directo al índice que se está mirando, así "dónde se quedó" es literalmente donde el mouse la dejó. Mismo patrón que ya usan los demás carruseles autoplay del sitio (`useInView` + `usePrefersReducedMotion` — con movimiento reducido, el autoplay no corre y queda la primera pregunta abierta siempre; el intervalo tampoco corre si la sección no está en pantalla).
+
+**Cómo se probó:** Playwright — confirmado con temporizador real: abre en la pregunta 1 al entrar en vista, avanza a la 2 a los ~4.3s y a la 3 a los ~8.6s; al hacer hover sobre la pregunta 4 se abre esa y se queda ahí 5 segundos completos sin avanzar; al sacar el mouse sigue en la 4 (no vuelve a la 1) y recién ~4.3s después avanza a la 5. Confirmada también la posición real en el DOM (FAQ es la primera `<section>` después del hero). `npm run lint` y `npm run build` limpios.
+
+**Archivos afectados:**
+- `src/pages/Home/components/FAQ.jsx` (autoplay + pausa por hover, `indice` de la SectionRule).
+- `src/pages/Home/components/LiveDemo.jsx` (`indice` de la SectionRule).
+- `src/pages/Home/Home.jsx` (orden de secciones).
+
+**Pendiente / próximos pasos:** los mismos de siempre.

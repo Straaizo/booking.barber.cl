@@ -1,9 +1,11 @@
-import { useState } from 'react'
-import { motion } from 'framer-motion'
+import { useEffect, useRef, useState } from 'react'
+import { motion, useInView } from 'framer-motion'
 import { SectionRule } from '../../../components/common/SectionRule'
 import { ScrollReveal } from '../../../components/animations/ScrollReveal'
 import { EASE_ENTRADA } from '../../../components/animations/easing'
 import { usePrefersReducedMotion } from '../../../hooks/usePrefersReducedMotion'
+
+const INTERVALO_MS = 4000
 
 const PREGUNTAS = [
   {
@@ -27,10 +29,6 @@ const PREGUNTAS = [
       'Tu página se desactiva y tus clientes ven que no está disponible por ahora. Nada se borra — si vuelves, todo sigue donde lo dejaste.',
   },
   {
-    pregunta: '¿Sirve si tengo un solo barbero?',
-    respuesta: 'Sí, el plan Solo está pensado exactamente para eso.',
-  },
-  {
     pregunta: '¿Puedo probarlo antes de pagar?',
     respuesta:
       'Escríbenos y te mostramos tu página funcionando antes de que decidas — sin compromiso.',
@@ -50,19 +48,23 @@ function IconoMasMenos({ abierto }) {
   )
 }
 
-function ItemFAQ({ pregunta, respuesta, indice, abierto, onToggle }) {
+function ItemFAQ({ pregunta, respuesta, indice, abierto, onAbrir, onSalir }) {
   const prefiereReducido = usePrefersReducedMotion()
   const idPanel = `faq-panel-${indice}`
   const idBoton = `faq-boton-${indice}`
 
   return (
-    <div className="border-t border-gris-calido-200 first:border-t-0">
+    <div
+      className="border-t border-gris-calido-200 first:border-t-0"
+      onMouseEnter={onAbrir}
+      onMouseLeave={onSalir}
+    >
       <button
         type="button"
         id={idBoton}
         aria-expanded={abierto}
         aria-controls={idPanel}
-        onClick={onToggle}
+        onClick={onAbrir}
         className="flex w-full items-center justify-between gap-4 py-6 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-laton"
       >
         <span className="flex items-baseline gap-4">
@@ -93,11 +95,29 @@ function ItemFAQ({ pregunta, respuesta, indice, abierto, onToggle }) {
 }
 
 export function FAQ() {
-  const [abierto, setAbierto] = useState(0)
+  // `indiceAuto` es la posición "de verdad" de la secuencia — nunca la toca
+  // el hover, solo el intervalo y el click. `enPausa` para cuando el mouse
+  // está encima de una pregunta: el intervalo se detiene ahí mismo (no se
+  // reinicia el conteo de los 4s de la que sigue) y, al sacar el mouse,
+  // arranca de nuevo desde `indiceAuto` tal cual quedó — nunca salta a la
+  // que se estaba mirando ni vuelve a la primera.
+  const [indiceAuto, setIndiceAuto] = useState(0)
+  const [enPausa, setEnPausa] = useState(false)
+  const contenedorRef = useRef(null)
+  const enVista = useInView(contenedorRef, { amount: 0.4 })
+  const prefiereReducido = usePrefersReducedMotion()
+
+  useEffect(() => {
+    if (!enVista || enPausa || prefiereReducido) return
+    const id = setInterval(() => {
+      setIndiceAuto((actual) => (actual + 1) % PREGUNTAS.length)
+    }, INTERVALO_MS)
+    return () => clearInterval(id)
+  }, [enVista, enPausa, prefiereReducido])
 
   return (
-    <section className="px-6 py-20 md:px-10 md:py-28">
-      <SectionRule indice="— 06" texto="Preguntas frecuentes" tono="oscuro" />
+    <section ref={contenedorRef} className="px-6 py-20 md:px-10 md:py-28">
+      <SectionRule indice="— 01" texto="Preguntas frecuentes" tono="oscuro" />
 
       <div className="mt-14 grid grid-cols-12 gap-x-6">
         <div className="col-span-12 mb-8 md:col-span-3 md:mb-0">
@@ -114,8 +134,12 @@ export function FAQ() {
               key={item.pregunta}
               {...item}
               indice={indice}
-              abierto={abierto === indice}
-              onToggle={() => setAbierto(abierto === indice ? null : indice)}
+              abierto={indiceAuto === indice}
+              onAbrir={() => {
+                setIndiceAuto(indice)
+                setEnPausa(true)
+              }}
+              onSalir={() => setEnPausa(false)}
             />
           ))}
         </div>

@@ -4,7 +4,7 @@ import { Hero } from './components/Hero'
 import { LiveDemo } from './components/LiveDemo'
 import { Benefits } from './components/Benefits'
 import { TeamPanels } from './components/TeamPanels'
-import { NotebookVsApp } from './components/NotebookVsApp'
+import { Novedades } from './components/Novedades'
 import { Pricing } from './components/Pricing'
 import { FounderSpots } from './components/FounderSpots'
 import { FAQ } from './components/FAQ'
@@ -21,13 +21,18 @@ export function Home() {
         <Header />
         <Hero />
       </div>
+      {/* Las dudas de "confianza" (¿instalo algo? ¿qué pasa si dejo de
+          pagar?) van apenas se empieza a bajar la página, antes incluso de
+          la demo — la mayoría de quienes visitan la landing no la recorren
+          entera, así que conviene resolverlas de inmediato en vez de
+          dejarlas al final. */}
+      <FAQ />
       <LiveDemo />
       <Benefits />
       <TeamPanels />
-      <NotebookVsApp />
+      <Novedades />
       <Pricing />
       <FounderSpots />
-      <FAQ />
       <Footer showModelCredit />
     </div>
   )

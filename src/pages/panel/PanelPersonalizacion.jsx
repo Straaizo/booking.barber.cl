@@ -7,11 +7,12 @@ import { HoverLink } from '../../components/common/HoverLink'
 import { ToastGuardado } from '../../components/common/ToastGuardado'
 import { SelectorArchivo } from '../../components/common/SelectorArchivo'
 import { Interruptor } from '../../components/panel/Interruptor'
+import { IconoCandado } from '../../components/panel/IconoCandado'
 import { usePersonalizacionAdmin, useGuardarPersonalizacion } from './hooks/usePersonalizacionAdmin'
 import { subirImagenBarberia, borrarImagenBarberia } from '../../services/storageImagenes'
 import { FUENTES_DISPONIBLES, asegurarFuenteCargada } from '../../utils/fuentes'
 import { ordenarEquipo } from '../../utils/personalizacion'
-import { puedePersonalizarSecciones } from '../../utils/planes'
+import { puedePersonalizarSecciones, seccionDisponibleParaPlan, maxFotosGaleria } from '../../utils/planes'
 
 // La vista previa usa exactamente el mismo componente que la página pública
 // real (`VistaBarberia`, renderizado dentro de un <iframe> — ver
@@ -142,6 +143,32 @@ function TituloGrupo({ numero, children }) {
   )
 }
 
+// Mismo botón de "+ Agregar sección" de siempre, salvo que si el tipo no
+// está disponible en el plan actual queda un candado en vez de un onClick —
+// no desaparece del todo: así el dueño ve que la función existe y en qué
+// plan la consigue, en vez de preguntarse por qué falta.
+function BotonAgregarSeccion({ etiqueta, disponible, onClick }) {
+  if (!disponible) {
+    return (
+      <span
+        title="Disponible desde el plan Estudio"
+        className="versalitas flex cursor-not-allowed items-center gap-1.5 rounded-md border border-dashed border-gris-calido-200 px-3 py-2 text-xs text-gris-calido-400"
+      >
+        <IconoCandado className="h-3 w-3" />+ {etiqueta}
+      </span>
+    )
+  }
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="versalitas rounded-md border border-gris-calido-200 px-3 py-2 text-xs text-gris-calido-700 hover:border-cobre hover:text-cobre-texto"
+    >
+      + {etiqueta}
+    </button>
+  )
+}
+
 export function PanelPersonalizacion() {
   const { perfil } = useAuth()
   const esMobile = useIsMobile()
@@ -153,6 +180,7 @@ export function PanelPersonalizacion() {
   const [estadoToast, setEstadoToast] = useState(null)
   const [subiendo, setSubiendo] = useState(false)
   const [seccionAbiertaId, setSeccionAbiertaId] = useState(null)
+  const [avisoLimiteFotos, setAvisoLimiteFotos] = useState(null)
   // Arranca en "movil" si ya se sabe desde el primer render que el viewport
   // es angosto — evita un parpadeo a "pc" (que fuerza min-width: 768px en el
   // iframe, rompiendo el ancho de la página en un celular real) antes de que
@@ -239,6 +267,7 @@ export function PanelPersonalizacion() {
   // que ya existiera de antes de bajar de plan quedan guardadas, solo
   // ocultas de la edición y de la página pública hasta que vuelva a subir).
   const puedeSecciones = barberia ? puedePersonalizarSecciones(barberia.plan_id) : false
+  const planId = barberia?.plan_id
 
   async function subirLogo(evento) {
     const archivo = evento.target.files?.[0]
@@ -296,8 +325,19 @@ export function PanelPersonalizacion() {
   }
 
   async function agregarImagenesAGaleria(id, evento) {
-    const archivos = Array.from(evento.target.files ?? [])
+    let archivos = Array.from(evento.target.files ?? [])
     if (archivos.length === 0) return
+    // El tope se aplica acá, antes de subir — así una barbería en Equipo
+    // que selecciona 10 fotos de una vez no paga la subida de las que van a
+    // quedar descartadas igual.
+    const seccionActual = form.secciones.find((s) => s.id === id)
+    const cupo = maxFotosGaleria(barberia.plan_id) - (seccionActual?.imagenes?.length ?? 0)
+    setAvisoLimiteFotos(cupo < archivos.length ? `Se subieron ${Math.max(cupo, 0)} de ${archivos.length} fotos — llegaste al máximo de tu plan.` : null)
+    if (cupo <= 0) {
+      evento.target.value = ''
+      return
+    }
+    archivos = archivos.slice(0, cupo)
     setSubiendo(true)
     try {
       const nuevas = await Promise.all(
@@ -797,26 +837,41 @@ export function PanelPersonalizacion() {
                   imagen y texto, y tu equipo de barberos — todo se puede reordenar entre sí, por ejemplo
                   para mostrar el equipo antes o después de las fotos del trabajo.
                 </p>
+                {!seccionDisponibleParaPlan('imagen_texto', planId) && (
+                  <p className="-mt-2 flex items-center gap-1.5 text-xs text-gris-calido-500">
+                    <IconoCandado className="h-3 w-3 shrink-0" />
+                    Imagen y texto, y testimonios son exclusivas del plan Estudio.
+                  </p>
+                )}
 
                 {form.secciones.map((seccion, indice) => {
               const abierta = seccionAbiertaId === seccion.id
+              const disponible = seccionDisponibleParaPlan(seccion.tipo, planId)
               return (
                 <div
                   key={seccion.id}
-                  className={`overflow-hidden rounded-lg border transition-colors ${abierta ? 'border-cobre' : 'border-gris-calido-200'}`}
+                  className={`overflow-hidden rounded-lg border transition-colors ${
+                    !disponible ? 'border-gris-calido-200 bg-gris-calido-100/40' : abierta ? 'border-cobre' : 'border-gris-calido-200'
+                  }`}
                 >
                   <div className="flex items-center justify-between gap-2 p-3">
                     <button
                       type="button"
-                      onClick={() => setSeccionAbiertaId(abierta ? null : seccion.id)}
-                      className="flex flex-1 items-center gap-3 text-left"
+                      onClick={() => disponible && setSeccionAbiertaId(abierta ? null : seccion.id)}
+                      disabled={!disponible}
+                      title={!disponible ? 'Disponible desde el plan Estudio' : undefined}
+                      className={`flex flex-1 items-center gap-3 text-left ${!disponible ? 'cursor-not-allowed opacity-60' : ''}`}
                     >
-                      <span className="text-xs text-gris-calido-400">{abierta ? '▾' : '▸'}</span>
+                      {disponible ? (
+                        <span className="text-xs text-gris-calido-400">{abierta ? '▾' : '▸'}</span>
+                      ) : (
+                        <IconoCandado className="h-3.5 w-3.5 shrink-0 text-gris-calido-400" />
+                      )}
                       <span className="versalitas shrink-0 text-xs text-gris-calido-500">
                         {ETIQUETA_TIPO_SECCION[seccion.tipo]}
                       </span>
                       <span className="truncate text-sm text-negro-barbero">
-                        {resumenSeccion(seccion, equipoOrdenado.length)}
+                        {disponible ? resumenSeccion(seccion, equipoOrdenado.length) : 'Disponible desde el plan Estudio'}
                       </span>
                     </button>
                     <div className="flex shrink-0 gap-2 text-xs text-gris-calido-500">
@@ -1158,12 +1213,46 @@ export function PanelPersonalizacion() {
                               </div>
                             ))}
                           </div>
-                          <SelectorArchivo
-                            etiqueta="Agregar fotos"
-                            cargando={subiendo}
-                            multiple
-                            onChange={(e) => agregarImagenesAGaleria(seccion.id, e)}
-                          />
+                          {(() => {
+                            const tope = maxFotosGaleria(planId)
+                            const cantidad = seccion.imagenes.length
+                            const enElTope = cantidad >= tope
+                            return (
+                              <div className="flex flex-col gap-2">
+                                <div className="flex items-center gap-3">
+                                  {enElTope ? (
+                                    <span
+                                      title="Sube de plan para agregar más fotos"
+                                      className="versalitas flex cursor-not-allowed items-center gap-1.5 rounded-md border border-dashed border-gris-calido-200 px-3 py-2 text-xs text-gris-calido-400"
+                                    >
+                                      <IconoCandado className="h-3 w-3" />
+                                      Agregar fotos
+                                    </span>
+                                  ) : (
+                                    <SelectorArchivo
+                                      etiqueta="Agregar fotos"
+                                      cargando={subiendo}
+                                      multiple
+                                      onChange={(e) => agregarImagenesAGaleria(seccion.id, e)}
+                                    />
+                                  )}
+                                  {Number.isFinite(tope) && (
+                                    <span className="numeros-tabulares text-xs text-gris-calido-500">
+                                      {cantidad} / {tope}
+                                    </span>
+                                  )}
+                                </div>
+                                {enElTope && (
+                                  <p className="text-xs text-gris-calido-500">
+                                    Llegaste al máximo de fotos de tu plan ({tope}). El plan Estudio no tiene tope.
+                                  </p>
+                                )}
+                                {avisoLimiteFotos && (
+                                  <p className="text-xs text-cobre-texto">{avisoLimiteFotos}</p>
+                                )}
+                              </div>
+                            )
+                          })()}
                         </div>
                       )}
 
@@ -1615,21 +1704,17 @@ export function PanelPersonalizacion() {
               )
             })}
 
-            <div className="flex gap-3">
-              <button
-                type="button"
+            <div className="flex flex-wrap gap-3">
+              <BotonAgregarSeccion
+                etiqueta="Galería de fotos"
+                disponible={seccionDisponibleParaPlan('galeria', planId)}
                 onClick={() => agregarSeccion('galeria')}
-                className="versalitas rounded-md border border-gris-calido-200 px-3 py-2 text-xs text-gris-calido-700 hover:border-cobre hover:text-cobre-texto"
-              >
-                + Galería de fotos
-              </button>
-              <button
-                type="button"
+              />
+              <BotonAgregarSeccion
+                etiqueta="Imagen y texto"
+                disponible={seccionDisponibleParaPlan('imagen_texto', planId)}
                 onClick={() => agregarSeccion('imagen_texto')}
-                className="versalitas rounded-md border border-gris-calido-200 px-3 py-2 text-xs text-gris-calido-700 hover:border-cobre hover:text-cobre-texto"
-              >
-                + Imagen y texto
-              </button>
+              />
               {/* Normalmente ya existe una (se agrega sola la primera vez que
                   se carga esta pantalla) — este botón solo hace falta si se
                   la borró a propósito y se quiere volver a mostrar el equipo. */}
@@ -1654,13 +1739,11 @@ export function PanelPersonalizacion() {
                   + Horario de atención
                 </button>
               )}
-              <button
-                type="button"
+              <BotonAgregarSeccion
+                etiqueta="Testimonios"
+                disponible={seccionDisponibleParaPlan('testimonios', planId)}
                 onClick={() => agregarSeccion('testimonios')}
-                className="versalitas rounded-md border border-gris-calido-200 px-3 py-2 text-xs text-gris-calido-700 hover:border-cobre hover:text-cobre-texto"
-              >
-                + Testimonios
-              </button>
+              />
             </div>
               </>
             )}

@@ -5,19 +5,19 @@ import { AnimatedNumber } from '../../../components/animations/AnimatedNumber'
 import { formatoCLP } from '../../../utils/formatos'
 
 const PLANES = [
-  { clave: 'solo', nombre: 'Solo', precio: 5000, destacado: false },
   { clave: 'equipo', nombre: 'Equipo', precio: 6000, destacado: true },
   { clave: 'estudio', nombre: 'Estudio', precio: 7000, destacado: false },
 ]
 
 const FILAS = [
-  { etiqueta: 'Barberos', solo: '1', equipo: 'Hasta 3', estudio: 'Ilimitados' },
-  { etiqueta: 'Página propia', solo: true, equipo: true, estudio: true },
-  { etiqueta: 'Reservas ilimitadas', solo: true, equipo: true, estudio: true },
-  { etiqueta: 'Notificación por correo', solo: true, equipo: true, estudio: true },
-  { etiqueta: 'Notificación automática por WhatsApp', solo: false, equipo: true, estudio: true },
-  { etiqueta: 'Ofertas ilimitadas', solo: false, equipo: true, estudio: true },
-  { etiqueta: 'Personalización de marca', solo: false, equipo: false, estudio: true },
+  { etiqueta: 'Barberos', equipo: 'Hasta 3', estudio: 'Ilimitados' },
+  { etiqueta: 'Página propia', equipo: true, estudio: true },
+  { etiqueta: 'Reservas ilimitadas', equipo: true, estudio: true },
+  { etiqueta: 'Ofertas ilimitadas', equipo: true, estudio: true },
+  { etiqueta: 'Galería de fotos', equipo: 'Hasta 6', estudio: 'Ilimitada' },
+  { etiqueta: 'Imagen y texto, testimonios', equipo: false, estudio: true },
+  { etiqueta: 'Notificación por correo y WhatsApp', equipo: false, estudio: true },
+  { etiqueta: 'Soporte prioritario', equipo: false, estudio: true },
 ]
 
 function Marca({ valor }) {
@@ -37,7 +37,7 @@ export function Pricing() {
       <div className="grid grid-cols-12 gap-x-6">
         <div className="col-span-12 mb-10 md:col-span-2 md:mb-0">
           <ScrollReveal>
-            <span className="versalitas text-xs text-gris-calido-500">— 04 / Planes</span>
+            <span className="versalitas text-xs text-gris-calido-500">— 05 / Planes</span>
           </ScrollReveal>
         </div>
 

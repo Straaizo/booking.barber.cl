@@ -10,7 +10,7 @@ export function PhoneMockup({ children }) {
       {/* flex, no bloque simple: un hijo con altura porcentual (100%) no se
           estira contra un padre cuyo alto viene solo de min-h — con flex sí,
           el motor de flexbox reparte el espacio libre respetando el piso. */}
-      <div className="relative flex min-h-[28rem] flex-col overflow-hidden rounded-[2rem] bg-hueso md:min-h-[31rem]">
+      <div className="relative flex min-h-[20rem] flex-col overflow-hidden rounded-[2rem] bg-hueso md:min-h-[22rem]">
         {children}
       </div>
     </div>

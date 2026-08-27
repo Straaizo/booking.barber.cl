@@ -20,6 +20,7 @@ import { PanelSuperadminLayout } from '../pages/panel/PanelSuperadminLayout'
 import { PanelSuperadminBarberias } from '../pages/panel/PanelSuperadminBarberias'
 import { PanelSuperadminBarberiaDetalle } from '../pages/panel/PanelSuperadminBarberiaDetalle'
 import { PanelSuperadminPlanes } from '../pages/panel/PanelSuperadminPlanes'
+import { PanelSuperadminNovedades } from '../pages/panel/PanelSuperadminNovedades'
 import { ROL_BARBERO, ROL_ADMIN, ROL_SUPERADMIN } from '../utils/roles'
 
 // Cualquiera que ya tenga guardado un link viejo con el prefijo (compartido
@@ -101,6 +102,7 @@ const router = createBrowserRouter([
           { index: true, element: <PanelSuperadminBarberias /> },
           { path: 'barberias/:id', element: <PanelSuperadminBarberiaDetalle /> },
           { path: 'planes', element: <PanelSuperadminPlanes /> },
+          { path: 'novedades', element: <PanelSuperadminNovedades /> },
         ],
       },
     ],

@@ -178,12 +178,21 @@ export function LiveDemo() {
     <section
       id="como-funciona"
       ref={contenedorRef}
-      className="bg-gris-calido-100 px-6 py-20 md:px-10 md:py-28"
+      className="relative overflow-hidden bg-gris-calido-100 px-6 py-16 md:px-10 md:py-24"
     >
-      <SectionRule indice="— 01" texto="Así se ve, de verdad" tono="oscuro" />
+      <SectionRule indice="— 02" texto="Así se ve, de verdad" tono="oscuro" />
 
       <div className="mt-14 grid grid-cols-1 items-center gap-12 md:grid-cols-2 md:gap-16">
-        <div className="order-2 md:order-1">
+        <div className="relative order-2 md:order-1">
+          {/* Mismo acento que ya usa el header de cada barbería (radial de
+              --color-cobre detrás del logo) — sin esto, el celular quedaba
+              flotando solo en un fondo plano sin ningún color de marca
+              alrededor. */}
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute left-1/2 top-1/2 h-80 w-80 -translate-x-1/2 -translate-y-1/2 rounded-full opacity-25 blur-3xl"
+            style={{ background: 'radial-gradient(circle, var(--color-cobre) 0%, transparent 70%)' }}
+          />
           <PhoneMockup>
             {/* Las 5 pantallas viven todas montadas, apiladas en la misma celda
                 de grid ([grid-area:1/1]) — así el contenedor mide, desde el

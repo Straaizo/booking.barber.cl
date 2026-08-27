@@ -12,7 +12,7 @@ import { linkWhatsApp, linkGoogleMaps, formatoCLP, ofertaVigente } from '../../.
 import { asegurarFuenteCargada, pilaFuente } from '../../../utils/fuentes'
 import { usePrefersReducedMotion } from '../../../hooks/usePrefersReducedMotion'
 import { ordenarEquipo } from '../../../utils/personalizacion'
-import { puedePersonalizarSecciones } from '../../../utils/planes'
+import { seccionDisponibleParaPlan } from '../../../utils/planes'
 import { resumenHorarioSemanal } from '../../../utils/horarios'
 
 // Grilla editorial, no una fila de fotos del mismo tamaño: las fotos
@@ -830,12 +830,15 @@ function SeccionServicios({ servicios, esOscuro }) {
 export function VistaBarberia({ barberia }) {
   const personalizacion = barberia.personalizacion ?? {}
   const inicial = barberia.nombre.trim().charAt(0).toUpperCase()
-  // Galería, imagen+texto y equipo son una función del plan Equipo hacia
-  // arriba (ver PanelPersonalizacion.jsx) — se vuelve a chequear acá, no solo
-  // en el panel de edición: si una barbería baja de plan, sus secciones ya
-  // guardadas dejan de mostrarse en la página pública de inmediato, sin
-  // depender de que alguien vuelva a guardar el formulario.
-  const secciones = puedePersonalizarSecciones(barberia.plan_id) ? personalizacion.secciones ?? [] : []
+  // Equipo/horario son del plan Equipo hacia arriba; galería/imagen y
+  // texto/testimonios son exclusivas de Estudio (ver `utils/planes.js`) —
+  // se vuelve a chequear acá, no solo en el panel de edición: si una
+  // barbería baja de plan, las secciones que ya no le corresponden dejan de
+  // mostrarse en la página pública de inmediato, sin depender de que
+  // alguien vuelva a guardar el formulario.
+  const secciones = (personalizacion.secciones ?? []).filter((s) =>
+    seccionDisponibleParaPlan(s.tipo, barberia.plan_id)
+  )
   const fuenteElegida = personalizacion.fuente_display || 'fraunces'
   const esOscuro = personalizacion.tema === 'oscuro'
   // La vista previa en vivo del panel (ver PreviewBarberia.jsx) renderiza
