@@ -4246,3 +4246,215 @@ La identidad básica (color de marca, color de header, tipografía del nombre, t
 - `src/pages/Home/Home.jsx` (orden de secciones).
 
 **Pendiente / próximos pasos:** los mismos de siempre.
+
+---
+
+## 2026-08-27 (53) - Se revirtió el tamaño del teléfono + bug real de hover encontrado y arreglado en el FAQ
+
+**Qué se hizo:** Enzo reportó 2 cosas: el teléfono de "Así se ve, de verdad" quedó mucho más chico sin que lo pidiera (efecto secundario de la entrada 51, al bajar el piso de altura de `PhoneMockup.jsx` para resolver lo de "se ve plana"), y el FAQ de la entrada 52 no avanzaba solo en la práctica.
+
+**Teléfono:** revertido a su tamaño original (`min-h-[28rem] md:min-h-[31rem]`, entrada 51 lo había bajado a `20rem`/`22rem`). El acento de color detrás del teléfono (lo que sí se pidió, atacar "sin colores de marca") se mantiene sin cambios.
+
+**FAQ — bug real, no ambiental:** se le preguntó a Enzo para descartar 2 hipótesis (mouse descansando sobre las preguntas vs. "reducir movimiento" activado en Windows) — confirmó que era el mouse. El bug: `onAbrir` pausaba el autoplay apenas el mouse entraba en CUALQUIER fila, incluida la que el autoplay ya tenía abierta — que es justo donde el mouse de alguien leyendo esa pregunta va a estar la mayor parte del tiempo. En la práctica, apenas la persona empezaba a leer, quedaba congelado ahí para siempre (hasta sacar el mouse de toda la columna de preguntas), dando la sensación de que "no se mueve sola".
+
+**Fix:** `onAbrir` ahora no hace nada si `indice === indiceAuto` — pasar el mouse por la pregunta que YA está mostrando el autoplay es un no-op (no hay nada que pausar, es redundante). Solo pausa y cambia de pregunta al pasar el mouse a una DISTINTA de la que se está mostrando — que es la señal real de "quiero ver esta otra", tal como se pidió originalmente.
+
+**Cómo se probó:** Playwright reproduciendo el escenario exacto reportado — mouse quieto sobre la pregunta 1 (ya abierta) desde el principio, sin moverse en ningún momento: confirmado que igual avanza a la 2 a los ~4.3s y a la 3 a los ~8.6s. Antes del fix este mismo escenario la habría dejado pegada en la 1 para siempre. `npm run lint` y `npm run build` limpios.
+
+**Archivos afectados:**
+- `src/components/common/PhoneMockup.jsx` (tamaño revertido).
+- `src/pages/Home/components/FAQ.jsx` (fix del hover).
+
+**Pendiente / próximos pasos:** los mismos de siempre.
+
+---
+
+## 2026-08-27 (54) - "¿Puedo probarlo antes de pagar?" reemplazada por 2 preguntas sobre funciones reales
+
+**Qué se hizo:** Enzo quería sacar la pregunta de "probarlo antes de pagar" y mostrar en su lugar funciones reales de la app — ofertas, precios, horarios. Se le dieron 3 ideas concretas (ofertas y descuentos, horarios por barbero, varios barberos sin choques) sin repetir "cambiar precios" porque esa ya la cubre la pregunta 3; eligió agregar las de ofertas y horarios, ambas.
+
+**Fix:** la pregunta se reemplazó por 2 nuevas, redactadas contra funciones reales del código (no inventadas): "¿Puedo hacer ofertas o descuentos?" (`precio_oferta`/`oferta_activa`/`oferta_vence` en `servicios`, ya usado en la vidriera pública) y "¿Puedo manejar los horarios de cada barbero?" (`horarios_disponibles` + `excepciones_horario` por barbero, confirmados en `PanelHorarios.jsx`). El FAQ pasa de 5 a 6 preguntas.
+
+**Cómo se probó:** Playwright — confirmadas las 6 preguntas en el orden correcto, captura de pantalla completa del landing revisada. `npm run lint` y `npm run build` limpios.
+
+**Archivos afectados:**
+- `src/pages/Home/components/FAQ.jsx` (2 preguntas nuevas en vez de "probarlo antes de pagar").
+
+**Pendiente / próximos pasos:** los mismos de siempre.
+
+---
+
+## 2026-08-27 (55) - Preguntas del FAQ reordenadas por importancia
+
+**Qué se hizo:** Enzo pidió reordenar las 6 preguntas del FAQ por nivel de importancia/criterio. Se aplicó un criterio de "objeción más fuerte primero": primero lo que quita la barrera de entrada (instalar algo, crear cuenta — fricción real de adopción), después el miedo a quedar atado a la plataforma (dejar de pagar — un temor de compromiso que puede frenar la decisión), luego autonomía (cambiar precios — importante pero no un freno real), y al final las funciones que suman valor sin ser objeciones (ofertas, horarios por barbero).
+
+**Fix:** único cambio real, "¿Qué pasa si dejo de pagar?" subió del puesto 4 al 3, delante de "¿Puedo cambiar mis precios yo mismo?" — el resto del orden ya calzaba con este criterio.
+
+**Cómo se probó:** `npm run lint` y `npm run build` limpios; el orden se verificó leyendo el array `PREGUNTAS` directamente.
+
+**Archivos afectados:**
+- `src/pages/Home/components/FAQ.jsx` (orden del array `PREGUNTAS`).
+
+**Pendiente / próximos pasos:** los mismos de siempre.
+
+---
+
+## 2026-08-27 (56) - "Tu equipo, su panel" reconstruida contra el panel real (no un sidebar inventado)
+
+**Qué se hizo:** Enzo notó que el mockup de "Tu equipo, su panel" en el landing no se parecía en nada al panel administrativo real — se estaba vendiendo una imagen del producto que no es la que el dueño termina usando. Pidió revisar el código real y replicarlo exactamente.
+
+**Diagnóstico:** el mockup viejo (`TeamPanels.jsx`) inventaba una barra lateral oscura de navegación (`w-36 bg-negro-barbero` con los links apilados verticalmente) — ese patrón **no existe en ningún lugar de la app real**. El panel de verdad (`PanelShell.jsx`) usa una barra superior oscura (marca + usuario + "Cerrar sesión") y debajo una fila de pestañas blancas con subrayado cobre — mismo patrón que ya se usa en Personalización, Servicios, etc. El contenido de "Reservas" tampoco calzaba: el mockup mostraba una lista plana de 3 filas; el real (reconstruido en las entradas 36-44 de esta misma bitácora) es un layout de 2 columnas — lista con estadísticas (Ingreso del día / Reservas esta semana) a la izquierda, calendario semanal tipo Google Calendar a la derecha.
+
+**Fix:** se tomaron capturas reales del panel (`/panel/reservas` con la cuenta de prueba `jluis`) como referencia directa, y se reconstruyeron ambos mockups desde cero:
+- Nuevo `EncabezadoPanelMock` compartido: header oscuro + fila de pestañas blancas real (con la pestaña correcta marcada activa según qué contenido se muestra — antes ni existía esta lógica).
+- `MockupDueno`: título "Reservas" + botones píldora "Reservas del día"/"Canceladas" + tarjeta de lista (día, "N reserva(s)", Ingreso del día, Reservas esta semana, fila de reserva con Editar/Cancelar) + `MiniCalendario`, una versión reducida (4 horas en vez de ~13) del calendario semanal real de `CalendarioReservas.jsx`, con el mismo bloque de color por barbero.
+- `MockupBarbero`: "Mis horarios" con la misma tarjeta real de `FilaHorario.jsx` (Día + interruptor Activo + Desde/Hasta) y la misma tarjeta de `ExcepcionesHorario.jsx` (borde sólido, no punteado como antes) con una excepción de ejemplo.
+
+**Cómo se probó:** Playwright — capturas de ambas vistas ("Tu vista"/"La de cada barbero") comparadas contra las capturas reales del panel; confirmado que la pestaña activa corresponde al contenido mostrado (antes de un ajuste, "La de cada barbero" marcaba "Reservas" activa mientras mostraba "Mis horarios" — se corrigió pasando `activaIndice` explícito por mockup); verificado en mobile que el calendario se oculta con `hidden sm:block` sin overflow ni layout roto. `npm run lint` y `npm run build` limpios.
+
+**Archivos afectados:**
+- `src/pages/Home/components/TeamPanels.jsx` (reescrito completo: `EncabezadoPanelMock`, `MiniCalendario`, `MockupDueno`, `MockupBarbero`).
+
+**Pendiente / próximos pasos:** los mismos de siempre.
+
+---
+
+## 2026-08-27 (57) - Nombre real de Enzo colado en el mockup de "Tu equipo, su panel"
+
+**Qué se hizo:** al reconstruir la entrada 56 contra una captura real del panel (`jluis`), la fila de reserva de ejemplo copió el nombre del cliente de esa reserva real de prueba: "Enzo Sabattini" — el nombre real de Enzo terminó mostrándose en el landing público como si fuera un cliente ficticio. Lo pidió sacar porque el contenido de esta sección es una demo, no debería mostrar datos reales de nadie.
+
+**Fix:** se reemplazó por "Matías Rojas" — mismo nombre ficticio que ya usa `LiveDemo.jsx` en su propia simulación de reserva, así los dos mockups del landing quedan consistentes entre sí en vez de inventar un nombre distinto de la nada.
+
+**Cómo se probó:** `npm run lint` y `npm run build` limpios; se revisó el archivo completo de nuevo para confirmar que no quedaba ningún otro dato personal real de Enzo (solo queda "Miguel Diaz", un barbero de prueba de la cuenta — no es el nombre de Enzo, no se tocó).
+
+**Archivos afectados:**
+- `src/pages/Home/components/TeamPanels.jsx` (nombre del cliente de ejemplo).
+
+**Pendiente / próximos pasos:** los mismos de siempre.
+
+---
+
+## 2026-08-27 (58) - Ícono de Instagram en el header + botón de fundadora enlaza a la publicación real
+
+**Qué se hizo:** Enzo pidió agregar un ícono de Instagram enlazando al perfil (pidiendo mi recomendación de dónde ponerlo) y que el botón "Quiero ser barbería fundadora" enlace a la publicación real de Instagram sobre el programa, en vez de saltar a Planes. Pasó las 2 URLs reales — no se inventó ninguna.
+
+**Dónde se puso:** en el header (`Header.jsx`), al lado de "Planes" — es el único otro elemento que ya vive ahí, mismo nivel jerárquico, no compite con nada.
+
+**Fix:**
+- Nuevo `IconoInstagram.jsx` en `components/common/` (mismo patrón de SVG a mano que `IconoX`/`IconoCandado` — nada de librería de íconos): cuadrado redondeado + lente + punto de flash.
+- `Header.jsx`: el ícono enlaza a `https://www.instagram.com/booking.barber.cl`, `target="_blank"` + `rel="noreferrer"` (enlace externo, pestaña nueva).
+- `FounderSpots.jsx`: el botón "Quiero ser barbería fundadora" cambió de `href="#planes"` a `https://www.instagram.com/p/Dcg1LIKKql5/` (se sacó el parámetro `?igsi=...` de la URL que pasó Enzo — es un parámetro de sesión/tracking de Instagram, no hace falta para que el link funcione), también en pestaña nueva.
+
+**Cómo se probó:** Playwright — confirmado que el ícono del header apunta al perfil con `target="_blank"`, y que el botón de fundadora apunta a la publicación real con `target="_blank"`. Captura de pantalla del header confirmando que el ícono se ve discreto y coherente con el resto del sitio. `npm run lint` y `npm run build` limpios.
+
+**Archivos afectados:**
+- `src/components/common/IconoInstagram.jsx` (nuevo).
+- `src/components/layout/Header.jsx` (ícono + link).
+- `src/pages/Home/components/FounderSpots.jsx` (destino del botón).
+
+**Pendiente / próximos pasos:** los mismos de siempre.
+
+---
+
+## 2026-08-27 (59) - Header: se saca "Planes", ícono de Instagram más grande, se agrega WhatsApp; contraste real en la sección Planes
+
+**Qué se hizo:** Enzo pidió sacar "Planes" del header, agrandar el ícono de Instagram, y agregar WhatsApp en su lugar (con el número real 4178 1505). Además, notó que sin "Planes" en el header, y con Novedades todavía sin usar (no hay contenido real cargado, así que no se renderiza), la sección "Planes" quedaba pegada directo a "Tu equipo, su panel" sin ningún quiebre visual — pidió darle el mismo color que la sección "— 02" para que se note la separación.
+
+**Header (`Header.jsx`):** se sacó el link "Planes"; Instagram subió de `h-5 w-5` a `h-7 w-7`; nuevo ícono de WhatsApp al lado (mismo trazo que ya usa `BurbujaWhatsApp` en `VistaBarberia.jsx` — se extrajo a un `IconoWhatsApp.jsx` compartido en `components/common/`, para no repetir el mismo SVG dos veces en el código). El número no se hardcodeó a mano: se encontró que el footer (`Footer.jsx`) ya arma su propio link de WhatsApp desde una variable de entorno (`VITE_WHATSAPP_CONTACTO`, ya cargada con el número real que pasó Enzo) — el header reusa esa misma variable, una sola fuente de verdad en vez de duplicar el número en el código.
+
+**Planes (`Pricing.jsx`):** el `<section id="planes">` pasó de fondo transparente (heredaba el `bg-hueso` de la página) a `bg-gris-calido-100` — el mismo tono que ya usa "— 02 Así se ve, de verdad". Nota explícita en el comentario de por qué: es un parche mientras Novedades no tenga contenido real y no aparezca entre medio.
+
+**Cómo se probó:** Playwright — confirmado que "Planes" ya no aparece dentro del `<header>`, que el link de WhatsApp arma la URL real con el número del `.env`, y que el fondo computado de `#planes` (`rgb(233, 228, 217)`) coincide exactamente con `--color-gris-calido-100`. Captura de pantalla del header (ambos íconos, tamaño parejo) y de la sección Planes (contraste visible contra "Tu equipo, su panel"). `npm run lint` y `npm run build` limpios.
+
+**Archivos afectados:**
+- `src/components/common/IconoWhatsApp.jsx` (nuevo).
+- `src/components/layout/Header.jsx` (sin "Planes", Instagram más grande, WhatsApp nuevo desde `.env`).
+- `src/pages/Home/components/Pricing.jsx` (fondo `bg-gris-calido-100`).
+
+**Pendiente / próximos pasos:** cuando Novedades tenga contenido real y empiece a mostrarse entre "Tu equipo, su panel" y "Planes", reevaluar si el fondo de Planes todavía hace falta o si ya alcanza con el quiebre que aporta Novedades en el medio. Los mismos pendientes de siempre.
+
+---
+
+## 2026-08-28 (60) - Primer deploy a Vercel + favicon y título nuevos
+
+**Qué se hizo:** Enzo pidió ayuda para subir el proyecto a Vercel por primera vez, y de paso reemplazar el favicon (uno morado genérico, sin relación con la marca — probablemente quedó del scaffold inicial) y el título de la pestaña.
+
+**Deploy a Vercel:**
+- Se agregó `vercel.json` con un rewrite (`/(.*)` → `/index.html`) — necesario porque React Router maneja las rutas en el cliente; sin esto, entrar directo a una URL como `/panel/reservas` o `/mi-barberia` en producción daría 404.
+- `.vercel` se agregó a `.gitignore` (contiene IDs de proyecto/organización, no debe versionarse).
+- Enzo corrió el login y el primer deploy desde su propia cuenta (correcto — no es algo que debiera hacer por él). Una vez enlazado el proyecto (`.vercel/project.json` ya presente), se cargaron las 3 variables de entorno reales (`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `VITE_WHATSAPP_CONTACTO`, los mismos valores que ya tenía en su `.env` local) en los 3 ambientes (production/preview/development) vía `vercel env add`, y se forzó un redeploy a producción (`vercel --prod`) para que el build las tomara — el primer deploy se había hecho sin ellas.
+- **Encontrado al verificar:** el deploy quedó detrás de un login de Vercel ("Deployment Protection"), no de la app — probablemente heredado del plan de equipo. Se le explicó a Enzo que esto bloquearía a sus clientes reales una vez que el sitio sea público, y se le pidió revisar `Settings → Deployment Protection` en el dashboard (no es ajustable por CLI) y cambiarlo a "Only Preview Deployments" o desactivarlo — pendiente de confirmación de Enzo.
+
+**Favicon y título:**
+- Nuevo `public/favicon.svg`: cuadrado redondeado en `--color-cobre` (#a85c32) con una "b" minúscula itálica en `--color-hueso` (#f3eee3) — mismo lenguaje que ya usa el logotipo "booking.barber.cl" en toda la página (serif itálica), en vez del ícono morado genérico de antes. Probado a tamaño real de pestaña (32px) con Playwright — legible.
+- `index.html`: `<title>` de "booking.barber.cl" a "Booking Barber - Sistema de reservas".
+
+**Cómo se probó:** build limpio confirmado después de cada cambio; favicon renderizado a tamaño grande y a tamaño de pestaña real vía Playwright; título de la pestaña confirmado en el navegador. El deploy en sí no se pudo verificar en vivo con Playwright por el "Deployment Protection" (ver arriba) — queda pendiente una vez Enzo lo desactive.
+
+**Archivos afectados:**
+- `vercel.json` (nuevo).
+- `.gitignore` (`.vercel`).
+- `public/favicon.svg`, `index.html`.
+
+**Pendiente / próximos pasos:** Enzo debe revisar/desactivar "Deployment Protection" en el dashboard de Vercel para que el sitio sea público de verdad; avisar cuando lo haga para verificar el deploy en vivo con Playwright. Los mismos pendientes de siempre.
+
+---
+
+## 2026-08-28 (61) - El hero en mobile: ilustración estática flotando + Safari mostrando su propia advertencia por el 3D
+
+**Qué se hizo:** Enzo probó el sitio en su iPhone 12 real y reportó 2 problemas serios: (1) el modelo 3D del hero corre ~3 segundos con un lag notorio (bajando de ~60 a ~5 fps) y recién ahí cae al respaldo estático, que además "sale al aire" (se ve flotando); (2) Safari mismo muestra una advertencia nativa de que la página no se muestra correctamente.
+
+**Bug 1 — la ilustración estática "flotaba":** `HeroScene3D.jsx` usa la misma caja (`CAJA`) tanto para el `<Canvas>` 3D como para el SVG de respaldo, con `items-center` para centrar verticalmente. El `<Canvas>` siempre ocupa el 100% de esa caja (la alineación no le afecta), pero el SVG estático (`StaticBarberPoleIllustration.jsx`) es de alto fijo y trae su propia sombra "de apoyo" pegada a la base de su propio dibujo — centrarlo en una caja alta dejaba esa sombra flotando a la mitad en vez de tocando el piso. Fix: `items-center` → `items-end`.
+
+**Bug 2 (el más serio) — Safari advirtiendo sobre la página:** que el navegador mismo muestre una advertencia nativa no es "un poco lento", es una señal real de inestabilidad de WebGL en mobile — y esto pasó **con el modo `liviano` ya activado** (dpr tope 1, sin sombra, menos luces — `useIsMobile()` se confirmó funcionando bien). Un iPhone 12 es un equipo perfectamente capaz; no vale la pena arriesgar esa advertencia — que un visitante real puede leer como "este sitio está roto" — por un modelo 3D decorativo en el hero.
+
+**Fix:** `HeroScene3D.jsx` ahora fuerza la ilustración estática también cuando `isMobile` es `true` (antes solo se decidía con la medición real de fps — deliberado en su momento, para no asumir de entrada que "mobile = equipo débil", pero la evidencia de un equipo real y capaz mostrando fallas cambia esa conclusión). En mobile, el `<Scene3DCanvas>` ya ni se monta: no hay intento de WebGL, no hay los ~3s de lag visible, no hay riesgo de la advertencia de Safari, y de paso se ahorra la descarga del bundle de three.js/r3f/drei y del `.glb` (1.48MB) que antes se pedían igual en mobile solo para descartarse a los pocos segundos.
+
+**Limpieza:** con `isMobile` cortando el camino antes de llegar a `Scene3DCanvas`, el prop `liviano` (que reducía dpr/luces/sombra para mobile) quedó sin ningún llamador que lo pase en `true` — código muerto. Se sacó por completo de `Scene3DCanvas.jsx`, que vuelve a sus valores "de escritorio" fijos (ya no hay rama mobile que necesite atender).
+
+**Cómo se probó:** Playwright con el dispositivo emulado `iPhone 12` (mismo user-agent/viewport que el equipo real de Enzo) — confirmado que en mobile hay **0** `<canvas>` en la página (el 3D nunca se intenta) y que la ilustración estática se muestra de entrada, con su sombra correctamente apoyada en la base, no flotando. En desktop (1280×900) se confirmó que el `<canvas>` 3D sigue montándose y renderizando normal — el cambio no afecta el desktop. `npm run lint` y `npm run build` limpios.
+
+**Archivos afectados:**
+- `src/components/animations/HeroScene3D.jsx` (`items-end`, `isMobile` fuerza estática).
+- `src/components/animations/Scene3DCanvas.jsx` (se sacó el prop `liviano`, código muerto).
+
+**Pendiente / próximos pasos:** ~~Enzo mandó una imagen de un ícono de logo... falta que pase el archivo~~ — Enzo reemplazó `public/favicon.svg` él mismo por una versión vectorizada real del isotipo (paths SVG propios, no texto con fuente) — ya no depende de que cargue ninguna fuente, se resolvió solo. Los mismos pendientes de siempre.
+
+---
+
+## 2026-08-28 (62) - En mobile, el hero queda solo con texto (sin 3D ni ilustración estática)
+
+**Qué se hizo:** conversando sobre la entrada anterior (61), Enzo preguntó si la idea era sacar el 3D de mobile en general — se le aclaró que el cambio fue solo para mobile, desktop sigue con el 3D intacto. Preguntó de dónde conseguir un video en loop del poste (para que mobile se sintiera "vivo" sin el riesgo del 3D real) — al no haber una fuente fácil para eso, prefirió simplificar: sacar también la ilustración estática en mobile, porque tampoco terminaba de sentirse parte de la identidad de la barbería ahí. El hero en mobile queda solo con el texto.
+
+**Fix:** `Hero.jsx` ahora decide con `useIsMobile()` si monta o no todo el bloque de `<HeroScene3D />` — en mobile, ese bloque ni se renderiza (antes era `HeroScene3D.jsx` el que decidía puertas adentro entre 3D e ilustración estática, con mobile siempre cayendo a la estática). Con eso, `HeroScene3D.jsx` quedó más simple: ya no necesita su propio chequeo de `isMobile` (nunca se monta en mobile, el filtro ya pasó en el padre) — solo decide entre 3D e ilustración estática por los 2 motivos que sí siguen siendo válidos en desktop: `prefers-reduced-motion` y un equipo de escritorio que mida fps bajo.
+
+**Cómo se probó:** Playwright con el dispositivo emulado `iPhone 12` — confirmado 0 `<canvas>` y 0 apariciones del SVG del poste (antes: 0 canvas pero el SVG sí aparecía). En desktop (1280×900), confirmado que el `<canvas>` 3D sigue montándose normal — sin cambios ahí. `npm run lint` y `npm run build` limpios.
+
+**Archivos afectados:**
+- `src/pages/Home/components/Hero.jsx` (gate de `isMobile` antes de montar el bloque del 3D/ilustración).
+- `src/components/animations/HeroScene3D.jsx` (se sacó el chequeo de `isMobile`, ya redundante).
+
+**Pendiente / próximos pasos:** los mismos de siempre.
+
+---
+
+## 2026-08-28 (63) - Carrusel de fondo con fotos reales para el hero en mobile
+
+**Qué se hizo:** siguiendo la entrada anterior (62), Enzo decidió que el hero en mobile no quedara solo con texto sobre negro — propuso un carrusel de fondo con fotos reales de barbería, difuminadas, con el mismo texto del hero encima. Pasó 4 fotos originales de cámara (`src/assets/inicio/login1.jpg` a `login4.jpg`, 3-8.8MB cada una, mezcla de orientación vertical/horizontal) — muy pesadas para mandarlas tal cual a mobile (habría recreado el mismo problema de peso que se acababa de resolver sacando el modelo 3D de 1.48MB).
+
+**Procesamiento de imágenes:** se instaló `sharp` de forma temporal (mismo criterio que con Playwright: instalar, usar, desinstalar) para redimensionar y comprimir las 4 fotos a `public/images/hero-movil/` — mismo patrón de carpeta que ya existe en `public/images/login/`. Cada foto se generó en WebP (calidad 62) y JPG de respaldo (calidad 68, mozjpeg), con el lado más largo topado a 1200px — de 3-8.8MB original a 24-97KB final. Los originales sin procesar quedan en `src/assets/inicio/` (no se importan en ningún componente, Vite no los empaqueta).
+
+**Componente nuevo:** `HeroFondoMovil.jsx`, en vez de reusar literalmente `useCarruselLogin.js` del login (que maneja desfase de texto/slogan por imagen, algo que acá no aplica — el texto del hero es siempre el mismo, no cambia por foto). Se armó una versión más simple, propia del hero: rotación automática cada 5s con framer-motion (crossfade), imágenes cargadas de a una (la primera con `fetchpriority="high"`, el resto recién en tiempo idle del navegador, mismo patrón de `useCarruselLogin`), respeta `prefers-reduced-motion`, y aplica `blur-md` + `scale-110` (el escalado evita que se noten los bordes transparentes que deja el blur) más un degradado oscuro (`from-negro-barbero/80 via-70% to-90%`) para que el texto siga legible encima, igual que antes sobre el fondo sólido.
+
+**Integración:** `Hero.jsx` monta `<HeroFondoMovil />` solo cuando `isMobile` es `true`, como capa `absolute inset-0 z-0` detrás de todo — el degradado decorativo cobre y el contenido de texto pasaron a `z-10` explícito para quedar siempre por encima.
+
+**Cómo se probó:** Playwright con `iPhone 12` — confirmado que las 4 imágenes del carrusel están montadas en el DOM (`bgImg: 4`) y que sigue en 0 el conteo de `<canvas>` (el 3D sigue sin intentarse en mobile). Capturas antes/después de un ciclo de rotación (5s) muestran el crossfade funcionando y el texto legible sobre cada foto. En desktop (1280×900) se confirmó que el `<canvas>` 3D sigue montado igual que siempre — el cambio no le afecta. `npm run lint` y `npm run build` limpios. `sharp` y Playwright se desinstalaron después, `git status` confirmado sin diffs en `package.json`/`package-lock.json`.
+
+**Archivos afectados:**
+- `public/images/hero-movil/{corte,herramientas,salon,sillon}.{webp,jpg}` (nuevos, optimizados).
+- `src/assets/inicio/login1.jpg` a `login4.jpg` (nuevos, originales sin procesar — no se compilan).
+- `src/pages/Home/data/heroFondoMovil.js` (nuevo, data de las 4 fotos + timings).
+- `src/pages/Home/components/HeroFondoMovil.jsx` (nuevo, el carrusel de fondo).
+- `src/pages/Home/components/Hero.jsx` (monta `HeroFondoMovil` en mobile, `z-10` explícito en el resto del contenido).
+
+**Pendiente / próximos pasos:** los mismos de siempre.

@@ -8,61 +8,148 @@ import { EASE_ENTRADA, DURACION_BASE } from '../../../components/animations/easi
 const NAV_DUENO = ['Reservas', 'Barberos', 'Servicios', 'Horarios', 'Personalización']
 const NAV_BARBERO = ['Reservas', 'Horarios', 'Servicios']
 
-const RESERVAS_DEMO = [
-  { id: 1, cliente: 'Matías Rojas', servicio: 'Corte + Barba', barbero: 'Javier Muñoz', precio: '$13.000', hora: '10:30' },
-  { id: 2, cliente: 'Ignacio Paredes', servicio: 'Corte clásico', barbero: 'Cristóbal Díaz', precio: '$8.000', hora: '11:15' },
-  { id: 3, cliente: 'Diego Fuentes', servicio: 'Afeitado', barbero: 'Javier Muñoz', precio: '$7.500', hora: '12:00' },
+const DIAS_SEMANA = [
+  { corto: 'LUN', num: 24 },
+  { corto: 'MAR', num: 25 },
+  { corto: 'MIÉ', num: 26 },
+  { corto: 'JUE', num: 27 },
+  { corto: 'VIE', num: 28 },
+  { corto: 'SÁB', num: 29 },
+  { corto: 'DOM', num: 30 },
 ]
+const HORAS_DEMO = ['09:00', '10:00', '11:00', '12:00']
+
+// Barra superior oscura + fila de pestañas blancas — el mismo cascarón real
+// de todo el panel (ver `PanelShell.jsx`), no una barra lateral inventada.
+// Antes esta sección mostraba un sidebar oscuro que no existe en ningún
+// lugar de la app real — la imagen que se vendía no era la que el dueño
+// termina usando.
+function EncabezadoPanelMock({ titulo, secciones, activaIndice }) {
+  return (
+    <>
+      <div className="flex items-center justify-between bg-negro-barbero px-4 py-2.5 text-hueso">
+        <div className="flex items-center gap-2 overflow-hidden">
+          <span className="font-display shrink-0 text-xs italic tracking-tight">
+            booking<span className="text-cobre">.</span>barber.cl
+          </span>
+          <span className="versalitas hidden truncate text-[9px] text-gris-calido-400 sm:inline">{titulo}</span>
+        </div>
+        <span className="versalitas shrink-0 rounded border border-gris-calido-700 px-2 py-1 text-[9px]">
+          Cerrar sesión
+        </span>
+      </div>
+      <div className="flex gap-4 overflow-x-auto border-b border-gris-calido-200 bg-white px-4">
+        {secciones.map((seccion, indice) => (
+          <span
+            key={seccion}
+            className={`versalitas whitespace-nowrap border-b-2 py-2.5 text-[10px] ${
+              indice === activaIndice ? 'border-cobre text-negro-barbero' : 'border-transparent text-gris-calido-500'
+            }`}
+          >
+            {seccion}
+          </span>
+        ))}
+      </div>
+    </>
+  )
+}
+
+// Línea de tiempo semanal — el mismo patrón real de `CalendarioReservas.jsx`
+// (columnas por día, filas por hora, bloques de color por barbero), reducido
+// a 4 horas para que quepa en una tarjeta chica en vez de las ~13 reales.
+function MiniCalendario() {
+  return (
+    <div className="hidden rounded-lg border border-gris-calido-200 bg-white p-3 sm:block">
+      <div className="flex items-center justify-between text-gris-calido-400">
+        <span>‹</span>
+        <span className="numeros-tabulares text-xs font-medium text-negro-barbero">24 – 30 Ago</span>
+        <span>›</span>
+      </div>
+      <div className="mt-3 grid grid-cols-[2.5rem_repeat(7,1fr)] overflow-hidden rounded border border-gris-calido-100">
+        <span className="border-b border-gris-calido-100 bg-white" />
+        {DIAS_SEMANA.map((dia) => (
+          <span
+            key={dia.corto}
+            className={`versalitas border-b border-l border-gris-calido-100 py-1.5 text-center text-[8px] ${
+              dia.corto === 'VIE' ? 'bg-cobre text-hueso' : 'text-gris-calido-600'
+            }`}
+          >
+            {dia.corto}
+          </span>
+        ))}
+        {HORAS_DEMO.map((hora, filaIndice) => (
+          <div key={hora} className="contents">
+            <span className="border-t border-gris-calido-100 px-1 py-2 text-right text-[8px] text-gris-calido-400">
+              {hora}
+            </span>
+            {DIAS_SEMANA.map((dia, colIndice) => (
+              <span key={dia.corto} className="relative border-t border-l border-gris-calido-100 py-2">
+                {colIndice === 4 && filaIndice === 2 && (
+                  <span className="absolute inset-x-0.5 inset-y-0.5 rounded-sm border-l-2 border-cobre bg-cobre/15" />
+                )}
+              </span>
+            ))}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
 
 function MockupDueno() {
   return (
     <div className="overflow-hidden rounded-2xl border border-gris-calido-200 bg-white shadow-sm">
-      <div className="flex">
-        <div className="hidden w-36 shrink-0 flex-col gap-1 bg-negro-barbero p-4 sm:flex">
-          <span className="versalitas mb-3 text-[10px] text-gris-calido-400">Tu barbería</span>
-          {NAV_DUENO.map((item, indice) => (
-            <span
-              key={item}
-              className={`rounded px-2.5 py-2 text-xs ${
-                indice === 0 ? 'bg-cobre-oscuro text-hueso' : 'text-gris-calido-200'
-              }`}
-            >
-              {item}
-            </span>
-          ))}
+      <EncabezadoPanelMock titulo="Panel de barbería" secciones={NAV_DUENO} activaIndice={0} />
+
+      <div className="bg-hueso p-4 md:p-5">
+        <h4 className="font-display text-lg font-light tracking-tight text-negro-barbero">Reservas</h4>
+
+        <div className="mt-3 flex gap-2">
+          <span className="versalitas rounded-full bg-cobre px-3 py-1.5 text-[9px] text-hueso">
+            Reservas del día
+          </span>
+          <span className="versalitas rounded-full bg-gris-calido-100 px-3 py-1.5 text-[9px] text-gris-calido-600">
+            Canceladas
+          </span>
         </div>
 
-        <div className="flex-1 p-5 md:p-7">
-          <h4 className="font-display text-lg font-light tracking-tight text-negro-barbero md:text-xl">
-            Reservas
-          </h4>
-          <p className="mt-1 text-xs text-gris-calido-500">
-            Todas las reservas de tu barbería, ordenadas por fecha.
-          </p>
+        <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
+          <div className="rounded-lg border border-gris-calido-200 bg-white p-4">
+            <div className="flex items-baseline justify-between gap-2">
+              <span className="text-sm font-semibold text-negro-barbero">Lunes, 24 de agosto</span>
+              <span className="versalitas shrink-0 text-[9px] text-gris-calido-500">1 reserva</span>
+            </div>
 
-          <div className="mt-4 flex flex-col">
-            {RESERVAS_DEMO.map((reserva) => (
-              <div
-                key={reserva.id}
-                className="grid grid-cols-[auto_1fr_auto] items-center gap-3 border-b border-gris-calido-100 py-3 text-sm first:border-t first:border-t-gris-calido-100"
-              >
-                <span className="numeros-tabulares text-gris-calido-500">{reserva.hora}</span>
-                <div className="min-w-0">
-                  <span className="block truncate font-medium text-negro-barbero">{reserva.cliente}</span>
-                  <span className="versalitas hidden text-[10px] text-gris-calido-500 sm:block">
-                    {reserva.servicio} · {reserva.barbero} · {reserva.precio}
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  tabIndex={-1}
-                  className="versalitas hidden shrink-0 text-[10px] text-red-700/70 underline decoration-red-700/30 md:inline"
-                >
-                  Cancelar
-                </button>
+            <div className="mt-3 flex items-baseline justify-between border-b border-gris-calido-100 pb-3">
+              <div>
+                <span className="versalitas block text-[8px] text-gris-calido-500">Ingreso del día</span>
+                <span className="numeros-tabulares text-sm font-medium text-negro-barbero">$10.000</span>
               </div>
-            ))}
+              <div className="text-right">
+                <span className="versalitas block text-[8px] text-gris-calido-500">Reservas esta semana</span>
+                <span className="numeros-tabulares text-sm font-medium text-negro-barbero">1</span>
+              </div>
+            </div>
+
+            <div className="mt-3 flex flex-col gap-1">
+              <div className="flex items-baseline justify-between">
+                <span className="numeros-tabulares text-xs font-medium text-negro-barbero">17:00</span>
+                <span className="numeros-tabulares text-[10px] text-gris-calido-500">$10.000</span>
+              </div>
+              <span className="text-xs font-medium text-negro-barbero">Matías Rojas</span>
+              <span className="versalitas text-[9px] text-gris-calido-500">Corte + Degradado · Miguel Diaz</span>
+              <div className="mt-1.5 flex items-center justify-between">
+                <span className="versalitas text-[9px] text-cobre-texto underline decoration-cobre-texto/40">
+                  Editar
+                </span>
+                <span className="versalitas text-[9px] text-red-700 underline decoration-red-700/40">
+                  Cancelar
+                </span>
+              </div>
+            </div>
           </div>
+
+          <MiniCalendario />
         </div>
       </div>
     </div>
@@ -72,57 +159,45 @@ function MockupDueno() {
 function MockupBarbero() {
   return (
     <div className="overflow-hidden rounded-2xl border border-gris-calido-200 bg-white shadow-sm">
-      <div className="flex">
-        <div className="hidden w-36 shrink-0 flex-col gap-1 bg-negro-barbero p-4 sm:flex">
-          <span className="versalitas mb-3 whitespace-nowrap text-[10px] text-gris-calido-400">
-            Panel de barbero
-          </span>
-          {NAV_BARBERO.map((item, indice) => (
-            <span
-              key={item}
-              className={`rounded px-2.5 py-2 text-xs ${
-                indice === 1 ? 'bg-cobre-oscuro text-hueso' : 'text-gris-calido-200'
-              }`}
-            >
-              {item}
-            </span>
-          ))}
+      <EncabezadoPanelMock titulo="Panel de barbero" secciones={NAV_BARBERO} activaIndice={1} />
+
+      <div className="bg-hueso p-4 md:p-5">
+        <h4 className="font-display text-lg font-light tracking-tight text-negro-barbero">Mis horarios</h4>
+
+        <div className="mt-4 rounded-lg border border-gris-calido-200 bg-white p-4">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <span className="versalitas text-[9px] text-gris-calido-500">Día</span>
+              <p className="text-sm font-medium text-negro-barbero">Lunes</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Interruptor activo onCambiar={() => {}} etiqueta="Bloque activo" />
+              <span className="versalitas text-[9px] text-gris-calido-500">Activo</span>
+            </div>
+          </div>
+          <div className="mt-3 grid grid-cols-2 gap-4 border-t border-gris-calido-100 pt-3">
+            <div>
+              <span className="versalitas block text-[9px] text-gris-calido-500">Desde</span>
+              <span className="numeros-tabulares text-sm text-negro-barbero">10:00</span>
+            </div>
+            <div>
+              <span className="versalitas block text-[9px] text-gris-calido-500">Hasta</span>
+              <span className="numeros-tabulares text-sm text-negro-barbero">19:00</span>
+            </div>
+          </div>
         </div>
 
-        <div className="flex-1 p-5 md:p-7">
-          <h4 className="font-display text-lg font-light tracking-tight text-negro-barbero md:text-xl">
-            Mis horarios
-          </h4>
-
-          <div className="mt-4 rounded-lg border border-gris-calido-200 p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <span className="versalitas text-[10px] text-gris-calido-500">Día</span>
-                <p className="text-sm font-medium text-negro-barbero">Lunes</p>
-              </div>
-              <Interruptor activo onCambiar={() => {}} etiqueta="Bloque activo" />
-            </div>
-            <div className="mt-3 flex gap-6 border-t border-gris-calido-100 pt-3">
-              <div>
-                <span className="versalitas block text-[10px] text-gris-calido-500">Desde</span>
-                <span className="numeros-tabulares text-sm text-negro-barbero">10:00</span>
-              </div>
-              <div>
-                <span className="versalitas block text-[10px] text-gris-calido-500">Hasta</span>
-                <span className="numeros-tabulares text-sm text-negro-barbero">19:00</span>
-              </div>
-            </div>
+        <div className="mt-3 rounded-lg border border-gris-calido-200 bg-white p-4">
+          <span className="versalitas text-[9px] text-gris-calido-500">Excepción para un día puntual</span>
+          <div className="mt-2 flex items-center justify-between rounded-md border border-gris-calido-100 px-3 py-2">
+            <span className="text-xs text-negro-barbero">Mañana — desde las 12:30 hasta las 19:00</span>
+            <span className="versalitas text-[9px] text-gris-calido-500">Quitar</span>
           </div>
+        </div>
 
-          <div className="mt-3 rounded-lg border border-dashed border-cobre/40 bg-cobre/5 px-4 py-3">
-            <span className="versalitas text-[10px] text-cobre-texto">Excepción — mañana</span>
-            <p className="mt-1 text-sm text-negro-barbero">desde las 12:30 hasta las 19:00</p>
-          </div>
-
-          <div className="mt-3 rounded-lg border border-gris-calido-200 px-4 py-3">
-            <span className="versalitas text-[10px] text-gris-calido-500">Intervalo entre reservas</span>
-            <p className="mt-1 text-sm font-medium text-negro-barbero">Cada 45 min</p>
-          </div>
+        <div className="mt-3 rounded-lg border border-gris-calido-200 bg-white p-4">
+          <span className="versalitas text-[9px] text-gris-calido-500">Intervalo entre reservas</span>
+          <p className="mt-1 text-sm font-medium text-negro-barbero">Cada 45 min</p>
         </div>
       </div>
     </div>

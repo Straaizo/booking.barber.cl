@@ -32,8 +32,12 @@ function Marca({ valor }) {
 }
 
 export function Pricing() {
+  // Mismo fondo que "— 02 Así se ve, de verdad" (`bg-gris-calido-100`) — sin
+  // esto, con Novedades todavía sin usar (no se renderiza sin contenido real
+  // cargado), Planes queda pegado directo a "Tu equipo, su panel" con el
+  // mismo fondo, sin ningún quiebre visual entre medio.
   return (
-    <section id="planes" className="px-6 py-20 md:px-10 md:py-28">
+    <section id="planes" className="bg-gris-calido-100 px-6 py-20 md:px-10 md:py-28">
       <div className="grid grid-cols-12 gap-x-6">
         <div className="col-span-12 mb-10 md:col-span-2 md:mb-0">
           <ScrollReveal>

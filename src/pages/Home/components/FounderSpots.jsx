@@ -61,7 +61,13 @@ export function FounderSpots() {
           </StaggerReveal>
 
           <ScrollReveal delay={0.2} className="mt-10">
-            <Button href="#planes">Quiero ser barbería fundadora</Button>
+            <Button
+              href="https://www.instagram.com/p/Dcg1LIKKql5/"
+              target="_blank"
+              rel="noreferrer"
+            >
+              Quiero ser barbería fundadora
+            </Button>
           </ScrollReveal>
         </div>
       </div>

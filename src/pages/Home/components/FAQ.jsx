@@ -19,19 +19,24 @@ const PREGUNTAS = [
       'No. Solo ingresan su nombre y celular al momento de reservar, nada más.',
   },
   {
-    pregunta: '¿Puedo cambiar mis precios yo mismo?',
-    respuesta:
-      'Sí. Tú y tus barberos pueden actualizar precios y ofertas cuando quieran, y se reflejan al instante en tu página pública.',
-  },
-  {
     pregunta: '¿Qué pasa si dejo de pagar?',
     respuesta:
       'Tu página se desactiva y tus clientes ven que no está disponible por ahora. Nada se borra — si vuelves, todo sigue donde lo dejaste.',
   },
   {
-    pregunta: '¿Puedo probarlo antes de pagar?',
+    pregunta: '¿Puedo cambiar mis precios yo mismo?',
     respuesta:
-      'Escríbenos y te mostramos tu página funcionando antes de que decidas — sin compromiso.',
+      'Sí. Tú y tus barberos pueden actualizar precios y ofertas cuando quieran, y se reflejan al instante en tu página pública.',
+  },
+  {
+    pregunta: '¿Puedo hacer ofertas o descuentos?',
+    respuesta:
+      'Sí, y sin límite. A cualquier servicio le pones un precio de oferta —con fecha de vencimiento si quieres— y en tu página se muestra el precio normal tachado al lado. Se activa y se desactiva cuando tú quieras.',
+  },
+  {
+    pregunta: '¿Puedo manejar los horarios de cada barbero?',
+    respuesta:
+      'Sí. Cada barbero configura sus propios horarios y sus días libres — si alguien no trabaja un feriado o se toma vacaciones, ese día simplemente no aparece disponible para reservar con él.',
   },
 ]
 
@@ -136,6 +141,13 @@ export function FAQ() {
               indice={indice}
               abierto={indiceAuto === indice}
               onAbrir={() => {
+                // Si el mouse queda descansando justo sobre la pregunta que
+                // el autoplay ya tiene abierta (lo más común: es la que la
+                // persona está leyendo), no hay nada que pausar — pausar acá
+                // significa que nunca avanza mientras alguien la esté
+                // leyendo. Solo pausa al pasar a una pregunta DISTINTA, que
+                // es la señal real de "quiero ver esta otra".
+                if (indice === indiceAuto) return
                 setIndiceAuto(indice)
                 setEnPausa(true)
               }}
