@@ -28,5 +28,5 @@ export const FONDOS_HERO_MOVIL = [
   },
 ]
 
-export const DURACION_FONDO_MS = 5000
+export const DURACION_FONDO_MS = 3500
 export const DURACION_TRANSICION_FONDO_MS = 1500

@@ -55,11 +55,11 @@ export function Hero() {
             transition={{ duration: 0.5, ease: EASE_ENTRADA }}
             className="versalitas mb-4 text-sm text-cobre-claro"
           >
-            Reservas online para barberías chilenas
+            Simple para ti, fácil para tus clientes
           </motion.p>
 
           <TextReveal
-            texto="Tu barbería, *con hora propia* en internet."
+            texto="Tu barbería, *con agenda y web única* en internet."
             as="h1"
             className="text-[2.6rem] font-light leading-[1.05] tracking-tight md:text-6xl"
           />
@@ -70,8 +70,9 @@ export function Hero() {
             transition={{ duration: 0.6, delay: 0.5, ease: EASE_ENTRADA }}
             className="mx-auto mt-6 max-w-lg text-gris-calido-200 md:mx-0 md:text-lg"
           >
-            Tu propia página, tus servicios, tus horarios, tus barberos. Sin apps que
-            instalar. Sin que la hora se te pierda en el chat de WhatsApp.
+            Tu propia página, tus servicios, tus horarios, tus barberos. 
+            Todo desde un mismo panel. Sin apps que
+            instalar. 
           </motion.p>
 
           <motion.div
