@@ -4510,3 +4510,34 @@ La identidad básica (color de marca, color de header, tipografía del nombre, t
 - Variables de entorno nuevas en Vercel: `SUPABASE_URL`, `SUPABASE_ANON_KEY` (sin prefijo `VITE_` — las funciones serverless no tienen `import.meta.env`, ese es un mecanismo de build-time de Vite para el bundle del navegador).
 
 **Pendiente / próximos pasos:** migrar a Next.js resolvería esto de forma NATIVA (metadata por ruta sin este puente de rewrites+User-Agent, generateMetadata server-side real, y de paso middleware real para redirigir barberías inactivas) — quedó fuera de alcance hoy a propósito (no se tocó lógica de negocio ni paneles). Confirmar en vivo con el Depurador de Facebook / WhatsApp real / Telegram cuando Enzo pueda. Simular Supabase caído en vivo si se quiere el test #11 con evidencia real, no solo revisión de código. Los mismos pendientes de siempre (Deployment Protection, migración de días máximos de reserva sin correr aún).
+
+---
+
+## 2026-09-01 (65) - robots.txt + sitemap.xml dinámico
+
+**Qué se hizo:** el dominio ya está verificado en Search Console pero faltaban los dos archivos que le dicen a Google qué rastrear. Advertencia importante que queda dicha acá y hay que recordar: el proyecto sigue siendo una SPA de Vite — Google recibe el `index.html` vacío y depende de ejecutar JavaScript para ver contenido real, cosa que hace pero de forma limitada e impredecible. `robots.txt`/`sitemap.xml` son necesarios y correctos, pero **no resuelven el SEO por sí solos** — el cuello de botella real es el renderizado en cliente. Lo mismo que ya quedó dicho en la entrada 64 sobre Next.js aplica acá.
+
+**`public/robots.txt`** (estático, no necesita generarse): permite todo por defecto, bloquea `/admin`, `/panel` (cubre también `/panel/barbero/*`, es match por prefijo), `/login`, `/_preview-barberia` (ruta interna de la vista previa del iframe, nunca pensada para visitarse directo) y `/api/`. Rutas confirmadas contra `src/routes/AppRouter.jsx` real, no inventadas. Apunta al sitemap con URL absoluta.
+
+**`api/sitemap.js`** (nueva función serverless, runtime Node — no 'edge'): arma el XML al momento consultando Supabase con la clave pública (misma política RLS `barberias_publico` que ya filtra `estado_id = 1` sola — igual razonamiento que en `api/meta.js`/entrada 64: es imposible que se cuele por error una barbería inactiva, RLS la excluye antes de que el código tenga oportunidad de filtrarla). Trae solo `slug, updated_at` (no la fila completa), con timeout de 4s vía `AbortController` — si Supabase no responde, `listarSlugsActivos()` devuelve `[]` y el sitemap sale igual, válido, con nada más que la home.
+
+`vercel.json` suma `{ "source": "/sitemap.xml", "destination": "/api/sitemap" }` — misma lección de la entrada 64: la función tuvo que quedar en runtime Node (no Edge), porque es DESTINO de un rewrite y un rewrite hacia una Edge Function se pierde en silencio (ver hallazgo 1 de esa entrada). No hizo falta redescubrir nada, se aplicó directo.
+
+**`lastmod`:** se usa el `updated_at` real de cada barbería, recortado a solo la fecha (`YYYY-MM-DD`). Si no hay `updated_at`, se omite esa etiqueta en vez de inventar una fecha — mismo criterio para la home (no se le puso una fecha inventada tampoco, aunque el formato de ejemplo del pedido sí traía una).
+
+**Cómo se probó (de las 8 pruebas pedidas):**
+- ✅ `robots.txt` sirve texto plano legible.
+- ✅ `sitemap.xml` sirve XML válido — confirmado estructura balanceada (prolog correcto, namespace correcto, tags `<url>` abren y cierran igual cantidad de veces) ya que no hay forma de abrir un validador interactivo desde acá; Enzo puede pasarlo por un validador en línea si quiere la confirmación visual.
+- ✅ Aparecen únicamente las 2 barberías activas reales hoy (`barberia-jose-luis`, `barberia-golden`) — confirmado contra la tabla real. **No probado en vivo**: suspender una desde el panel superadmin y confirmar que desaparece — la tarea pide explícitamente no tocar paneles ni la base, así que no se accionó un cambio de estado real sobre una barbería real para esta prueba. El comportamiento está garantizado por construcción (RLS), no por lógica de aplicación que se pueda desincronizar.
+- ✅ Ninguna ruta privada en el sitemap — por construcción, el código no tiene ningún camino que pueda emitir `/panel` o `/admin`.
+- ✅ SPA intacta y función de Open Graph sin cambios — confirmado con navegador real en `/`, una barbería real, `/panel`, y `/sitemap.xml`; `api/og` y `api/meta` siguen respondiendo igual que en la entrada 64.
+- ✅ Supabase caído/lento — a diferencia de la entrada 64 (donde quedó pendiente), esta vez SÍ se simuló en vivo: se agregó temporalmente un branch de depuración que apunta a una IP no enrutable (10.255.255.1) con el mismo patrón exacto de `AbortController`, se desplegó, se confirmó que tarda exactamente los 4000ms del timeout y responde 200 con el sitemap mínimo (nunca cuelga, nunca 500), y se sacó el branch de depuración antes de terminar.
+- ✅ Headers: `Content-Type: application/xml; charset=utf-8` correcto. `Cache-Control`: el valor que ve el cliente se simplifica a `public` (Vercel no reenvía `s-maxage`/`stale-while-revalidate` al navegador aunque sí los usa para su propia cache) — confirmado pidiendo la misma URL dos veces seguidas: la segunda vino con `X-Vercel-Cache: HIT` y `Age: 3`, prueba de que el `s-maxage=10800` sí se está respetando de verdad del lado del CDN, solo que no se lo muestra tal cual al cliente. Mismo comportamiento ya presente (sin que se hubiera notado) en `api/og.js` de la entrada 64 — no es un bug nuevo de hoy, es cómo Vercel maneja siempre esta cabecera.
+
+**Archivos afectados:**
+- `public/robots.txt` (nuevo).
+- `api/sitemap.js` (nuevo).
+- `api/_lib/supabase.js` (+ `listarSlugsActivos()`).
+- `vercel.json` (+ rewrite de `/sitemap.xml`).
+
+**Pendiente / próximos pasos:** confirmar con un validador de sitemaps en línea si Enzo quiere la vuelta visual. Probar en vivo el caso de suspender una barbería real y ver que desaparece del sitemap, cuando Enzo lo considere oportuno (no se hizo hoy por estar fuera del alcance pedido). Los mismos pendientes de siempre.

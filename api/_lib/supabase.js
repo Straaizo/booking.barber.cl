@@ -12,6 +12,7 @@ const cliente = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON
 })
 
 const TIMEOUT_MS = 2500
+const TIMEOUT_SITEMAP_MS = 4000
 
 // Nunca deja la consulta colgada: WhatsApp/Facebook abandonan la petición
 // de previsualización en pocos segundos, así que si Supabase no responde a
@@ -42,6 +43,30 @@ export async function buscarBarberiaPorSlug(slug) {
     }
   } catch {
     return null
+  } finally {
+    clearTimeout(temporizador)
+  }
+}
+
+// Para el sitemap: igual que arriba, la política `barberias_publico` (RLS)
+// ya filtra por `estado_id = 1` sola — nunca hay que acordarse de excluir a
+// mano una barbería inactiva/suspendida/pendiente, es imposible que se cuele
+// una por error. Nunca lanza: si Supabase no responde a tiempo o falla,
+// devuelve `[]` y quien llama arma un sitemap mínimo (solo la home) en vez
+// de colgar la respuesta o caer con un 500.
+export async function listarSlugsActivos() {
+  const controlador = new AbortController()
+  const temporizador = setTimeout(() => controlador.abort(), TIMEOUT_SITEMAP_MS)
+  try {
+    const { data, error } = await cliente
+      .from('barberias')
+      .select('slug, updated_at')
+      .abortSignal(controlador.signal)
+
+    if (error || !data) return []
+    return data
+  } catch {
+    return []
   } finally {
     clearTimeout(temporizador)
   }

@@ -1,0 +1,10 @@
+User-agent: *
+Allow: /
+
+Disallow: /admin
+Disallow: /panel
+Disallow: /login
+Disallow: /_preview-barberia
+Disallow: /api/
+
+Sitemap: https://bookingbarber.cl/sitemap.xml
