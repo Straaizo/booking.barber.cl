@@ -102,7 +102,7 @@ export function Cursor() {
     function alSalirDeUnElemento(evento) {
       if (evento.target.tagName === 'IFRAME') {
         sobreIframe.current = false
-        evento.target.contentWindow?.postMessage({ tipo: 'cursor-propio-fuera-de-vista' }, '*')
+        evento.target.contentWindow?.postMessage({ tipo: 'cursor-propio-fuera-de-vista' }, window.location.origin)
         return
       }
       // `relatedTarget` nulo en un `pointerout` significa que el puntero no

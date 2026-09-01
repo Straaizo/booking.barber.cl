@@ -4541,3 +4541,40 @@ La identidad básica (color de marca, color de header, tipografía del nombre, t
 - `vercel.json` (+ rewrite de `/sitemap.xml`).
 
 **Pendiente / próximos pasos:** confirmar con un validador de sitemaps en línea si Enzo quiere la vuelta visual. Probar en vivo el caso de suspender una barbería real y ver que desaparece del sitemap, cuando Enzo lo considere oportuno (no se hizo hoy por estar fuera del alcance pedido). Los mismos pendientes de siempre.
+
+**Actualización el mismo día:** el validador de sitemaps se corrió igual (instalé `fast-xml-parser` temporal, validó estricto: XML bien formado, namespace correcto, las 3 URLs esperadas, lo desinstalé después). El caso de suspender una barbería real SÍ se probó en vivo — Enzo suspendió `barberia-golden` desde el panel superadmin, se confirmó que desaparece del sitemap con un pedido que evita la caché (`?n=timestamp`), y se confirmó también contra la tabla real vía API pública que solo `barberia-jose-luis` sigue activa. Sin cambios de código, solo verificación.
+
+---
+
+## 2026-09-01 (66) - Revisión de ciberseguridad
+
+**Qué se pidió:** Enzo pidió una revisión general de seguridad — qué se puede ver desde la consola del navegador, proteger datos confidenciales de clientes, evitar backdoors, y si hace falta alguna política de lista negra de IPs en Supabase.
+
+**Hallazgo real, arreglado — abuso de costo en `api/og.js`:** cualquiera podía pedir `/api/og?slug=lo-que-sea` con un slug inventado y forzar un render completo de imagen (carga de fuente TTF + WASM de resvg) en cada intento, sin límite, variando el slug para nunca pegarle a la caché. Ahora un slug que no coincide con ninguna barbería real (`buscarBarberiaPorSlug` devuelve `null`) redirige (302) a `/api/og` sin slug — la imagen genérica, que sí converge en una sola URL cacheada fuerte. WhatsApp/Facebook/Twitter siguen el redirect sin problema (comportamiento estándar de esos rastreadores), un slug real no se ve afectado en nada.
+
+**Hallazgo menor, endurecido — `postMessage` con `'*'` como origen destino:** `PanelPersonalizacion.jsx` (2 lugares), `PreviewBarberia.jsx` y `Cursor.jsx` mandaban mensajes al iframe de la vista previa con `'*'` como target origin — no explotable hoy (el `src` del iframe es un string fijo, `/_preview-barberia`, mismo origen siempre), pero es una higiene barata: se cambió a `window.location.origin` explícito en los 4 lugares. La RECEPCIÓN en `PreviewBarberia.jsx` ya validaba `evento.origin` correctamente de antes (con un comentario explicando por qué) — ese lado ya estaba bien.
+
+**Cabeceras de seguridad agregadas** (`vercel.json`, nuevo bloque `headers`, aplican a todo el sitio): `X-Frame-Options: SAMEORIGIN` (protege contra clickjacking desde otros sitios, sin romper el iframe de vista previa que sí es del mismo origen), `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy` bloqueando geolocalización/micrófono/cámara (el sitio no usa ninguno). **Deliberadamente NO se agregó Content-Security-Policy hoy** — con WebGL/Three.js, Google Fonts, imágenes de Supabase Storage y animaciones inline de por medio, una CSP mal armada puede romper el sitio entero; merece su propio trabajo con pruebas dedicadas, no agregarla apurado dentro de esta revisión.
+
+**Todo lo demás se revisó y ya estaba bien — sin necesidad de cambios:**
+- Sin `SERVICE_ROLE_KEY` ni ningún secreto hardcodeado en `src/` ni en el build del cliente — solo la clave pública, pensada para estar expuesta.
+- **Falsificar el header `Host` no sirve de nada**: probado en vivo contra `bookingbarber.cl` y contra la URL cruda de Vercel — la plataforma responde 404 `DEPLOYMENT_NOT_FOUND` para cualquier `Host` que no sea un dominio real del proyecto, antes de que corra cualquier función. Las URLs que arman `api/meta.js`/`api/og.js` (usadas en `og:url`, redirects, etc.) no se pueden envenenar así.
+- RLS de `reservas`, `usuarios`, `personalizacion`, `pagos`, `historial_estados` y el storage de imágenes: todo correctamente acotado por `barberia_id`/`barbero_id`, confirmado releyendo cada policy — ningún cruce entre tenants.
+- `gestionar-usuario` (la Edge Function que crea/borra cuentas): un dueño no puede crear otro dueño, no puede tocar barberos de otra barbería — y aunque el código fallara, hay un constraint compuesto en la base (`usuarios_barbero_fk`) que igual lo impediría.
+- Sin `dangerouslySetInnerHTML`, sin `eval`/`new Function`, sin SQL dinámico (`execute format`) en ningún trigger o función.
+- Login: ya resuelto de antes (ver el comentario en `authService.js`) un enumerador de cuentas que existía vía una RPC vieja (`obtener_email_por_usuario`) — hoy el email técnico se arma en el cliente sin ninguna llamada al servidor, y el error de login no distingue "no existe" de "contraseña mala". No hay flujo de "olvidé mi contraseña" expuesto públicamente (las cuentas solo las crea/resetea un dueño o superadmin autenticado) — reduce la superficie de ataque del login a lo mínimo.
+- `cancelar_reserva_por_token`: el token es un UUID random (`gen_random_uuid()`, 122 bits) generado por Postgres, no adivinable; el mensaje de error es genérico sin importar la causa real (no existe, ya cancelada, o falta poco para la hora) — no hay forma de enumerar reservas por ahí.
+- `.env` correctamente en `.gitignore` y nunca trackeado; `.env.example` solo tiene valores de ejemplo.
+
+**Respuesta a la pregunta de Enzo sobre "filtrar algo por la consola":** como el sitio llama a Supabase directo desde el navegador, cualquier petición se ve en la pestaña Network de las herramientas de desarrollador — eso es inherente a esta arquitectura, no una fuga. Lo que importa es que RLS decide qué puede devolver esa petición, y eso ya está bien acotado (verificado arriba): la consola solo puede mostrar lo que RLS ya permite, nunca más.
+
+**Respuesta sobre "lista negra de IPs" en Supabase:** no existe esa función para el API público (PostgREST/RPC) en los planes típicos — la protección DDoS de Supabase es automática y no configurable, y "Network Restrictions" (Pro+) es para la conexión directa a Postgres, no para el API que usa la app. El rate-limiting real de este proyecto ya vive en triggers propios (`limitar_reservas_por_barberia`: 20 cada 10 min; enfriamiento de 12 min por teléfono). Si algún día hace falta bloqueo de IP de verdad, es una configuración de **Vercel** (su propio firewall, en planes pagos) — Vercel es el borde público de `bookingbarber.cl`, pero las llamadas a Supabase salen directo del navegador sin pasar por Vercel, así que el firewall de Vercel no las vería de todas formas.
+
+**Cómo se probó:** todo lo de arriba se verificó en vivo contra producción (`curl` con headers forjados, cabeceras de respuesta reales, redirect del slug inválido) salvo la revisión de RLS/funciones SQL, que fue relectura directa de las policies ya escritas — no hay forma de "probar en vivo" que una policy no tiene un agujero sin una cuenta de otro tenant a mano, así que se confió en la lectura línea por línea de cada `using`/`with check`.
+
+**Archivos afectados:**
+- `api/og.js` (redirect para slug inválido — mitiga abuso de costo).
+- `src/pages/panel/PanelPersonalizacion.jsx`, `src/pages/panel/PreviewBarberia.jsx`, `src/components/common/Cursor.jsx` (`postMessage` con origen explícito en vez de `'*'`).
+- `vercel.json` (+ bloque `headers` con 4 cabeceras de seguridad).
+
+**Pendiente / próximos pasos:** Content-Security-Policy real, con pruebas dedicadas (queda explícitamente fuera de hoy). Enzo va a rotar la contraseña del superadmin `esabattini` pronto (expuesta en una sesión anterior) — no es urgente según él, pero sigue siendo lo primero de la lista. Los mismos pendientes de siempre (Deployment Protection — parece resuelto, confirmado que `booking-barber-coral.vercel.app` ya no pide login).

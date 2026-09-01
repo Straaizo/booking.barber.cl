@@ -177,6 +177,13 @@ export default async function handler(request) {
       nombre = datos.nombre
       descripcion = datos.eslogan || datos.direccion || 'Reserva tu hora online'
       logoUrl = datos.logo_url
+    } else {
+      // Un `slug` que no existe (o una barbería inactiva) no debe forzar un
+      // render completo (fuente + WASM) por cada valor distinto que alguien
+      // pruebe — eso es una forma barata de hacer gastar cómputo sin límite
+      // variando el slug en la URL. Redirige a la imagen genérica, que sí
+      // converge en una sola URL cacheada fuerte.
+      return Response.redirect(`${url.origin}/api/og`, 302)
     }
   }
 

@@ -104,7 +104,7 @@ export function Pricing() {
                   {PLANES.map((plan) => (
                     <td key={plan.clave} className={`px-4 py-6 ${plan.destacado ? 'bg-cobre/5' : ''}`}>
                       <Button
-                        href="mailto:hola@bookingbarber.cl?subject=Quiero%20mi%20barbería%20en%20booking.barber.cl"
+                        href="https://wa.me/56941781505?text=Hola%2C%20quiero%20saber%20m%C3%A1s%20de%20los%20Servicios!"
                         className={`w-full ${
                           plan.destacado ? '' : 'bg-negro-barbero hover:bg-black'
                         }`}
@@ -159,7 +159,7 @@ export function Pricing() {
                 </ul>
 
                 <Button
-                  href="mailto:hola@bookingbarber.cl?subject=Quiero%20mi%20barbería%20en%20booking.barber.cl"
+                  href="https://wa.me/56941781505?text=Hola%2C%20quiero%20saber%20m%C3%A1s%20de%20los%20Servicios!"
                   className={`mt-6 block w-full ${
                     plan.destacado ? '' : 'bg-negro-barbero hover:bg-black'
                   }`}

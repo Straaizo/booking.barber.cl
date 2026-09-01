@@ -26,7 +26,7 @@ export function PreviewBarberia() {
       if (evento.data?.tipo === 'preview-barberia') setBarberia(evento.data.barberia)
     }
     window.addEventListener('message', alMensaje)
-    window.parent?.postMessage({ tipo: 'preview-barberia-listo' }, '*')
+    window.parent?.postMessage({ tipo: 'preview-barberia-listo' }, window.location.origin)
     return () => window.removeEventListener('message', alMensaje)
   }, [])
 

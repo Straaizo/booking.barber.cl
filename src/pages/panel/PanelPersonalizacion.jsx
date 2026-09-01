@@ -225,7 +225,7 @@ export function PanelPersonalizacion() {
     if (!form || !barberia) return
     iframeRef.current?.contentWindow?.postMessage(
       { tipo: 'preview-barberia', barberia: construirVistaPrevia(barberia, form) },
-      '*'
+      window.location.origin
     )
   }, [form, barberia])
 
