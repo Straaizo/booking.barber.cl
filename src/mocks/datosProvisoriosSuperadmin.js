@@ -45,6 +45,7 @@ const BARBERIAS_SEED = [
     telefono_whatsapp: '+56911112222',
     email_contacto: 'contacto@donmanuel.cl',
     direccion: 'Av. Irarrázaval 2140, Ñuñoa',
+    dias_maximos_reserva: 3,
     logo_url: null,
     nombre_dueno: 'Demo',
     usuario_dueno: 'demo',
@@ -223,7 +224,7 @@ export async function obtenerBarberiaProvisoriaPorSlug(slug) {
   const { barberias } = leerEstado()
   const b = barberias.find((x) => x.slug === slug)
   if (!b) throw new Error('Barbería provisoria no encontrada para el slug: ' + slug)
-  const { id, nombre, telefono_whatsapp, email_contacto, direccion, logo_url, estado_id, plan_id, personalizacion, servicios, barberos } = b
+  const { id, nombre, telefono_whatsapp, email_contacto, direccion, dias_maximos_reserva, logo_url, estado_id, plan_id, personalizacion, servicios, barberos } = b
   return {
     id,
     slug,
@@ -231,6 +232,7 @@ export async function obtenerBarberiaProvisoriaPorSlug(slug) {
     telefono_whatsapp,
     email_contacto,
     direccion,
+    dias_maximos_reserva: dias_maximos_reserva ?? 3,
     logo_url,
     estado_id,
     plan_id,
@@ -261,6 +263,7 @@ export async function crearBarberiaProvisoria({ nombre, slug, plan_id }) {
     telefono_whatsapp: '',
     email_contacto: '',
     direccion: '',
+    dias_maximos_reserva: 3,
     logo_url: null,
     nombre_dueno: '',
     usuario_dueno: null,
@@ -341,6 +344,7 @@ export async function obtenerBarberiaParaPersonalizacion(barberiaId) {
     logo_url: b.logo_url,
     direccion: b.direccion,
     telefono_whatsapp: b.telefono_whatsapp,
+    dias_maximos_reserva: b.dias_maximos_reserva ?? 3,
     plan_id: b.plan_id,
     servicios: b.servicios ?? [],
     barberos: b.barberos ?? [],
@@ -356,6 +360,7 @@ export async function guardarPersonalizacionProvisoria(barberiaId, cambios) {
   if ('logo_url' in cambios) barberia.logo_url = cambios.logo_url
   if ('direccion' in cambios) barberia.direccion = cambios.direccion
   if ('telefono_whatsapp' in cambios) barberia.telefono_whatsapp = cambios.telefono_whatsapp
+  if ('dias_maximos_reserva' in cambios) barberia.dias_maximos_reserva = cambios.dias_maximos_reserva
   guardarEstado(estado)
   return barberia.personalizacion
 }
@@ -661,7 +666,7 @@ export async function listarReservasDelDiaProvisorias(barberoId, fechaISO) {
         r.estado !== 'cancelada' &&
         r.fecha_hora.slice(0, 10) === fechaISO
     )
-    .map((r) => ({ fecha_hora: r.fecha_hora, servicio_id: r.servicio_id }))
+    .map((r) => ({ fecha_hora: r.fecha_hora, fecha_hora_fin: r.fecha_hora_fin, servicio_id: r.servicio_id }))
 }
 
 // Mismo cálculo que el trigger `calcular_fin_reserva`/`precio_vigente()` del

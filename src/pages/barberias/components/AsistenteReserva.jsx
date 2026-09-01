@@ -175,6 +175,7 @@ export function AsistenteReserva({ barberia }) {
               <PasoHorario
                 barbero={barbero}
                 servicio={servicio}
+                diasMaximosReserva={barberia.dias_maximos_reserva}
                 onSeleccionar={elegirHorario}
                 onVolver={() => volverA('servicio')}
               />

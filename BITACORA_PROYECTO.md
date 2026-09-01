@@ -4458,3 +4458,55 @@ La identidad básica (color de marca, color de header, tipografía del nombre, t
 - `src/pages/Home/components/Hero.jsx` (monta `HeroFondoMovil` en mobile, `z-10` explícito en el resto del contenido).
 
 **Pendiente / próximos pasos:** los mismos de siempre.
+
+---
+
+## 2026-09-01 (64) - Previsualización de enlaces (Open Graph) + assets de marca
+
+**Qué se hizo:** hoy compartir un link de `bookingbarber.cl` por WhatsApp/Instagram/Telegram mostraba una previsualización vacía o genérica — crítico para este producto, cuyo caso de uso principal es que cada barbería pegue su propio link en Instagram/WhatsApp. La causa de fondo: el proyecto es una SPA de Vite (un solo `index.html` para todas las rutas) y los rastreadores de esas plataformas no ejecutan JavaScript — cualquier `<meta>` que React ponga en el cliente les es invisible. `react-helmet` no habría resuelto nada, todas las barberías hubieran seguido mostrando la misma previsualización genérica.
+
+**Solución (puente, no la solución nativa):** dos funciones serverless de Vercel bajo `api/`:
+- `api/meta.js` — devuelve HTML mínimo con las etiquetas meta correctas según la ruta pedida, SOLO a rastreadores conocidos (detección por User-Agent). Un navegador real nunca la ve.
+- `api/og.js` — genera la imagen de previsualización (1200×630 PNG) con `@vercel/og`, con el logo y nombre reales de cada barbería, o la genérica de la plataforma sin `slug`.
+- `vercel.json` rutea hacia `api/meta.js` SOLO cuando el header `user-agent` matchea una lista de rastreadores conocidos (`has` de una regex) — cualquier otro request (o sea, prácticamente todo el tráfico real) sigue exactamente la misma regla de siempre (`/(.*) -> /index.html`), sin tocarla. Así es estructuralmente imposible que esto rompa la navegación real: el código nuevo ni se ejecuta para un visitante de verdad.
+
+**Tres hallazgos de plataforma, no obvios, que costó tiempo diagnosticar (dejarlos anotados para no repetir la investigación):**
+
+1. **Un rewrite de `vercel.json` hacia una Edge Function se pierde en silencio.** Probado en vivo, muchas veces: con `export const config = { runtime: 'edge' }`, un rewrite (`has` incluido) hacia esa función simplemente cae al siguiente rewrite de la lista (en este caso, el catch-all de `/index.html`) sin ningún error — la función funciona perfecto si se la llama DIRECTO por su URL (`/api/meta?path=...`), pero nunca se la llega a invocar cuando es DESTINO de un rewrite. Cambiar la función a runtime Node.js (default, sin ese `config`) resolvió esto — con Node, el mismo rewrite sí la invoca. Costo: la firma del handler cambia de `Request`/`Response` web-estándar (Edge) a la clásica de Vercel, `(req, res)` con `req.headers` como objeto plano (sin `.get()`) y `res.status().send()`.
+
+2. **La ruta raíz `/` nunca llega a NINGÚN rewrite, tenga o no `has`.** Vercel sirve `index.html` como archivo estático directo desde su CDN para `/` exacto, antes de evaluar cualquier rewrite — confirmado con `X-Vercel-Cache: HIT` y headers de archivo estático (`Etag`, `Accept-Ranges`) en la respuesta. No hay forma de interceptarlo. Solución: como el home no tiene contenido dinámico por barbería, sus etiquetas quedan escritas a mano en el propio `index.html` (idénticas a las que generaría `metaGenerico()` en `api/meta.js` — si se cambia una hay que cambiar la otra, ver comentario en ambos archivos).
+
+3. **Un archivo `.jsx` bajo `/api` no se reconoce como función.** `api/og.jsx` (con JSX, el patrón habitual de `@vercel/og`) se ignoraba en silencio en el build — ni error, ni la función aparecía en `vercel inspect`. Se resolvió escribiendo el árbol de elementos a mano con un helper `h(type, props, ...children)` (exactamente lo que JSX compila por debajo) en un archivo `.js` normal, sin JSX. De paso se confirmó que `@vercel/og` en runtime Node (no 'edge') falla real: su WASM interno (resvg) no carga bajo el resolutor de módulos de Node (`ERR_MODULE_NOT_FOUND` sobre un paquete interno `wbg`) — por eso `api/og.js` sí quedó en runtime `edge` (nunca es destino de un rewrite, así que el hallazgo 1 no le aplica).
+
+**Casos cubiertos** (ver tabla completa en el pedido original): home, barbería activa (con/sin logo, con/sin eslogan), barbería inactiva o slug inexistente → genérico sin filtrar cuál de las dos cosas pasó (la misma policy RLS que permite leer sin sesión ya filtra por `estado_id = 1`, así que ambos casos devuelven cero filas — estructuralmente imposible filtrar por accidente el nombre de una barbería suspendida), rutas privadas (`/login`, `/panel*`, `/admin`, `/_preview-barberia`) con `noindex`, ruta desconocida con `noindex`, `/demo` con metadatos propios (datos fijos en `api/_lib/demo.js`, copia independiente de `src/config/demo.js` para no acoplar el build de `api/` al de la SPA). `/barberias/:slug` (el prefijo viejo, hoy solo un redirect del lado del cliente) se acepta como alias del mismo caso "barbería" — un link viejo ya compartido también previsualiza bien.
+
+**Imagen OG:** `@vercel/og` con la tipografía Fraunces real del proyecto (dos archivos `.ttf` estáticos bajados de Google Fonts y commiteados en `api/_lib/fonts/`, cargados vía `fetch(new URL(..., import.meta.url))` — sin llamada de red en cada request), colores tomados de los tokens reales (`--color-negro-barbero`, `--color-hueso`, `--color-cobre-claro`, etc., nunca definidos de nuevo). Nombre truncado con elipsis + tamaño de fuente decreciente según largo; emojis eliminados del render (la fuente no tiene esos glifos, saldrían como cuadrados); logo contenido en una caja fija sin deformar, con reintento automático sin logo si la URL falla o Satori no puede procesarla. Cacheada 3 horas (`s-maxage=10800`) — no días, para que un cambio de nombre/logo se refleje en un plazo razonable.
+
+**Seguridad:** el nombre de una barbería lo edita su dueño desde el panel — todo lo que llega a HTML se escapa (`escaparHtml()`) antes de insertarse en `api/meta.js`; verificado con un nombre fabricado (`Barbería "El Corte" & Cía <script>alert(1)</script>`) que el HTML resultante no deja ninguna etiqueta viva. La consulta a Supabase usa la clave pública (no la de servicio) con un timeout explícito de 2.5s vía `AbortController` — si Supabase no responde a tiempo, degrada a metadatos genéricos en vez de colgar la petición (WhatsApp abandona en pocos segundos).
+
+**Cómo se probó (de las 14 pruebas pedidas):**
+- ✅ Bot real (`facebookexternalhit`, `WhatsApp/...`) vs. navegador real, en `/`, `/demo`, `/login`, `/panel`, `/panel/reservas`, `/admin`, un slug real con logo (`barberia-jose-luis`), uno sin logo (`barberia-golden`), un slug inexistente, y una ruta multi-segmento inexistente — cada uno con el título/robots esperado, confirmado con `curl -A "<user-agent real>"` contra el sitio ya desplegado.
+- ✅ Imagen generada para los 4 casos (home, con logo, sin logo, demo) — PNG real, 40-85KB, muy por debajo de 1MB.
+- ✅ Nombre con tildes/ñ (`Barbería El Andén`, `González`) — se renderiza perfecto.
+- ✅ Nombre muy largo (54 caracteres, fabricado) — reduce tamaño de fuente, no desborda el lienzo.
+- ✅ Nombre con emojis (fabricado) — se eliminan limpio, sin cuadrados ni caracteres sueltos.
+- ✅ Nombre con caracteres que rompen HTML (fabricado) — HTML resultante verificado sin etiquetas vivas.
+- ✅ Barbería inactiva / slug inexistente → genérico sin filtrar cuál pasó — verificado por construcción (RLS), no con una barbería inactiva real a mano (no había ninguna disponible hoy para probar en vivo).
+- ✅ La SPA sigue funcionando igual para un navegador real, en las 7 rutas de arriba — la más importante de todas.
+- ✅ Assets estáticos (favicon, manifest, imágenes) siguen sirviéndose igual.
+- ⚠️ Supabase caído/lento: el timeout se revisó por código (patrón estándar de `AbortController`, ya usado en otras partes del proyecto), pero NO se simuló en vivo — hacerlo real hubiera requerido romper temporalmente las variables de entorno `SUPABASE_URL`/`SUPABASE_ANON_KEY` en Vercel (usadas solo por estas 2 funciones nuevas, pero aun así un cambio de config compartido innecesario para una tarea de previsualización). Queda pendiente si Enzo quiere verificarlo en vivo.
+- ⏳ Depurador de Facebook, prueba real por WhatsApp desde el celular, Telegram, validador de Twitter/X: son herramientas interactivas — no se pueden ejecutar desde acá. Los 6 primeros bullets de arriba son el equivalente automatizado (mismo User-Agent real que usa cada rastreador), pero Enzo debería confirmar con las herramientas reales al menos una vez, sobre todo el share real por WhatsApp (el cliente más restrictivo).
+
+**Favicon y assets de marca:** `favicon.ico` (16+32px), `apple-touch-icon.png` (180×180), `icon-192.png`/`icon-512.png`, `site.webmanifest` — todos generados desde el `favicon.svg` real (el isotipo "b." que Enzo ya había puesto), no un diseño nuevo. Referenciados en `index.html` junto con `theme-color`.
+
+**Archivos afectados:**
+- `api/meta.js`, `api/og.js` (nuevos).
+- `api/_lib/supabase.js`, `api/_lib/rutas.js`, `api/_lib/texto.js`, `api/_lib/demo.js` (nuevos, módulos compartidos).
+- `api/_lib/fonts/Fraunces-Regular.ttf`, `Fraunces-SemiBold.ttf` (nuevos, bajados de Google Fonts).
+- `vercel.json` (rewrite condicionado por User-Agent hacia `api/meta.js`).
+- `index.html` (meta tags estáticas para `/`, favicon completo, `theme-color`).
+- `public/favicon.ico`, `apple-touch-icon.png`, `icon-192.png`, `icon-512.png`, `site.webmanifest` (nuevos).
+- `package.json` (+ `@vercel/og`).
+- Variables de entorno nuevas en Vercel: `SUPABASE_URL`, `SUPABASE_ANON_KEY` (sin prefijo `VITE_` — las funciones serverless no tienen `import.meta.env`, ese es un mecanismo de build-time de Vite para el bundle del navegador).
+
+**Pendiente / próximos pasos:** migrar a Next.js resolvería esto de forma NATIVA (metadata por ruta sin este puente de rewrites+User-Agent, generateMetadata server-side real, y de paso middleware real para redirigir barberías inactivas) — quedó fuera de alcance hoy a propósito (no se tocó lógica de negocio ni paneles). Confirmar en vivo con el Depurador de Facebook / WhatsApp real / Telegram cuando Enzo pueda. Simular Supabase caído en vivo si se quiere el test #11 con evidencia real, no solo revisión de código. Los mismos pendientes de siempre (Deployment Protection, migración de días máximos de reserva sin correr aún).

@@ -1,5 +1,16 @@
 {
   "rewrites": [
+    {
+      "source": "/:path((?!api/)(?!assets/)(?!.*\\.[a-zA-Z0-9]+$).*)",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": ".*(facebookexternalhit|Facebot|WhatsApp|Twitterbot|LinkedInBot|TelegramBot|Slackbot|Discordbot|Pinterest|Googlebot|Bingbot|Applebot|SkypeUriPreview|vkShare|redditbot).*"
+        }
+      ],
+      "destination": "/api/meta?path=/:path"
+    },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }

@@ -14,7 +14,7 @@ async function obtenerBarberiaParaPersonalizacionReal(barberiaId) {
     .from('barberias')
     .select(
       `
-      id, nombre, slug, logo_url, direccion, telefono_whatsapp, plan_id,
+      id, nombre, slug, logo_url, direccion, telefono_whatsapp, plan_id, dias_maximos_reserva,
       personalizacion (color_primario, color_header, fuente_display, tema, eslogan, eslogan_color, descripcion, banner_url, secciones, orden_equipo, estilo_whatsapp, whatsapp_color, whatsapp_tamano, mostrar_servicios),
       servicios (id, nombre, duracion_minutos, precio_clp, precio_oferta, oferta_activa, oferta_vence, activo, barbero_id),
       barberos (id, nombre, activo, foto_url, especialidad, usa_catalogo_propio,
@@ -40,12 +40,13 @@ export function usePersonalizacionAdmin(barberiaId) {
   })
 }
 
-// `logo_url`, `direccion` y `telefono_whatsapp` viven en `barberias`, el
-// resto en `personalizacion` (1:1 por `barberia_id`) — se separan acá para
-// no obligar a quien llama a saber en qué tabla vive cada campo.
+// `logo_url`, `direccion`, `telefono_whatsapp` y `dias_maximos_reserva`
+// viven en `barberias`, el resto en `personalizacion` (1:1 por
+// `barberia_id`) — se separan acá para no obligar a quien llama a saber en
+// qué tabla vive cada campo.
 async function guardarPersonalizacionReal(barberiaId, cambios) {
-  const { logo_url, direccion, telefono_whatsapp, ...personalizacionCambios } = cambios
-  const cambiosBarberia = { logo_url, direccion, telefono_whatsapp }
+  const { logo_url, direccion, telefono_whatsapp, dias_maximos_reserva, ...personalizacionCambios } = cambios
+  const cambiosBarberia = { logo_url, direccion, telefono_whatsapp, dias_maximos_reserva }
   const hayCambiosBarberia = Object.values(cambiosBarberia).some((v) => v !== undefined)
   if (hayCambiosBarberia) {
     const { error } = await supabase.from('barberias').update(cambiosBarberia).eq('id', barberiaId)

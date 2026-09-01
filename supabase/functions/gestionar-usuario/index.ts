@@ -34,7 +34,8 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 // navegador — cualquier otro origen se queda sin preflight y el POST nunca
 // sale. Configurable por si el dominio cambia, sin tener que tocar código.
 const ORIGENES_PERMITIDOS = (
-  Deno.env.get('ORIGENES_PERMITIDOS') ?? 'https://booking.barber.cl,http://localhost:5173'
+  Deno.env.get('ORIGENES_PERMITIDOS') ??
+    'https://booking.barber.cl,https://bookingbarber.cl,http://localhost:5173'
 )
   .split(',')
   .map((o) => o.trim())

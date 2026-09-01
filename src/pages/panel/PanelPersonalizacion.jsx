@@ -48,6 +48,7 @@ function formularioDesdeBarberia(barberia) {
     logo_url: barberia.logo_url ?? null,
     direccion: barberia.direccion ?? '',
     telefono_whatsapp: barberia.telefono_whatsapp ?? '',
+    dias_maximos_reserva: barberia.dias_maximos_reserva ?? 3,
     color_primario: p.color_primario ?? '',
     color_header: p.color_header ?? '',
     fuente_display: p.fuente_display || 'fraunces',
@@ -62,6 +63,15 @@ function formularioDesdeBarberia(barberia) {
     whatsapp_tamano: p.whatsapp_tamano || 'mediana',
     mostrar_servicios: p.mostrar_servicios ?? 1,
   }
+}
+
+// Mismo whitelist que el check de `barberias.dias_maximos_reserva` en la
+// base — un select de opciones fijas, no un número libre, para no poder
+// mandar un valor que la base va a rechazar igual.
+const OPCIONES_DIAS_MAXIMOS_RESERVA = [1, 2, 3, 5, 7, 10, 14, 21, 30]
+
+function etiquetaDiasMaximosReserva(dias) {
+  return dias === 1 ? '1 día' : `${dias} días`
 }
 
 function nuevaSeccion(tipo) {
@@ -447,6 +457,7 @@ export function PanelPersonalizacion() {
         logo_url: form.logo_url,
         direccion: form.direccion,
         telefono_whatsapp: form.telefono_whatsapp,
+        dias_maximos_reserva: form.dias_maximos_reserva,
         color_primario: form.color_primario || null,
         color_header: form.color_header || null,
         fuente_display: form.fuente_display,
@@ -1766,6 +1777,32 @@ export function PanelPersonalizacion() {
               />
               <span className="versalitas text-xs text-gris-calido-500">Servicios y precios</span>
             </div>
+          </section>
+
+          <section className="flex flex-col gap-6">
+            <TituloGrupo numero="05">Reglas de reserva</TituloGrupo>
+            <label className="flex flex-col gap-2">
+              <span className="versalitas text-xs text-gris-calido-500">Anticipación máxima para reservar</span>
+              <select
+                name="dias_maximos_reserva"
+                value={form.dias_maximos_reserva}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, dias_maximos_reserva: Number(e.target.value) }))
+                }
+                className="min-h-11 min-w-40 border-b border-gris-calido-200 bg-transparent py-2 text-negro-barbero outline-none transition-colors focus:border-cobre"
+              >
+                {OPCIONES_DIAS_MAXIMOS_RESERVA.map((dias) => (
+                  <option key={dias} value={dias}>
+                    {etiquetaDiasMaximosReserva(dias)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <p className="-mt-2 text-xs text-gris-calido-500">
+              Hasta cuántos días hacia adelante puede reservar un cliente en tu página pública.
+              Ayuda a mantener la agenda ordenada — vos igual puedes agendar por teléfono o en
+              persona más lejos si hace falta.
+            </p>
           </section>
 
           {/* El botón queda al final del formulario a propósito — se edita,

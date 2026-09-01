@@ -17,13 +17,11 @@ async function obtenerReservasDelDia(barberoId, fechaISO) {
 
   if (error) throw error
 
-  // La RPC entrega `{ inicio, fin }` (el fin real de cada reserva, no una
-  // fila de `reservas`). `calcularSlotsDisponibles` (src/utils/horarios.js)
-  // hoy solo lee `fecha_hora` de cada ocupado y sigue aproximando su fin con
-  // la duración del servicio que se está por reservar — se mantiene ese
-  // nombre acá para no tener que tocar esa función, fuera del alcance de
-  // este cambio. El `fin` real que ya entrega la RPC queda disponible pero
-  // sin usar todavía.
+  // La RPC entrega `{ inicio, fin }` — el fin real de cada reserva ya
+  // tomada, calculado con la duración de SU propio servicio. Se renombra acá
+  // a `fecha_hora`/`fecha_hora_fin` porque así los usa `calcularSlotsDisponibles`
+  // (src/utils/horarios.js) para chequear superposición sin aproximar con la
+  // duración del servicio que se está por reservar ahora.
   return data.map((r) => ({ fecha_hora: r.inicio, fecha_hora_fin: r.fin }))
 }
 

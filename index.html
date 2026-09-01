@@ -3,8 +3,37 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/x-icon" href="/favicon.ico" sizes="32x32" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+    <meta name="theme-color" content="#1c1b19" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Booking Barber - Sistema de reservas</title>
+    <title>Booking Barber — Reservas online para tu barbería</title>
+
+    <!-- La ruta "/" es la ÚNICA que nunca pasa por `api/meta.js`: Vercel
+         sirve el archivo estático `index.html` para "/" directo desde su
+         CDN, antes de evaluar cualquier rewrite de vercel.json — no hay
+         forma de interceptarla (comprobado en vivo). No es un problema acá
+         porque el home no tiene contenido dinámico por barbería: estas
+         etiquetas son fijas y deben quedar IDÉNTICAS a `metaGenerico()` en
+         api/meta.js, que sí sirve cualquier otra ruta genérica (privada,
+         404, slug inexistente). -->
+    <meta name="description" content="Tu propia página, tus servicios, tus horarios, tus barberos — todo en un solo lugar. Sin apps que instalar." />
+    <link rel="canonical" href="https://bookingbarber.cl/" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="bookingbarber.cl" />
+    <meta property="og:title" content="Booking Barber — Reservas online para tu barbería" />
+    <meta property="og:description" content="Tu propia página, tus servicios, tus horarios, tus barberos — todo en un solo lugar. Sin apps que instalar." />
+    <meta property="og:url" content="https://bookingbarber.cl/" />
+    <meta property="og:image" content="https://bookingbarber.cl/api/og" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Booking Barber — Reservas online para barberías chilenas" />
+    <meta property="og:locale" content="es_CL" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Booking Barber — Reservas online para tu barbería" />
+    <meta name="twitter:description" content="Tu propia página, tus servicios, tus horarios, tus barberos — todo en un solo lugar. Sin apps que instalar." />
+    <meta name="twitter:image" content="https://bookingbarber.cl/api/og" />
   </head>
   <body>
     <div id="root"></div>

@@ -9,7 +9,7 @@ import { BackButton } from '../../../components/common/BackButton'
 import { Loader } from '../../../components/common/Loader'
 import { EASE_ENTRADA } from '../../../components/animations/easing'
 
-export function PasoHorario({ barbero, servicio, onSeleccionar, onVolver }) {
+export function PasoHorario({ barbero, servicio, diasMaximosReserva, onSeleccionar, onVolver }) {
   const {
     data: horarios,
     isLoading: cargandoHorarios,
@@ -17,8 +17,9 @@ export function PasoHorario({ barbero, servicio, onSeleccionar, onVolver }) {
   } = useHorariosDisponibles(barbero.id)
   const { data: excepciones } = useExcepcionesHorario(barbero.id)
   const dias = useMemo(
-    () => (horarios ? proximosDiasConHorario(horarios, excepciones ?? []) : []),
-    [horarios, excepciones]
+    () =>
+      horarios ? proximosDiasConHorario(horarios, excepciones ?? [], diasMaximosReserva ?? 14) : [],
+    [horarios, excepciones, diasMaximosReserva]
   )
   const [fechaSeleccionada, setFechaSeleccionada] = useState(null)
 

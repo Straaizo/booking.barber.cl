@@ -88,9 +88,14 @@ export function proximosDiasConHorario(horarios, excepciones = [], cantidadDias 
 // El paso entre horas ofrecidas (`intervaloMinutos`) es independiente de
 // cuánto dura el servicio (`duracionMinutos`): un corte de 30 min puede
 // ofrecerse cada 45 min si el barbero prefiere dejar más aire entre
-// clientes, o cada 60 min si quiere agendar menos gente por día. La
-// duración real del servicio sigue siendo la que se usa para chequear
-// superposición con reservas ya tomadas — eso no puede acortarse.
+// clientes, o cada 60 min si quiere agendar menos gente por día. Eso sí,
+// cada reserva ya tomada (`reservasOcupadas`) ocupa su propio bloque real
+// (`fecha_hora` a `fecha_hora_fin`, calculado con LA duración de SU
+// servicio) — nunca se aproxima con `duracionMinutos` del servicio que se
+// está por reservar ahora, porque son servicios distintos que pueden durar
+// tiempos distintos. Confundir ambos dejaba slots marcados como libres que
+// en realidad se pisaban con una reserva más larga que la que se estaba
+// por agendar.
 // `excepcionDelDia` reemplaza por completo el horario semanal de ESA fecha
 // puntual (no del día de la semana en general) — o la deja sin horas si
 // viene marcada `cerrado`. Se resuelve afuera (en quien llama) buscando en
@@ -115,8 +120,11 @@ export function calcularSlotsDisponibles({
 
   const ocupados = reservasOcupadas.map((r) => {
     const inicio = new Date(r.fecha_hora)
-    const minutos = inicio.getHours() * 60 + inicio.getMinutes()
-    return { inicio: minutos, fin: minutos + duracionMinutos }
+    const fin = new Date(r.fecha_hora_fin)
+    return {
+      inicio: inicio.getHours() * 60 + inicio.getMinutes(),
+      fin: fin.getHours() * 60 + fin.getMinutes(),
+    }
   })
 
   const esHoy = fecha.toDateString() === new Date().toDateString()
