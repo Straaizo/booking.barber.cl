@@ -3,7 +3,7 @@ import { IconoInstagram } from '../common/IconoInstagram'
 import { IconoWhatsApp } from '../common/IconoWhatsApp'
 import { linkWhatsApp } from '../../utils/formatos'
 
-// Mismo número que ya usa el footer ("O escríbenos por WhatsApp") — una sola
+// Mismo número que ya usa el footer y la sección de planes — una sola
 // fuente de verdad en el `.env`, no un número duplicado a mano acá.
 const NUMERO_WHATSAPP_CONTACTO = import.meta.env.VITE_WHATSAPP_CONTACTO
 

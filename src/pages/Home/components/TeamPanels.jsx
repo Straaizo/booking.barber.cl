@@ -210,7 +210,7 @@ const VISTAS = [
     etiqueta: 'Tu vista',
     Mockup: MockupDueno,
     anotaciones: [
-      'Ves cada reserva nueva al instante, sin revisar WhatsApp',
+      'Todas tus reservas nuevas, en un solo panel',
       'Cambias precios y ofertas tú mismo, se reflejan al momento',
       'Todo tu negocio — barberos, servicios, horarios — en un lugar',
     ],

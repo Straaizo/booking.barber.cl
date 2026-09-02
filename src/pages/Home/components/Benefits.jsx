@@ -15,8 +15,8 @@ const BENEFICIOS = [
   },
   {
     numero: '02',
-    titulo: 'Te avisamos, no revisas tú',
-    texto: 'Cada reserva nueva te llega directo por WhatsApp o correo, mientras sigues cortando.',
+    titulo: 'Todas tus reservas, en un solo lugar',
+    texto: 'Entra a tu panel y ve cada reserva nueva, sin perseguir mensajes sueltos.',
   },
   {
     numero: '03',

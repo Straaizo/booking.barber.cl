@@ -29,17 +29,33 @@ function clave(barberiaId) {
   return ['barberos_admin', barberiaId]
 }
 
+// Dos consultas, no un embed `usuarios (usuario)` — PostgREST no arma el
+// embed automático porque la FK real (`usuarios_barbero_fk`) es compuesta
+// (`barbero_id, barberia_id` juntas, ver 20260819120000_schema.sql), no una
+// columna simple. Con el embed, TODO barbero volvía con `usuario: null` sin
+// ningún error visible, aunque la cuenta existiera de verdad en `usuarios`
+// — confirmado con una consulta directa a la base (Miguel Diaz sí tenía
+// cuenta, "mdiaz", y el panel igual mostraba "+ Crear cuenta").
 async function obtenerBarberos(barberiaId) {
-  // `usuarios` es 1:1 con `barberos` (barbero_id es unique) — PostgREST
-  // devuelve el embed como objeto, no como arreglo, gracias a esa unicidad.
-  const { data, error } = await supabase
+  const { data: barberos, error } = await supabase
     .from('barberos')
-    .select(`${COLUMNAS}, usuarios (usuario)`)
+    .select(COLUMNAS)
     .eq('barberia_id', barberiaId)
     .order('nombre')
-
   if (error) throw error
-  return data.map(({ usuarios, ...barbero }) => ({ ...barbero, usuario: usuarios?.usuario ?? null }))
+  if (barberos.length === 0) return []
+
+  const { data: cuentas, error: errorCuentas } = await supabase
+    .from('usuarios')
+    .select('barbero_id, usuario')
+    .in(
+      'barbero_id',
+      barberos.map((b) => b.id)
+    )
+  if (errorCuentas) throw errorCuentas
+
+  const usuarioPorBarberoId = new Map(cuentas.map((c) => [c.barbero_id, c.usuario]))
+  return barberos.map((b) => ({ ...b, usuario: usuarioPorBarberoId.get(b.id) ?? null }))
 }
 
 export function useBarberosAdmin(barberiaId) {

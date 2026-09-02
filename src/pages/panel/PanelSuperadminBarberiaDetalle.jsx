@@ -15,6 +15,7 @@ import { useHistorialEstados } from './hooks/useHistorialEstados'
 import {
   useBarberosAdmin,
   useCrearBarbero,
+  useActualizarBarbero,
   useEstablecerContrasenaBarbero,
   useEliminarCuentaBarbero,
 } from './hooks/useBarberosAdmin'
@@ -49,14 +50,45 @@ const CLASE_INPUT =
 // que lo exige.
 const LARGO_MINIMO_PASSWORD = 8
 
-// Modal genérico para EDITAR una cuenta ya existente (dueño o barbero): solo
-// hay dos cosas que tocar — la contraseña (el dueño siempre la escribe él
-// mismo, nunca una generada al azar) y, como última acción, borrar la cuenta
-// entera. Un solo componente para ambos casos porque el formulario es
-// idéntico, cambia solo el título y a qué mutación apunta cada botón.
-function ModalEditarCuenta({ abierto, onCerrar, titulo, usuario, onGuardarPassword, onEliminar, eliminando }) {
+// Modal genérico para EDITAR una cuenta ya existente (dueño o barbero): la
+// contraseña (el dueño/barbero siempre la escribe él mismo, nunca una
+// generada al azar) y, como última acción, borrar la cuenta entera. Un solo
+// componente para ambos casos porque el formulario es idéntico, cambia solo
+// el título y a qué mutación apunta cada botón.
+//
+// `nombre`/`onGuardarNombre` son opcionales: la cuenta del dueño no los pasa
+// (su nombre no se edita desde acá), la fila de un barbero sí — un solo
+// lápiz para "los parámetros de esta cuenta", en vez de uno separado para el
+// nombre y otro para la contraseña.
+function ModalEditarCuenta({
+  abierto,
+  onCerrar,
+  titulo,
+  usuario,
+  nombre,
+  onGuardarNombre,
+  onGuardarPassword,
+  onEliminar,
+  eliminando,
+}) {
+  const [nombreEditado, setNombreEditado] = useState(nombre ?? '')
+  const [estadoNombre, setEstadoNombre] = useState(null) // 'guardando' | 'guardado' | 'error'
   const [password, setPassword] = useState('')
   const [estado, setEstado] = useState(null) // 'guardando' | 'guardado' | 'error' | 'debil'
+
+  async function guardarNombre(evento) {
+    evento.preventDefault()
+    const limpio = nombreEditado.trim()
+    if (!limpio || limpio === nombre) return
+    setEstadoNombre('guardando')
+    try {
+      await onGuardarNombre(limpio)
+      setEstadoNombre('guardado')
+    } catch {
+      setEstadoNombre('error')
+      setNombreEditado(nombre ?? '')
+    }
+  }
 
   async function guardar(evento) {
     evento.preventDefault()
@@ -78,14 +110,48 @@ function ModalEditarCuenta({ abierto, onCerrar, titulo, usuario, onGuardarPasswo
 
   return (
     <ModalFormulario abierto={abierto} onCerrar={onCerrar} titulo={titulo}>
-      <p className="versalitas text-xs text-gris-calido-500">Usuario: {usuario}</p>
+      {onGuardarNombre && (
+        <form onSubmit={guardarNombre} className="flex flex-col gap-3 border-b border-gris-calido-100 pb-4">
+          <label className="flex flex-col gap-1">
+            <span className="versalitas text-xs text-gris-calido-500">Nombre</span>
+            <input
+              type="text"
+              name="nombre"
+              autoFocus
+              value={nombreEditado}
+              onChange={(e) => {
+                setNombreEditado(e.target.value)
+                setEstadoNombre(null)
+              }}
+              className={CLASE_INPUT}
+            />
+          </label>
+          <Button
+            as="button"
+            type="submit"
+            disabled={estadoNombre === 'guardando' || nombreEditado.trim() === nombre}
+            className="w-fit"
+          >
+            {estadoNombre === 'guardando' ? 'Guardando…' : 'Guardar nombre'}
+          </Button>
+          {estadoNombre === 'guardado' && <p className="text-sm text-verde-barberia">Nombre actualizado.</p>}
+          {estadoNombre === 'error' && (
+            <p role="alert" className="text-sm text-red-700">
+              No se pudo guardar.
+            </p>
+          )}
+        </form>
+      )}
+      <p className={onGuardarNombre ? 'mt-4 versalitas text-xs text-gris-calido-500' : 'versalitas text-xs text-gris-calido-500'}>
+        Usuario: {usuario}
+      </p>
       <form onSubmit={guardar} className="mt-4 flex flex-col gap-3">
         <label className="flex flex-col gap-1">
           <span className="versalitas text-xs text-gris-calido-500">Nueva contraseña</span>
           <input
             type="text"
             name="password"
-            autoFocus
+            autoFocus={!onGuardarNombre}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder="Con la que va a entrar"
@@ -250,18 +316,40 @@ function SeccionCuentaDueno({ barberiaId }) {
   )
 }
 
-// Una fila por barbero: sin cuenta, un botón de texto abre el modal de
-// creación (solo pide contraseña — el nombre ya se sabe); con cuenta, un
-// lápiz abre el mismo modal de edición que usa la cuenta del dueño.
+// Una fila por barbero, con el mismo estilo de tarjeta que la cuenta del
+// dueño (SeccionCuentaDueno): nombre arriba, "Usuario: X" debajo. Con
+// cuenta, un solo lápiz edita los dos (nombre + contraseña, con eliminar
+// cuenta al fondo) en el mismo ModalEditarCuenta. Sin cuenta todavía, el
+// nombre se edita inline con su propio lápiz chico (no hay contraseña que
+// combinar ahí) y un botón de texto aparte crea la cuenta.
 function FilaBarberoUsuario({ barbero, barberiaId }) {
   const crearCuenta = useCrearCuentaBarbero(barberiaId)
+  const actualizarBarbero = useActualizarBarbero(barberiaId)
   const establecerPassword = useEstablecerContrasenaBarbero(barberiaId)
   const eliminarCuenta = useEliminarCuentaBarbero(barberiaId)
 
   const [modalCrearAbierto, setModalCrearAbierto] = useState(false)
   const [modalEditarAbierto, setModalEditarAbierto] = useState(false)
+  const [editandoNombre, setEditandoNombre] = useState(false)
+  const [nombreEditado, setNombreEditado] = useState(barbero.nombre)
   const [password, setPassword] = useState('')
   const [error, setError] = useState(null)
+
+  async function guardarNombreInline(evento) {
+    evento.preventDefault()
+    const nombre = nombreEditado.trim()
+    if (!nombre || nombre === barbero.nombre) {
+      setEditandoNombre(false)
+      setNombreEditado(barbero.nombre)
+      return
+    }
+    try {
+      await actualizarBarbero.mutateAsync({ id: barbero.id, cambios: { nombre } })
+      setEditandoNombre(false)
+    } catch {
+      setNombreEditado(barbero.nombre)
+    }
+  }
 
   async function crear(evento) {
     evento.preventDefault()
@@ -290,18 +378,50 @@ function FilaBarberoUsuario({ barbero, barberiaId }) {
   }
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gris-calido-100 py-3 last:border-b-0">
-      <span className="text-sm text-negro-barbero">{barbero.nombre}</span>
-      {barbero.usuario ? (
-        <div className="flex items-center gap-3">
+    <div className="flex flex-wrap items-center justify-between gap-4 rounded-lg border border-gris-calido-200 bg-white p-5">
+      <div className="flex flex-col gap-1">
+        {editandoNombre ? (
+          <form onSubmit={guardarNombreInline} className="flex items-center gap-2">
+            <input
+              type="text"
+              autoFocus
+              value={nombreEditado}
+              onChange={(e) => setNombreEditado(e.target.value)}
+              onBlur={guardarNombreInline}
+              className="min-h-9 border-b border-gris-calido-200 bg-transparent px-1 py-1 font-medium text-negro-barbero outline-none focus:border-cobre"
+            />
+          </form>
+        ) : (
+          <div className="flex items-center gap-2">
+            <span className="font-medium text-negro-barbero">{barbero.nombre}</span>
+            {!barbero.usuario && (
+              <button
+                type="button"
+                onClick={() => setEditandoNombre(true)}
+                aria-label={`Editar nombre de ${barbero.nombre}`}
+                className="text-gris-calido-400 transition-colors hover:text-cobre-texto"
+              >
+                <IconoLapiz className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+        )}
+        {barbero.usuario ? (
           <span className="versalitas text-xs text-gris-calido-500">Usuario: {barbero.usuario}</span>
+        ) : (
+          <span className="versalitas text-xs text-gris-calido-400">Sin cuenta creada</span>
+        )}
+      </div>
+
+      {barbero.usuario ? (
+        <>
           <button
             type="button"
             onClick={() => setModalEditarAbierto(true)}
             aria-label={`Editar cuenta de ${barbero.nombre}`}
             className="text-gris-calido-500 transition-colors hover:text-cobre-texto"
           >
-            <IconoLapiz className="h-4 w-4" />
+            <IconoLapiz className="h-5 w-5" />
           </button>
 
           <ModalEditarCuenta
@@ -309,11 +429,13 @@ function FilaBarberoUsuario({ barbero, barberiaId }) {
             onCerrar={() => setModalEditarAbierto(false)}
             titulo={`Cuenta de ${barbero.nombre}`}
             usuario={barbero.usuario}
+            nombre={barbero.nombre}
+            onGuardarNombre={(nombre) => actualizarBarbero.mutateAsync({ id: barbero.id, cambios: { nombre } })}
             onGuardarPassword={(password) => establecerPassword.mutateAsync({ barberoId: barbero.id, password })}
             onEliminar={eliminar}
             eliminando={eliminarCuenta.isPending}
           />
-        </div>
+        </>
       ) : (
         <>
           <button
@@ -653,7 +775,7 @@ export function PanelSuperadminBarberiaDetalle() {
           )}
 
           {barberos && barberos.length > 0 && (
-            <div className="mt-3 rounded-lg border border-gris-calido-200 bg-white px-5">
+            <div className="mt-3 flex flex-col gap-3">
               {barberos.map((barbero) => (
                 <FilaBarberoUsuario key={barbero.id} barbero={barbero} barberiaId={id} />
               ))}

@@ -15,24 +15,24 @@ export function Footer({ showModelCredit = false, variante = 'marketing' }) {
       {!esMinimal && (
         <div className="px-6 md:px-10">
           <TextReveal
-            texto="¿Sigues agendando por WhatsApp a mano?"
+            texto="¿Qué esperas para llevar tu barbería al siguiente nivel?"
             as="h2"
             className="max-w-3xl font-display text-4xl font-light leading-[1.05] tracking-tight md:text-6xl"
           />
-          <ScrollReveal delay={0.15} className="mt-8 flex flex-col items-start gap-5 sm:flex-row sm:items-center">
-            <Button href="#planes">Quiero mi barbería en booking.barber.cl</Button>
-            {NUMERO_WHATSAPP_CONTACTO && (
-              <HoverLink
+          {NUMERO_WHATSAPP_CONTACTO && (
+            <ScrollReveal delay={0.15} className="mt-8">
+              <Button
                 href={linkWhatsApp(
                   NUMERO_WHATSAPP_CONTACTO,
                   'Hola, quiero información sobre booking.barber.cl para mi barbería'
                 )}
-                className="text-sm font-medium text-gris-calido-200"
+                target="_blank"
+                rel="noreferrer"
               >
-                O escríbenos por WhatsApp ↗
-              </HoverLink>
-            )}
-          </ScrollReveal>
+                Escríbeme y lo vemos
+              </Button>
+            </ScrollReveal>
+          )}
         </div>
       )}
 

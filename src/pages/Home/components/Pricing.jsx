@@ -2,21 +2,34 @@ import { Button } from '../../../components/common/Button'
 import { ScrollReveal } from '../../../components/animations/ScrollReveal'
 import { StaggerReveal } from '../../../components/animations/StaggerReveal'
 import { AnimatedNumber } from '../../../components/animations/AnimatedNumber'
-import { formatoCLP } from '../../../utils/formatos'
+import { formatoCLP, linkWhatsApp } from '../../../utils/formatos'
+
+const NUMERO_WHATSAPP_CONTACTO = import.meta.env.VITE_WHATSAPP_CONTACTO
+
+// No hay alta automatizada todavía: "Elegir" siempre lleva a hablar
+// directo por WhatsApp con Enzo, para coordinar ahí mismo.
+function linkElegirPlan(nombrePlan) {
+  return linkWhatsApp(
+    NUMERO_WHATSAPP_CONTACTO,
+    `Hola, quiero conversar sobre el plan ${nombrePlan} de booking.barber.cl para mi barbería`
+  )
+}
 
 const PLANES = [
   { clave: 'equipo', nombre: 'Equipo', precio: 6000, destacado: true },
   { clave: 'estudio', nombre: 'Estudio', precio: 7000, destacado: false },
 ]
 
+// Sin la fila de "Notificación por correo y WhatsApp" a propósito: todavía
+// no existe ningún aviso automático — ni por correo ni por WhatsApp — así
+// que prometerlo acá sería falso. Vuelve cuando esté construido de verdad.
 const FILAS = [
-  { etiqueta: 'Barberos', equipo: 'Hasta 3', estudio: 'Ilimitados' },
+  { etiqueta: 'Barberos', equipo: 'Hasta 3', estudio: 'Hasta 10' },
   { etiqueta: 'Página propia', equipo: true, estudio: true },
   { etiqueta: 'Reservas ilimitadas', equipo: true, estudio: true },
   { etiqueta: 'Ofertas ilimitadas', equipo: true, estudio: true },
   { etiqueta: 'Galería de fotos', equipo: 'Hasta 6', estudio: 'Ilimitada' },
   { etiqueta: 'Imagen y texto, testimonios', equipo: false, estudio: true },
-  { etiqueta: 'Notificación por correo y WhatsApp', equipo: false, estudio: true },
   { etiqueta: 'Soporte prioritario', equipo: false, estudio: true },
 ]
 
@@ -56,9 +69,9 @@ export function Pricing() {
           <StaggerReveal className="mt-14 hidden lg:block">
             {/* table-fixed es la corrección real: sin esto, table-layout:auto
                 expande cada columna según su contenido más ancho (el botón
-                "Elegir Estudio", la fila de WhatsApp) y el navegador ensancha
-                la tabla entera más allá de su contenedor — no es un problema
-                de grid ni de overflow, es table-layout. */}
+                "Elegir Estudio") y el navegador ensancha la tabla entera más
+                allá de su contenedor — no es un problema de grid ni de
+                overflow, es table-layout. */}
             <table className="w-full table-fixed border-collapse text-left">
               <thead>
                 <tr>
@@ -104,7 +117,9 @@ export function Pricing() {
                   {PLANES.map((plan) => (
                     <td key={plan.clave} className={`px-4 py-6 ${plan.destacado ? 'bg-cobre/5' : ''}`}>
                       <Button
-                        href="https://wa.me/56941781505?text=Hola%2C%20quiero%20saber%20m%C3%A1s%20de%20los%20Servicios!"
+                        href={linkElegirPlan(plan.nombre)}
+                        target="_blank"
+                        rel="noreferrer"
                         className={`w-full ${
                           plan.destacado ? '' : 'bg-negro-barbero hover:bg-black'
                         }`}
@@ -127,10 +142,8 @@ export function Pricing() {
             {PLANES.map((plan) => (
               <div
                 key={plan.clave}
-                className={`w-[85vw] shrink-0 snap-center rounded-2xl border p-6 sm:w-72 ${
-                  plan.destacado
-                    ? 'border-cobre bg-cobre/5'
-                    : 'border-gris-calido-200 bg-white/60'
+                className={`flex w-[85vw] shrink-0 snap-center flex-col rounded-2xl border bg-white/60 p-6 sm:w-72 ${
+                  plan.destacado ? 'border-cobre' : 'border-gris-calido-200'
                 }`}
               >
                 {plan.destacado && (
@@ -146,7 +159,7 @@ export function Pricing() {
                   <span className="ml-1 text-sm font-normal text-gris-calido-500">/mes</span>
                 </span>
 
-                <ul className="mt-6 flex flex-col gap-3 border-t border-gris-calido-200 pt-6">
+                <ul className="mb-6 mt-6 flex flex-col gap-3 border-t border-gris-calido-200 pt-6">
                   {FILAS.map((fila) => (
                     <li
                       key={fila.etiqueta}
@@ -159,8 +172,10 @@ export function Pricing() {
                 </ul>
 
                 <Button
-                  href="https://wa.me/56941781505?text=Hola%2C%20quiero%20saber%20m%C3%A1s%20de%20los%20Servicios!"
-                  className={`mt-6 block w-full ${
+                  href={linkElegirPlan(plan.nombre)}
+                  target="_blank"
+                  rel="noreferrer"
+                  className={`mt-auto block w-full ${
                     plan.destacado ? '' : 'bg-negro-barbero hover:bg-black'
                   }`}
                 >

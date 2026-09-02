@@ -32,7 +32,7 @@ export const SUPERADMIN_PROVISORIO = { usuario: 'superadmin', password_provisori
 const PLANES_SEED = [
   { id: 1, nombre: 'Solo', precio_clp: 5000, max_barberos: 1, orden: 1 },
   { id: 2, nombre: 'Equipo', precio_clp: 6000, max_barberos: 3, orden: 2 },
-  { id: 3, nombre: 'Estudio', precio_clp: 7000, max_barberos: 99, orden: 3 },
+  { id: 3, nombre: 'Estudio', precio_clp: 7000, max_barberos: 10, orden: 3 },
 ]
 
 const BARBERIAS_SEED = [
@@ -242,9 +242,21 @@ export async function obtenerBarberiaProvisoriaPorSlug(slug) {
   }
 }
 
+// Plan "Solo" (id 1) discontinuado — mismo filtro que obtenerPlanes() en
+// usePlanesSuperadmin.js, para que el modo sin backend real se comporte
+// igual.
 export async function listarPlanesProvisorios() {
   const { planes } = leerEstado()
-  return [...planes].sort((a, b) => a.orden - b.orden)
+  return [...planes].filter((p) => p.id !== 1).sort((a, b) => a.orden - b.orden)
+}
+
+export async function actualizarPrecioPlanProvisorio(id, precio_clp) {
+  const estado = leerEstado()
+  const plan = estado.planes.find((p) => p.id === id)
+  if (!plan) throw new Error('Plan provisorio no encontrado: ' + id)
+  plan.precio_clp = precio_clp
+  guardarEstado(estado)
+  return plan
 }
 
 export async function slugProvisorioDisponible(slug) {

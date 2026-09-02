@@ -3,7 +3,7 @@ import { PanelShell } from '../../components/panel/PanelShell'
 
 const SECCIONES = [
   { to: '/admin', etiqueta: 'Barberías', fin: true },
-  { to: '/admin/planes', etiqueta: 'Planes' },
+  { to: '/admin/planes', etiqueta: 'Precios' },
   { to: '/admin/novedades', etiqueta: 'Novedades' },
 ]
 

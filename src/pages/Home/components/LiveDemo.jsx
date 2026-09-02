@@ -225,6 +225,14 @@ export function LiveDemo() {
         </div>
 
         <div className="order-1 md:order-2">
+          {/* min-h fijo: el título y el texto cambian de largo en cada uno de
+              los 5 pasos ("Elige un barbero" vs "¡Listo!"), y como acá arriba
+              no hay ningún truco de grid apilado (a diferencia del
+              PhoneMockup) — sin este piso, cada paso más corto encogía este
+              bloque y, en mobile (donde queda apilado ARRIBA del celular,
+              `order-1`), toda la sección se achicaba y agrandaba de golpe al
+              cambiar de paso. Medido en vivo: 102-122px en mobile,
+              113-137px en desktop. */}
           <AnimatePresence mode="wait">
             <motion.div
               key={paso}
@@ -232,6 +240,7 @@ export function LiveDemo() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -12 }}
               transition={{ duration: 0.35, ease: EASE_ENTRADA }}
+              className="min-h-[128px] md:min-h-[148px]"
             >
               <span className="numeros-tabulares text-sm text-cobre-texto">
                 {String(paso + 1).padStart(2, '0')} / {String(PASOS.length).padStart(2, '0')}
