@@ -8,6 +8,17 @@
     <link rel="manifest" href="/site.webmanifest" />
     <meta name="theme-color" content="#1c1b19" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <!-- Antes esto era un @import dentro de index.css: el navegador tenía
+         que bajar el CSS, leerlo, y recién ahí pedir la fuente — 3 saltos de
+         red en cadena antes de poder pintar texto. Como <link> acá arriba,
+         se descubre y se pide en paralelo desde el primer instante. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,100..900;1,9..144,100..900&family=Archivo:wght@100..900&display=swap"
+    />
     <title>Booking Barber — Reservas online para tu barbería</title>
 
     <!-- La ruta "/" es la ÚNICA que nunca pasa por `api/meta.js`: Vercel

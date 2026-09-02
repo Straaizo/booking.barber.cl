@@ -14,10 +14,18 @@ export function Footer({ showModelCredit = false, variante = 'marketing' }) {
     <footer className={`bg-negro-barbero text-hueso ${esMinimal ? 'pb-8 pt-14' : 'pb-8 pt-20 md:pt-28'}`}>
       {!esMinimal && (
         <div className="px-6 md:px-10">
+          <ScrollReveal>
+            <HoverLink
+              href="/"
+              className="font-display text-2xl font-semibold italic tracking-tight text-hueso"
+            >
+              booking<span className="text-cobre-claro">.</span>barber.cl
+            </HoverLink>
+          </ScrollReveal>
           <TextReveal
             texto="¿Qué esperas para llevar tu barbería al siguiente nivel?"
             as="h2"
-            className="max-w-3xl font-display text-4xl font-light leading-[1.05] tracking-tight md:text-6xl"
+            className="mt-6 max-w-3xl font-display text-4xl font-light leading-[1.05] tracking-tight md:text-6xl"
           />
           {NUMERO_WHATSAPP_CONTACTO && (
             <ScrollReveal delay={0.15} className="mt-8">
@@ -29,7 +37,7 @@ export function Footer({ showModelCredit = false, variante = 'marketing' }) {
                 target="_blank"
                 rel="noreferrer"
               >
-                Escríbeme y lo vemos
+                Contáctanos
               </Button>
             </ScrollReveal>
           )}

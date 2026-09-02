@@ -18,7 +18,7 @@ export function FounderSpots() {
       <SectionRule indice="— 06" texto="Cupos fundadores" tono="claro" />
 
       <div className="mt-14 grid grid-cols-12 gap-x-6">
-        <div className="col-span-12 md:col-span-5">
+        <div className="col-span-12 md:col-span-6">
           <ScrollReveal>
             <p className="font-display text-3xl font-light leading-tight tracking-tight md:text-5xl">
               Recién estamos partiendo.{' '}
@@ -31,8 +31,10 @@ export function FounderSpots() {
               atención mientras el producto crece.
             </p>
           </ScrollReveal>
+        </div>
 
-          <ScrollReveal delay={0.1} className="mt-10">
+        <div className="col-span-12 mt-12 md:col-span-6 md:col-start-7 md:mt-0">
+          <ScrollReveal delay={0.1}>
             <span className="numeros-tabulares font-display text-6xl font-light tracking-tight text-hueso md:text-7xl">
               {disponibles}
             </span>
@@ -46,10 +48,8 @@ export function FounderSpots() {
               />
             </div>
           </ScrollReveal>
-        </div>
 
-        <div className="col-span-12 mt-12 md:col-span-6 md:col-start-7 md:mt-0">
-          <StaggerReveal className="flex flex-col gap-8">
+          <StaggerReveal className="mt-10 flex flex-col gap-8">
             {BENEFICIOS.map((beneficio, indice) => (
               <div key={beneficio} className="flex gap-5 border-t border-hueso/10 pt-6 first:border-t-0 first:pt-0">
                 <span className="numeros-tabulares text-cobre-claro">

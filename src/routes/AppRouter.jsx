@@ -1,27 +1,52 @@
-import { createBrowserRouter, Navigate, RouterProvider, useParams } from 'react-router-dom'
+import { lazy, Suspense } from 'react'
+import { createBrowserRouter, Navigate, Outlet, RouterProvider, useParams } from 'react-router-dom'
 import { Home } from '../pages/Home/Home'
-import { PaginaBarberia } from '../pages/barberias/PaginaBarberia'
-import { RutaBarberia } from '../pages/barberias/RutaBarberia'
-import { RutaDemo } from '../pages/demo/RutaDemo'
-import { Login } from '../pages/Login/Login'
 import { RutaProtegida } from './RutaProtegida'
-import { PanelBarberoLayout } from '../pages/panel/PanelBarberoLayout'
-import { PanelBarberoReservas } from '../pages/panel/PanelBarberoReservas'
-import { PanelBarberoHorarios } from '../pages/panel/PanelBarberoHorarios'
-import { PanelBarberoServicios } from '../pages/panel/PanelBarberoServicios'
-import { PanelAdminLayout } from '../pages/panel/PanelAdminLayout'
-import { PanelReservas } from '../pages/panel/PanelReservas'
-import { PanelBarberos } from '../pages/panel/PanelBarberos'
-import { PanelServicios } from '../pages/panel/PanelServicios'
-import { PanelHorarios } from '../pages/panel/PanelHorarios'
-import { PanelPersonalizacion } from '../pages/panel/PanelPersonalizacion'
-import { PreviewBarberia } from '../pages/panel/PreviewBarberia'
-import { PanelSuperadminLayout } from '../pages/panel/PanelSuperadminLayout'
-import { PanelSuperadminBarberias } from '../pages/panel/PanelSuperadminBarberias'
-import { PanelSuperadminBarberiaDetalle } from '../pages/panel/PanelSuperadminBarberiaDetalle'
-import { PanelSuperadminPlanes } from '../pages/panel/PanelSuperadminPlanes'
-import { PanelSuperadminNovedades } from '../pages/panel/PanelSuperadminNovedades'
+import { Loader } from '../components/common/Loader'
 import { ROL_BARBERO, ROL_ADMIN, ROL_SUPERADMIN } from '../utils/roles'
+
+// `Home` es la única página que se carga sin lazy — es la puerta de entrada
+// más visitada (bookingbarber.cl) y no vale la pena el viaje de red extra
+// que implica un chunk separado para ella. Todo lo demás (páginas públicas
+// de barbería, login, y sobre todo los 3 paneles con toda su lógica de
+// Supabase/TanStack Query) antes viajaba junto en un solo bundle de ~980kB
+// gzip aunque el visitante nunca los usara — separados en chunks, cada
+// visita solo descarga el código de la ruta que realmente pisa.
+function pagina(cargar, nombre) {
+  return lazy(() => cargar().then((modulo) => ({ default: modulo[nombre] })))
+}
+
+const PaginaBarberia = pagina(() => import('../pages/barberias/PaginaBarberia'), 'PaginaBarberia')
+const RutaBarberia = pagina(() => import('../pages/barberias/RutaBarberia'), 'RutaBarberia')
+const RutaDemo = pagina(() => import('../pages/demo/RutaDemo'), 'RutaDemo')
+const Login = pagina(() => import('../pages/Login/Login'), 'Login')
+const PanelBarberoLayout = pagina(() => import('../pages/panel/PanelBarberoLayout'), 'PanelBarberoLayout')
+const PanelBarberoReservas = pagina(() => import('../pages/panel/PanelBarberoReservas'), 'PanelBarberoReservas')
+const PanelBarberoHorarios = pagina(() => import('../pages/panel/PanelBarberoHorarios'), 'PanelBarberoHorarios')
+const PanelBarberoServicios = pagina(() => import('../pages/panel/PanelBarberoServicios'), 'PanelBarberoServicios')
+const PanelAdminLayout = pagina(() => import('../pages/panel/PanelAdminLayout'), 'PanelAdminLayout')
+const PanelReservas = pagina(() => import('../pages/panel/PanelReservas'), 'PanelReservas')
+const PanelBarberos = pagina(() => import('../pages/panel/PanelBarberos'), 'PanelBarberos')
+const PanelServicios = pagina(() => import('../pages/panel/PanelServicios'), 'PanelServicios')
+const PanelHorarios = pagina(() => import('../pages/panel/PanelHorarios'), 'PanelHorarios')
+const PanelPersonalizacion = pagina(() => import('../pages/panel/PanelPersonalizacion'), 'PanelPersonalizacion')
+const PreviewBarberia = pagina(() => import('../pages/panel/PreviewBarberia'), 'PreviewBarberia')
+const PanelSuperadminLayout = pagina(() => import('../pages/panel/PanelSuperadminLayout'), 'PanelSuperadminLayout')
+const PanelSuperadminBarberias = pagina(() => import('../pages/panel/PanelSuperadminBarberias'), 'PanelSuperadminBarberias')
+const PanelSuperadminBarberiaDetalle = pagina(
+  () => import('../pages/panel/PanelSuperadminBarberiaDetalle'),
+  'PanelSuperadminBarberiaDetalle'
+)
+const PanelSuperadminPlanes = pagina(() => import('../pages/panel/PanelSuperadminPlanes'), 'PanelSuperadminPlanes')
+const PanelSuperadminNovedades = pagina(() => import('../pages/panel/PanelSuperadminNovedades'), 'PanelSuperadminNovedades')
+
+function CargandoPagina() {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-hueso">
+      <Loader label="Cargando" />
+    </div>
+  )
+}
 
 // Cualquiera que ya tenga guardado un link viejo con el prefijo (compartido
 // antes de este cambio, en Instagram/WhatsApp/etc.) sigue llegando a la
@@ -33,8 +58,15 @@ function RedirigirBarberiaSinPrefijo() {
 }
 
 const router = createBrowserRouter([
-  { path: '/', element: <Home /> },
-  { path: '/login', element: <Login /> },
+  {
+    element: (
+      <Suspense fallback={<CargandoPagina />}>
+        <Outlet />
+      </Suspense>
+    ),
+    children: [
+      { path: '/', element: <Home /> },
+      { path: '/login', element: <Login /> },
   // Superficie de render aislada para la vista previa PC/Móvil del panel de
   // personalización — vive en un <iframe>, recibe sus datos por postMessage,
   // nunca se navega a mano. Al cargar ahí dentro (con su propia
@@ -111,7 +143,9 @@ const router = createBrowserRouter([
   // apuntando a algo que ya no existe) vuelve al inicio en vez de quedar en
   // blanco — no es una medida de seguridad en sí, pero evita que alguien
   // "explorando" URLs a mano tenga alguna señal de que encontró algo.
-  { path: '*', element: <Navigate to="/" replace /> },
+      { path: '*', element: <Navigate to="/" replace /> },
+    ],
+  },
 ])
 
 export function AppRouter() {
