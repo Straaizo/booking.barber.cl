@@ -1,9 +1,17 @@
-import { useNavigate } from 'react-router-dom'
+import { NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
 import { rutaPorRol, ROL_ADMIN, ROL_BARBERO } from '../../utils/roles'
 import { HoverLink } from '../common/HoverLink'
+import { IconoCuenta } from '../common/IconoCuenta'
 
 const NOMBRES_ROL = { 1: 'Superadmin', 2: 'Administrador', 3: 'Barbero' }
+
+const FORMATO_FECHA = new Intl.DateTimeFormat('es-CL', { weekday: 'long', day: 'numeric', month: 'long' })
+
+function fechaDeHoy() {
+  const fecha = FORMATO_FECHA.format(new Date())
+  return fecha.charAt(0).toUpperCase() + fecha.slice(1)
+}
 
 // Cascarón compartido por los tres paneles (barbero/admin/superadmin) — barra
 // superior densa con identidad de marca + sesión, y una franja lateral
@@ -18,7 +26,7 @@ const ANCHOS = {
   amplio: 'max-w-7xl',
 }
 
-export function PanelShell({ titulo, nav, children, ancho = 'normal' }) {
+export function PanelShell({ nav, children, ancho = 'normal', rutaCuenta }) {
   const { perfil, cerrarSesion, verComo, cambiarVerComo, barberosParaSelector } = useAuth()
   const navigate = useNavigate()
 
@@ -43,18 +51,16 @@ export function PanelShell({ titulo, nav, children, ancho = 'normal' }) {
           <HoverLink href="/" className="font-display text-base italic tracking-tight">
             booking<span className="text-cobre">.</span>barber.cl
           </HoverLink>
-          <span className="versalitas hidden text-xs text-gris-calido-400 md:inline">
-            {titulo}
+          <span className="hidden h-8 w-px bg-gris-calido-700 sm:block" aria-hidden="true" />
+          <span className="hidden text-left sm:block">
+            <span className="block text-sm leading-tight">Bienvenido, {perfil?.nombre}</span>
+            <span className="versalitas block text-xs text-gris-calido-400">
+              {NOMBRES_ROL[perfil?.rol_id]} · {fechaDeHoy()}
+            </span>
           </span>
         </div>
 
         <div className="flex items-center gap-4 text-sm">
-          <span className="hidden text-right sm:block">
-            <span className="block leading-tight">{perfil?.nombre}</span>
-            <span className="versalitas block text-xs text-gris-calido-400">
-              {NOMBRES_ROL[perfil?.rol_id]}
-            </span>
-          </span>
           {cambiarVerComo && (
             <label className="hidden items-center gap-2 md:flex">
               <span className="versalitas text-xs text-gris-calido-400">Ver como</span>
@@ -72,6 +78,19 @@ export function PanelShell({ titulo, nav, children, ancho = 'normal' }) {
                 ))}
               </select>
             </label>
+          )}
+          {rutaCuenta && (
+            <>
+              <NavLink
+                to={rutaCuenta}
+                aria-label="Cuenta"
+                className="versalitas flex items-center gap-1.5 text-xs text-gris-calido-400 transition-colors hover:text-cobre"
+              >
+                <IconoCuenta className="h-5 w-5" />
+                <span className="hidden sm:inline">Cuenta</span>
+              </NavLink>
+              <span className="h-8 w-px bg-gris-calido-700" aria-hidden="true" />
+            </>
           )}
           <button
             type="button"

@@ -19,6 +19,8 @@
 //   { accion: 'crear_barbero',  barberiaId, barberoId, nombre, password }
 //   { accion: 'resetear_password', usuarioId, password }
 //   { accion: 'eliminar_cuenta',   usuarioId }
+//   { accion: 'eliminar_cuenta_huerfana' } — cualquiera, pero SOLO borra su
+//     propia cuenta, y solo si no tiene fila en `usuarios` (ver ese bloque).
 // El `usuario` (nombre de login) no lo manda el cliente: se genera acá mismo
 // a partir de `nombre` (ver `generarUsuarioServidor`) — así la unicidad se
 // resuelve contra la base real, no contra lo que el navegador cree que existe.
@@ -153,6 +155,36 @@ Deno.serve(async (req) => {
       return responder({ error: 'Sesión inválida.' }, 401)
     }
 
+    const body = await req.json()
+    const { accion } = body
+
+    // ------------------------------------------------------------------
+    // eliminar_cuenta_huerfana — la única acción que NO requiere tener ya
+    // una fila en `usuarios` (por eso vive antes de esa resolución de más
+    // abajo). Pasa cuando alguien completa un login con Google sin que su
+    // cuenta esté vinculada a ningún barbero/dueño real: Supabase ya creó
+    // la identidad de Auth para esa persona ANTES de que la app pueda
+    // rechazarla — sin este borrado, cualquiera que visite /login y pruebe
+    // "Iniciar sesión con Google" (sin ninguna relación con una barbería
+    // real) deja una fila permanente en auth.users. Doble chequeo acá: si
+    // la cuenta que pide borrarse SÍ tiene una fila real en `usuarios`,
+    // se rechaza — esto nunca debe poder borrar una cuenta vinculada de
+    // verdad, ni la de nadie más que uno mismo (siempre opera sobre
+    // `datosUsuario.user.id`, nunca sobre un id que mande el body).
+    if (accion === 'eliminar_cuenta_huerfana') {
+      const { data: filaExistente } = await clienteAdmin
+        .from('usuarios')
+        .select('id')
+        .eq('id', datosUsuario.user.id)
+        .maybeSingle()
+      if (filaExistente) {
+        return responder({ error: 'Esta cuenta tiene un perfil real — no se puede eliminar así.' }, 403)
+      }
+      const { error } = await clienteAdmin.auth.admin.deleteUser(datosUsuario.user.id)
+      if (error) return responder({ error: error.message }, 400)
+      return responder({ ok: true })
+    }
+
     const { data: quienLlama, error: errorPerfil } = await clienteAdmin
       .from('usuarios')
       .select('rol_id, barberia_id')
@@ -164,9 +196,6 @@ Deno.serve(async (req) => {
 
     const esSuperadmin = quienLlama.rol_id === 1
     const esDueno = quienLlama.rol_id === 2
-
-    const body = await req.json()
-    const { accion } = body
 
     // ------------------------------------------------------------------
     // crear_dueno — solo superadmin.

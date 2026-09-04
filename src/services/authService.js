@@ -59,6 +59,43 @@ export async function iniciarSesion({ usuario, password }) {
   }
 }
 
+// Login directo con Google — SOLO funciona para una cuenta que ya vinculó su
+// Google antes con `vincularGoogle()` (ver ahí el motivo: sin ese paso previo,
+// Supabase crea una identidad nueva sin fila en `usuarios`, y `obtenerPerfil`
+// la rechaza como sesión inválida). `redirectTo` vuelve siempre a `/login`:
+// esa pantalla ya redirige sola por rol en cuanto detecta sesión + perfil.
+export async function iniciarSesionConGoogle() {
+  const { error } = await supabase.auth.signInWithOAuth({
+    provider: 'google',
+    options: { redirectTo: `${window.location.origin}/login` },
+  })
+  if (error) throw new ErrorLogin('desconocido', MENSAJE_CONEXION)
+}
+
+// Ata la cuenta de Google de quien YA tiene una sesión activa (usuario/
+// contraseña) al mismo `auth.users.id` que ya tiene — a diferencia de un
+// login con Google normal, esto no crea una identidad separada, así que
+// `usuarios.id = auth.uid()` sigue funcionando para cualquiera de las dos
+// formas de entrar después. Requiere "Allow manual linking" prendido en
+// Supabase (Authentication → Providers → Email, más abajo del todo).
+export async function vincularGoogle() {
+  const { error } = await supabase.auth.linkIdentity({
+    provider: 'google',
+    options: { redirectTo: `${window.location.origin}/panel` },
+  })
+  if (error) throw error
+}
+
+// A diferencia de `resetearPasswordUsuario` (usuariosService.js, para que un
+// dueño/superadmin cambie la contraseña de OTRA cuenta vía Edge Function),
+// esto cambia la contraseña de quien está autenticado ahora mismo — Supabase
+// lo permite directo desde el cliente porque ya viene con una sesión válida,
+// sin necesitar la `SERVICE_ROLE_KEY`.
+export async function cambiarPasswordPropia(password) {
+  const { error } = await supabase.auth.updateUser({ password })
+  if (error) throw error
+}
+
 export async function cerrarSesion() {
   // En modo provisorio (ver AuthContext) no hay sesión real de Supabase que
   // cerrar — intentarlo solo tira un error de red contra la URL de ejemplo.

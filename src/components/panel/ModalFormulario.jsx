@@ -6,7 +6,13 @@ import { EASE_ENTRADA, DURACION_MICRO } from '../animations/easing'
 // crear algo puntual (una cuenta, una contraseña) sin sacar a la persona de
 // dónde estaba ni ensuciar la pantalla con un formulario siempre visible.
 // Esc y clic afuera cierran igual que el botón "Cerrar".
-export function ModalFormulario({ abierto, titulo, onCerrar, children }) {
+const ANCHOS = {
+  sm: 'max-w-sm',
+  md: 'max-w-md',
+  lg: 'max-w-lg',
+}
+
+export function ModalFormulario({ abierto, titulo, onCerrar, children, ancho = 'sm' }) {
   useEffect(() => {
     if (!abierto) return
     function alTeclado(evento) {
@@ -36,7 +42,7 @@ export function ModalFormulario({ abierto, titulo, onCerrar, children }) {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 8, scale: 0.98 }}
             transition={{ duration: DURACION_MICRO, ease: EASE_ENTRADA }}
-            className="w-full max-w-sm rounded-lg border border-gris-calido-200 bg-white p-6 shadow-xl"
+            className={`w-full ${ANCHOS[ancho]} rounded-lg border border-gris-calido-200 bg-white p-6 shadow-xl`}
           >
             <div className="flex items-center justify-between gap-4">
               <span className="versalitas text-xs text-cobre">{titulo}</span>

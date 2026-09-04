@@ -1,6 +1,7 @@
 import { createContext, useEffect, useState } from 'react'
 import { supabase } from '../services/supabaseClient'
-import { obtenerPerfil, iniciarSesion, cerrarSesion, ErrorLogin } from '../services/authService'
+import { obtenerPerfil, iniciarSesion, cerrarSesion, vincularGoogle, ErrorLogin } from '../services/authService'
+import { eliminarCuentaHuerfanaPropia } from '../services/usuariosService'
 import {
   HAY_BACKEND_REAL,
   SUPERADMIN_PROVISORIO,
@@ -150,9 +151,32 @@ export function AuthProvider({ children }) {
         // La sesión de Supabase Auth existe pero no hay fila en `usuarios`
         // (o RLS la bloquea) — no se puede resolver un rol, se trata como
         // sesión inválida para no dejar a nadie en un estado indefinido.
-        setErrorPerfil(error)
+        // Si esa sesión venía de un login con Google (no de "vincular", sino
+        // de entrar directo por primera vez con una cuenta que nadie ató
+        // todavía a un usuario real), se marca aparte para mostrar un
+        // mensaje específico en vez del genérico de credenciales.
+        const esGoogleSinVincular = sesionActual.user.app_metadata?.provider === 'google'
+        setErrorPerfil({ ...error, esGoogleSinVincular })
         setSesion(null)
         setPerfil(null)
+        // Si viene de un login con Google sin vincular, Supabase ya creó una
+        // identidad real en `auth.users` para esa persona ANTES de que acá
+        // se la pueda rechazar — sin borrarla, cualquiera que pruebe el botón
+        // de Google sin tener ninguna cuenta real deja una fila permanente.
+        // Tiene que llamarse ANTES de `signOut()`: la Edge Function identifica
+        // a quien borra por su propio JWT, que deja de servir apenas se cierra
+        // la sesión.
+        // `await` acá es obligatorio, no cosmético: sin esperar, `signOut()`
+        // de la línea de abajo corre en paralelo y puede limpiar la sesión
+        // ANTES de que esta llamada llegue a armar su header de
+        // autenticación — la Edge Function la rechaza con 401 y el `catch`
+        // la traga en silencio, dejando la cuenta huérfana igual.
+        if (esGoogleSinVincular) await eliminarCuentaHuerfanaPropia().catch(() => {})
+        // La sesión de Supabase Auth queda huérfana (autenticada, sin perfil
+        // de la app) si no se cierra acá — de lo contrario, el próximo
+        // `getSession()` la vuelve a traer y repite el mismo fallo en
+        // silencio en cada carga, sin que la persona pueda hacer nada.
+        supabase.auth.signOut()
       } finally {
         if (activo) setCargando(false)
       }
@@ -205,14 +229,23 @@ export function AuthProvider({ children }) {
   // propia sesión — un barbero que entró con su propio usuario no lo ve.
   const puedeVerComo = !HAY_BACKEND_REAL && sesionProvisoria?.tipo === 'dueno'
 
+  // `identities` viene incluido en el user de Supabase Auth — lo usa
+  // PanelShell para saber si ya se vinculó Google o hay que ofrecer hacerlo.
+  const googleVinculado = Boolean(
+    sesion?.user?.identities?.some((identidad) => identidad.provider === 'google')
+  )
+
   const valor = {
     sesion,
     perfil,
     cargando,
     errorPerfil,
+    limpiarErrorPerfil: () => setErrorPerfil(null),
     autenticado: Boolean(sesion && perfil),
     iniciarSesion: iniciarSesionUsuario,
     cerrarSesion: cerrarSesionUsuario,
+    vincularGoogle: HAY_BACKEND_REAL ? vincularGoogle : null,
+    googleVinculado,
     verComo: puedeVerComo ? verComo : null,
     cambiarVerComo: puedeVerComo ? cambiarVerComo : null,
     barberosParaSelector: puedeVerComo ? listarBarberosParaSelectorProvisorio(sesionProvisoria.barberiaId) : [],

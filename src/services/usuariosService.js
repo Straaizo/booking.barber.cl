@@ -30,3 +30,10 @@ export function resetearPasswordUsuario({ usuarioId, password }) {
 export function eliminarCuentaUsuario({ usuarioId }) {
   return invocarGestionUsuario({ accion: 'eliminar_cuenta', usuarioId })
 }
+
+// Se llama sobre la sesión de quien la está pidiendo — nunca recibe un id,
+// la Edge Function solo borra a `auth.uid()` y solo si esa cuenta no tiene
+// fila real en `usuarios` (ver ese bloque para el motivo completo).
+export function eliminarCuentaHuerfanaPropia() {
+  return invocarGestionUsuario({ accion: 'eliminar_cuenta_huerfana' })
+}

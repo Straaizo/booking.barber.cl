@@ -6,7 +6,9 @@ import { esquemaLogin } from './esquemaLogin'
 import { useLogin } from './useLogin'
 import { IconoOjo } from './IconoOjo'
 import { Button } from '../../../components/common/Button'
+import { IconoGoogle } from '../../../components/common/IconoGoogle'
 import { linkWhatsApp } from '../../../utils/formatos'
+import { iniciarSesionConGoogle } from '../../../services/authService'
 import { HAY_BACKEND_REAL, ADMIN_PROVISORIO, SUPERADMIN_PROVISORIO } from '../../../mocks/datosProvisoriosSuperadmin'
 
 const NUMERO_CONTACTO = import.meta.env.VITE_WHATSAPP_CONTACTO
@@ -50,6 +52,8 @@ export function FormularioAcceso({ onCambioFoco, onEscribiendo, compacto = false
   const [mostrarPassword, setMostrarPassword] = useState(false)
   const [bloqMayusActivo, setBloqMayusActivo] = useState(false)
   const [mostrarAyudaRecuperar, setMostrarAyudaRecuperar] = useState(false)
+  const [enviandoGoogle, setEnviandoGoogle] = useState(false)
+  const [errorGoogle, setErrorGoogle] = useState(null)
   const formularioRef = useRef(null)
   const timeoutEscrituraRef = useRef(null)
 
@@ -91,6 +95,19 @@ export function FormularioAcceso({ onCambioFoco, onEscribiendo, compacto = false
 
   async function alEnviar(datos) {
     await enviar(datos)
+  }
+
+  async function alEntrarConGoogle() {
+    setEnviandoGoogle(true)
+    setErrorGoogle(null)
+    try {
+      await iniciarSesionConGoogle()
+      // Si no tira error, el navegador ya está siendo redirigido a Google —
+      // no hay nada más que hacer acá.
+    } catch {
+      setErrorGoogle('No pudimos conectar con Google. Intenta de nuevo.')
+      setEnviandoGoogle(false)
+    }
   }
 
   return (
@@ -163,6 +180,32 @@ export function FormularioAcceso({ onCambioFoco, onEscribiendo, compacto = false
           {enviando ? 'Ingresando…' : 'Ingresar'}
         </span>
       </Button>
+
+      {/* Solo tiene sentido con Supabase real conectado — en modo de prueba
+          no hay OAuth de verdad contra el que autenticarse. */}
+      {HAY_BACKEND_REAL && (
+        <>
+          <Button
+            as="button"
+            type="button"
+            onClick={alEntrarConGoogle}
+            disabled={enviandoGoogle}
+            className="w-full border border-gris-calido-200 !bg-white !text-negro-barbero hover:!brightness-100 hover:border-gris-calido-500 disabled:opacity-70"
+          >
+            <span className="flex items-center justify-center gap-2">
+              {/* Sin IndicadorCargaBoton acá: está pensado en tonos claros
+                  para el botón oscuro de arriba, invisible sobre blanco. */}
+              {!enviandoGoogle && <IconoGoogle className="h-5 w-5" />}
+              {enviandoGoogle ? 'Conectando…' : 'Iniciar sesión con Google'}
+            </span>
+          </Button>
+          {errorGoogle && (
+            <p role="alert" className="text-center text-sm text-red-700">
+              {errorGoogle}
+            </p>
+          )}
+        </>
+      )}
 
       {/* Solo mientras no hay Supabase real conectado — se apaga sola junto
           con el resto del modo provisorio (ver datosProvisoriosSuperadmin.js). */}

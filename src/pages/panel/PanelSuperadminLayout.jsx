@@ -29,7 +29,7 @@ export function PanelSuperadminLayout() {
   const nav = SECCIONES.map((seccion) => <PestanaNav key={seccion.to} {...seccion} />)
 
   return (
-    <PanelShell titulo="Panel superadmin" nav={<div className="flex gap-6">{nav}</div>}>
+    <PanelShell nav={<div className="flex gap-6">{nav}</div>} rutaCuenta="/admin/cuenta">
       <Outlet />
     </PanelShell>
   )

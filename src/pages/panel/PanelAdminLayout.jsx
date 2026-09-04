@@ -34,9 +34,9 @@ export function PanelAdminLayout() {
 
   return (
     <PanelShell
-      titulo="Panel de barbería"
       nav={<div className="flex gap-6">{nav}</div>}
       ancho={esReservas ? 'amplio' : 'normal'}
+      rutaCuenta="/panel/cuenta"
     >
       <Outlet />
     </PanelShell>

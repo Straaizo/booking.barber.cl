@@ -39,6 +39,10 @@ const PanelSuperadminBarberiaDetalle = pagina(
 )
 const PanelSuperadminPlanes = pagina(() => import('../pages/panel/PanelSuperadminPlanes'), 'PanelSuperadminPlanes')
 const PanelSuperadminNovedades = pagina(() => import('../pages/panel/PanelSuperadminNovedades'), 'PanelSuperadminNovedades')
+// Una sola página de "Configuración" (contraseña propia + vincular Google),
+// reusada tal cual en los 3 paneles — no hay nada en su contenido que
+// dependa del rol.
+const PanelCuenta = pagina(() => import('../pages/panel/PanelCuenta'), 'PanelCuenta')
 
 function CargandoPagina() {
   return (
@@ -103,6 +107,7 @@ const router = createBrowserRouter([
           { path: 'reservas', element: <PanelBarberoReservas /> },
           { path: 'horarios', element: <PanelBarberoHorarios /> },
           { path: 'servicios', element: <PanelBarberoServicios /> },
+          { path: 'cuenta', element: <PanelCuenta /> },
         ],
       },
     ],
@@ -120,6 +125,7 @@ const router = createBrowserRouter([
           { path: 'servicios', element: <PanelServicios /> },
           { path: 'horarios', element: <PanelHorarios /> },
           { path: 'personalizacion', element: <PanelPersonalizacion /> },
+          { path: 'cuenta', element: <PanelCuenta /> },
         ],
       },
     ],
@@ -135,6 +141,7 @@ const router = createBrowserRouter([
           { path: 'barberias/:id', element: <PanelSuperadminBarberiaDetalle /> },
           { path: 'planes', element: <PanelSuperadminPlanes /> },
           { path: 'novedades', element: <PanelSuperadminNovedades /> },
+          { path: 'cuenta', element: <PanelCuenta /> },
         ],
       },
     ],

@@ -28,7 +28,7 @@ export function PanelBarberoLayout() {
   const nav = SECCIONES.map((seccion) => <PestanaNav key={seccion.to} {...seccion} />)
 
   return (
-    <PanelShell titulo="Panel de barbero" nav={<div className="flex gap-6">{nav}</div>}>
+    <PanelShell nav={<div className="flex gap-6">{nav}</div>} rutaCuenta="/panel/barbero/cuenta">
       <Outlet />
     </PanelShell>
   )
