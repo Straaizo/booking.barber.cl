@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Interruptor } from '../../../components/panel/Interruptor'
+import { SelectorArchivo } from '../../../components/common/SelectorArchivo'
+import { ModalAsignarBarberos } from './ModalAsignarBarberos'
+import { subirImagenBarberia, borrarImagenBarberia } from '../../../services/storageImagenes'
 import { errorDeOferta } from '../../../utils/ofertas'
 
 const ESTADOS = {
@@ -9,19 +12,23 @@ const ESTADOS = {
   error: 'No se pudo guardar',
 }
 
-export function FilaServicioAdmin({ servicio, onGuardar }) {
+export function FilaServicioAdmin({ servicio, barberiaId, barberos, onGuardar }) {
   const [campos, setCampos] = useState({
     nombre: servicio.nombre,
+    descripcion: servicio.descripcion ?? '',
     duracion_minutos: String(servicio.duracion_minutos),
     precio_clp: String(servicio.precio_clp ?? ''),
     precio_oferta: String(servicio.precio_oferta ?? ''),
   })
   const [estado, setEstado] = useState(null)
   const [errorOferta, setErrorOferta] = useState(null)
+  const [subiendoImagen, setSubiendoImagen] = useState(false)
+  const [modalBarberosAbierto, setModalBarberosAbierto] = useState(false)
 
   useEffect(() => {
     setCampos({
       nombre: servicio.nombre,
+      descripcion: servicio.descripcion ?? '',
       duracion_minutos: String(servicio.duracion_minutos),
       precio_clp: String(servicio.precio_clp ?? ''),
       precio_oferta: String(servicio.precio_oferta ?? ''),
@@ -47,6 +54,28 @@ export function FilaServicioAdmin({ servicio, onGuardar }) {
   function commitTexto() {
     if (campos.nombre.trim() && campos.nombre !== servicio.nombre) {
       guardar({ nombre: campos.nombre.trim() })
+    }
+  }
+
+  function commitDescripcion() {
+    const limpia = campos.descripcion.trim()
+    if (limpia !== (servicio.descripcion ?? '')) {
+      guardar({ descripcion: limpia })
+    }
+  }
+
+  async function cambiarImagen(evento) {
+    const archivo = evento.target.files?.[0]
+    if (!archivo) return
+    setSubiendoImagen(true)
+    try {
+      const urlAnterior = servicio.imagen_url
+      const url = await subirImagenBarberia(archivo, { barberiaId, maxAncho: 800, maxAlto: 600 })
+      await guardar({ imagen_url: url })
+      if (urlAnterior) borrarImagenBarberia(urlAnterior)
+    } finally {
+      setSubiendoImagen(false)
+      evento.target.value = ''
     }
   }
 
@@ -140,6 +169,80 @@ export function FilaServicioAdmin({ servicio, onGuardar }) {
           </div>
         </div>
       </div>
+
+      {/* Imagen + descripción: lo que convierte esta fila en algo que se
+          puede mostrar como tarjeta en la vidriera pública de servicios, no
+          solo una línea de precio. Ambos opcionales — un servicio sin nada
+          de esto sigue funcionando igual, solo que sin foto ni bajada en esa
+          vidriera. */}
+      <div className="mt-4 flex flex-col gap-4 border-t border-gris-calido-100 pt-4 sm:flex-row">
+        <div className="shrink-0">
+          {servicio.imagen_url ? (
+            <img
+              src={servicio.imagen_url}
+              alt={servicio.nombre}
+              className="h-20 w-28 rounded-md object-cover"
+            />
+          ) : (
+            <div className="flex h-20 w-28 items-center justify-center rounded-md border border-dashed border-gris-calido-200 text-xs text-gris-calido-400">
+              Sin foto
+            </div>
+          )}
+          <SelectorArchivo
+            etiqueta={servicio.imagen_url ? 'Cambiar foto' : 'Agregar foto'}
+            cargando={subiendoImagen}
+            onChange={cambiarImagen}
+            className="mt-2 w-full justify-center"
+          />
+        </div>
+        <label className="flex min-w-0 flex-1 flex-col gap-1">
+          <span className="versalitas text-xs text-gris-calido-500">Descripción</span>
+          <textarea
+            name="descripcion"
+            rows={3}
+            value={campos.descripcion}
+            onChange={(e) => setCampos((c) => ({ ...c, descripcion: e.target.value }))}
+            onBlur={commitDescripcion}
+            placeholder="Qué incluye este servicio, para que el cliente sepa qué está eligiendo."
+            className="resize-none rounded-md border border-gris-calido-200 bg-transparent p-2 text-sm text-negro-barbero outline-none transition-colors focus:border-cobre"
+          />
+        </label>
+      </div>
+
+      {/* A qué barberos pertenece este servicio — sin ninguno asignado (el
+          caso por defecto) lo ofrece cualquier barbero activo; con uno o
+          varios, SOLO esos lo ofrecen (ver AsistenteReserva.jsx). Reemplaza
+          al viejo "catálogo propio" que activaba/desactivaba el barbero
+          desde su panel — ahora es el dueño quien decide esto acá, por
+          servicio, en su propia card en vez de una fila de checkboxes
+          siempre visible. */}
+      <div className="mt-4 border-t border-gris-calido-100 pt-4">
+        <span className="versalitas text-xs text-gris-calido-500">Barberos asignados</span>
+        <p className="mt-1 text-sm text-negro-barbero">
+          {(servicio.barbero_ids ?? []).length === 0
+            ? 'Compartido — cualquier barbero'
+            : (barberos ?? [])
+                .filter((barbero) => servicio.barbero_ids.includes(barbero.id))
+                .map((barbero) => barbero.nombre)
+                .join(', ')}
+        </p>
+        <button
+          type="button"
+          onClick={() => setModalBarberosAbierto(true)}
+          className="mt-2 rounded-md border border-gris-calido-200 px-4 py-2 text-sm text-negro-barbero transition-colors hover:border-cobre hover:text-cobre-texto"
+        >
+          Asignar servicio
+        </button>
+      </div>
+
+      <ModalAsignarBarberos
+        abierto={modalBarberosAbierto}
+        servicioNombre={servicio.nombre}
+        barberos={barberos}
+        barberoIds={servicio.barbero_ids ?? []}
+        onGuardar={(barbero_ids) => guardar({ barbero_ids })}
+        onCerrar={() => setModalBarberosAbierto(false)}
+      />
 
       <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-4 border-t border-gris-calido-100 pt-4 md:grid-cols-[8rem_10rem_12rem]">
         <label className="flex flex-col gap-1">

@@ -6,9 +6,10 @@ import {
   listarReservasDeBarberoProvisorias,
   cancelarReservaProvisoria,
 } from '../../../mocks/datosProvisoriosSuperadmin'
+import { conBarberoIds } from '../../../utils/servicios'
 
 const COLUMNAS =
-  'id, cliente_nombre, cliente_telefono, fecha_hora, fecha_hora_fin, estado, servicio_id, barbero_id, servicios (nombre, precio_clp), barberos (nombre, usa_catalogo_propio)'
+  'id, cliente_nombre, cliente_telefono, fecha_hora, fecha_hora_fin, estado, servicio_id, barbero_id, servicios (nombre, precio_clp), barberos (nombre)'
 
 function clave(barberiaId) {
   return ['reservas_bandeja', barberiaId]
@@ -96,10 +97,10 @@ export function useReactivarReserva(barberiaId, barberoId) {
   })
 }
 
-// Todos los servicios ACTIVOS de la barbería, con su `barbero_id` — a
-// diferencia de `useServiciosAdmin` (solo el catálogo compartido), acá hace
-// falta también el catálogo propio de cada barbero para poder ofrecer las
-// opciones correctas al reprogramar una reserva de cualquiera de ellos.
+// Todos los servicios ACTIVOS de la barbería, con sus barberos asignados —
+// hace falta para poder ofrecer las opciones correctas al reprogramar una
+// reserva de cualquiera de ellos (ver `ModalReprogramarReserva` en
+// PanelReservas.jsx).
 export function useServiciosParaReprogramar(barberiaId) {
   return useQuery({
     queryKey: ['servicios_para_reprogramar', barberiaId],
@@ -107,11 +108,11 @@ export function useServiciosParaReprogramar(barberiaId) {
       if (!HAY_BACKEND_REAL) return []
       const { data, error } = await supabase
         .from('servicios')
-        .select('id, nombre, precio_clp, barbero_id')
+        .select('id, nombre, precio_clp')
         .eq('barberia_id', barberiaId)
         .eq('activo', 1)
       if (error) throw error
-      return data
+      return conBarberoIds(data)
     },
     enabled: Boolean(barberiaId),
   })

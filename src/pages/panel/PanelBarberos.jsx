@@ -5,7 +5,9 @@ import { Loader } from '../../components/common/Loader'
 import { Button } from '../../components/common/Button'
 import { Interruptor } from '../../components/panel/Interruptor'
 import { CambiarPassword } from '../../components/panel/CambiarPassword'
-import { SelectorArchivo } from '../../components/common/SelectorArchivo'
+import { ModalConfirmacion } from '../../components/panel/ModalConfirmacion'
+import { IconoPapelera } from '../../components/panel/IconoPapelera'
+import { IconoLapiz } from '../../components/panel/IconoLapiz'
 import { subirImagenBarberia, borrarImagenBarberia } from '../../services/storageImagenes'
 import { useBarberiaAdmin } from './hooks/useBarberiaAdmin'
 import {
@@ -14,8 +16,6 @@ import {
   useActualizarBarbero,
   useDarDeBajaBarbero,
   useEstablecerContrasenaBarbero,
-  useActivarCatalogoPropio,
-  useDesactivarCatalogoPropio,
 } from './hooks/useBarberosAdmin'
 
 // Mismo mínimo que valida la Edge Function `gestionar-usuario`.
@@ -28,8 +28,6 @@ function TarjetaBarbero({
   barbero,
   barberiaId,
   onCambiar,
-  onCambiarCatalogoPropio,
-  cambiandoCatalogo,
   onDarDeBaja,
   dandoDeBaja,
   onCambiarPassword,
@@ -51,17 +49,60 @@ function TarjetaBarbero({
     }
   }
 
+  function quitarFoto() {
+    if (barbero.foto_url) borrarImagenBarberia(barbero.foto_url)
+    onCambiar({ foto_url: null })
+  }
+
   return (
-    <div className="rounded-lg border border-gris-calido-200 bg-white p-5 transition-colors hover:border-gris-calido-300">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-        <div className="flex items-center gap-4 sm:w-56 sm:shrink-0">
-          {barbero.foto_url ? (
-            <img src={barbero.foto_url} alt={barbero.nombre} className="h-14 w-14 shrink-0 rounded-full object-cover" />
-          ) : (
-            <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full border border-gris-calido-200 text-lg text-gris-calido-400">
-              {barbero.nombre.trim().charAt(0).toUpperCase()}
-            </span>
-          )}
+    <div className="rounded-lg border border-gris-calido-200 bg-white p-6 transition-colors hover:border-gris-calido-300">
+      {/* Fila 1 — identidad: quién es y si está activo, nada más. La foto y
+          el nombre son lo primero que se lee de una tarjeta, así que van
+          solos en su propia línea, sin competir por espacio con el campo de
+          especialidad (antes los 3 vivían apretados en una sola fila). */}
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-4">
+          {/* La foto vive DENTRO del mismo círculo del avatar — "Agregar
+              foto" ya no es un botón aparte que ocupa su propio espacio: el
+              círculo entero es el botón (el `<label>` cubre todo el
+              círculo), con un ícono de cámara que aparece al pasar el mouse
+              como pista de que es clickeable. Para QUITAR la foto (no
+              reemplazarla) hay un botón redondo chico de basura superpuesto
+              en la esquina — separado a propósito, para no confundir
+              "cambiar" con "borrar sin reemplazo". */}
+          <div className="group/foto relative h-14 w-14 shrink-0">
+            <label
+              className={`relative block h-14 w-14 cursor-pointer overflow-hidden rounded-full border border-gris-calido-200 ${subiendo ? 'opacity-60' : ''}`}
+            >
+              {barbero.foto_url ? (
+                <img src={barbero.foto_url} alt={barbero.nombre} className="h-full w-full object-cover" />
+              ) : (
+                <span className="flex h-full w-full items-center justify-center text-lg text-gris-calido-400">
+                  {barbero.nombre.trim().charAt(0).toUpperCase()}
+                </span>
+              )}
+              <span className="absolute inset-0 flex items-center justify-center bg-negro-barbero/0 opacity-0 transition-all group-hover/foto:bg-negro-barbero/40 group-hover/foto:opacity-100">
+                <IconoLapiz className="h-4 w-4 text-hueso" />
+              </span>
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                disabled={subiendo}
+                onChange={subirFoto}
+              />
+            </label>
+            {barbero.foto_url && (
+              <button
+                type="button"
+                onClick={quitarFoto}
+                aria-label={`Quitar foto de ${barbero.nombre}`}
+                className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full border border-gris-calido-200 bg-white text-gris-calido-500 transition-colors hover:border-red-700 hover:text-red-700"
+              >
+                <IconoPapelera className="h-3 w-3" />
+              </button>
+            )}
+          </div>
           <div className="flex flex-col gap-1">
             <span className={`font-medium ${barbero.activo ? 'text-negro-barbero' : 'text-gris-calido-400 line-through'}`}>
               {barbero.nombre}
@@ -69,15 +110,25 @@ function TarjetaBarbero({
             {barbero.usuario && (
               <span className="versalitas text-xs text-gris-calido-500">Usuario: {barbero.usuario}</span>
             )}
-            <SelectorArchivo
-              etiqueta={barbero.foto_url ? 'Cambiar foto' : 'Agregar foto'}
-              cargando={subiendo}
-              onChange={subirFoto}
-              className="w-fit px-2.5 py-1.5"
-            />
           </div>
         </div>
 
+        <div className="flex shrink-0 items-center gap-3">
+          <span className="versalitas hidden text-xs text-gris-calido-500 sm:inline">
+            {barbero.activo ? 'Activo' : 'Inactivo'}
+          </span>
+          <Interruptor
+            activo={barbero.activo}
+            etiqueta={`Activar/desactivar a ${barbero.nombre}`}
+            onCambiar={(valor) => onCambiar({ activo: valor })}
+          />
+        </div>
+      </div>
+
+      {/* Fila 2 — especialidad, con su propio ancho completo en vez de
+          compartir línea con la identidad de arriba (la foto ya se maneja
+          directo sobre el avatar, ver más arriba). */}
+      <div className="mt-4 border-t border-gris-calido-100 pt-4">
         <label className="flex min-w-0 flex-1 flex-col gap-1">
           <span className="versalitas text-xs text-gris-calido-500">Especialidad</span>
           <input
@@ -89,50 +140,20 @@ function TarjetaBarbero({
             className="min-h-11 min-w-0 border-b border-gris-calido-200 bg-transparent py-1 text-sm text-negro-barbero outline-none transition-colors focus:border-cobre"
           />
         </label>
-
-        <div className="flex items-center gap-3 sm:shrink-0">
-          <span className="versalitas text-xs text-gris-calido-500">{barbero.activo ? 'Activo' : 'Inactivo'}</span>
-          <Interruptor
-            activo={barbero.activo}
-            etiqueta={`Activar/desactivar a ${barbero.nombre}`}
-            onCambiar={(valor) => onCambiar({ activo: valor })}
-          />
-        </div>
       </div>
 
-      {/* Fila propia, debajo de un separador — no comparte fila con lo de
-          arriba porque es un permiso distinto (edición de servicios), no la
-          identidad/estado del barbero. Esto decide si este barbero puede
-          MODIFICAR algo en su pestaña "Servicios" o no — apagado, solo puede
-          mirar el catálogo compartido (lo administra el dueño); prendido,
-          tiene su propio catálogo editable, arrancando con una copia del
-          compartido para no partir de cero. No es solo "qué lista ve" — es
-          literalmente el permiso de edición. */}
-      <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-gris-calido-100 pt-4">
-        <Interruptor
-          activo={Boolean(barbero.usa_catalogo_propio)}
-          etiqueta={`Servicios propios de ${barbero.nombre}`}
-          disabled={cambiandoCatalogo}
-          onCambiar={onCambiarCatalogoPropio}
-        />
-        <span className="versalitas text-xs text-gris-calido-500">
-          {barbero.usa_catalogo_propio ? 'Tiene su propio catálogo' : 'Ve el catálogo compartido'}
-        </span>
-      </div>
-
-      {/* Fila propia, aparte de la de arriba a propósito: si comparten fila,
-          un texto de descripción más largo (o una pantalla más angosta que
-          mobile pero no tan ancha como desktop) hace que estos dos controles
-          terminen apretados contra el borde de la tarjeta o se corten mal —
-          separarlos evita pelear por el mismo espacio sin importar el ancho. */}
-      <div className="mt-3 flex flex-wrap items-center justify-end gap-4">
+      {/* Fila 3 — acciones sobre la cuenta. El catálogo propio por barbero
+          se sacó de acá: ahora se asigna un barbero a cada servicio directo
+          desde el panel de Servicios, no con un interruptor por barbero. */}
+      <div className="mt-4 flex flex-wrap items-center justify-end gap-5">
         <CambiarPassword onGuardar={onCambiarPassword} />
         <button
           type="button"
           onClick={onDarDeBaja}
           disabled={dandoDeBaja}
-          className="versalitas text-xs text-gris-calido-500 transition-colors hover:text-red-700 disabled:opacity-50"
+          className="versalitas flex items-center gap-1.5 text-xs text-gris-calido-500 transition-colors hover:text-red-700 disabled:opacity-50"
         >
+          <IconoPapelera className="h-3.5 w-3.5" />
           {dandoDeBaja ? 'Dando de baja…' : 'Dar de baja'}
         </button>
       </div>
@@ -148,14 +169,12 @@ export function PanelBarberos() {
   const actualizarBarbero = useActualizarBarbero(perfil.barberia_id)
   const darDeBajaBarbero = useDarDeBajaBarbero(perfil.barberia_id)
   const establecerContrasena = useEstablecerContrasenaBarbero(perfil.barberia_id)
-  const activarCatalogoPropio = useActivarCatalogoPropio(perfil.barberia_id)
-  const desactivarCatalogoPropio = useDesactivarCatalogoPropio(perfil.barberia_id)
 
   const [nombreNuevo, setNombreNuevo] = useState('')
   const [passwordNueva, setPasswordNueva] = useState('')
   const [errorEnvio, setErrorEnvio] = useState(null)
-  const [cambiandoCatalogoId, setCambiandoCatalogoId] = useState(null)
   const [dandoDeBajaId, setDandoDeBajaId] = useState(null)
+  const [barberoDandoDeBaja, setBarberoDandoDeBaja] = useState(null)
   const [usuarioCreado, setUsuarioCreado] = useState(null)
   const [errorActivo, setErrorActivo] = useState(null)
 
@@ -176,23 +195,16 @@ export function PanelBarberos() {
     )
   }
 
-  async function alternarCatalogoPropio(barberoId, activar) {
-    setCambiandoCatalogoId(barberoId)
-    try {
-      await (activar ? activarCatalogoPropio : desactivarCatalogoPropio).mutateAsync(barberoId)
-    } finally {
-      setCambiandoCatalogoId(null)
-    }
+  function pedirDarDeBaja(barbero) {
+    setBarberoDandoDeBaja(barbero)
   }
 
-  async function darDeBaja(barbero) {
-    const confirmado = window.confirm(
-      `¿Dar de baja a ${barbero.nombre}? Ya no va a poder entrar a su panel ni aparecer en tu página pública, pero su historial de reservas y su horario quedan guardados por si lo reactivas más adelante.`
-    )
-    if (!confirmado) return
+  async function confirmarDarDeBaja() {
+    const barbero = barberoDandoDeBaja
     setDandoDeBajaId(barbero.id)
     try {
       await darDeBajaBarbero.mutateAsync(barbero.id)
+      setBarberoDandoDeBaja(null)
     } finally {
       setDandoDeBajaId(null)
     }
@@ -234,9 +246,13 @@ export function PanelBarberos() {
           Barberos
         </h1>
         {maxBarberos !== null && (
-          <span className="numeros-tabulares text-sm text-gris-calido-500">
-            {totalBarberos} / {maxBarberos}{' '}
-            <span className="versalitas text-xs">según tu plan {barberia?.planes?.nombre}</span>
+          <span className="inline-flex items-center gap-2 rounded-full border border-gris-calido-200 bg-hueso px-3 py-1.5">
+            <span className="numeros-tabulares text-sm font-semibold text-negro-barbero">
+              {totalBarberos}/{maxBarberos}
+            </span>
+            <span className="versalitas text-xs text-gris-calido-500">
+              barberos · plan {barberia?.planes?.nombre}
+            </span>
           </span>
         )}
       </div>
@@ -278,9 +294,7 @@ export function PanelBarberos() {
                 barbero={barbero}
                 barberiaId={perfil.barberia_id}
                 onCambiar={(cambios) => cambiarBarbero(barbero, cambios)}
-                onCambiarCatalogoPropio={(valor) => alternarCatalogoPropio(barbero.id, valor)}
-                cambiandoCatalogo={cambiandoCatalogoId === barbero.id}
-                onDarDeBaja={() => darDeBaja(barbero)}
+                onDarDeBaja={() => pedirDarDeBaja(barbero)}
                 dandoDeBaja={dandoDeBajaId === barbero.id}
                 onCambiarPassword={(password) =>
                   establecerContrasena.mutateAsync({ barberoId: barbero.id, password })
@@ -359,6 +373,21 @@ export function PanelBarberos() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      <ModalConfirmacion
+        abierto={Boolean(barberoDandoDeBaja)}
+        titulo="Dar de baja"
+        mensaje={
+          barberoDandoDeBaja
+            ? `¿Dar de baja a ${barberoDandoDeBaja.nombre}? Ya no va a poder entrar a su panel ni aparecer en tu página pública, pero su historial de reservas y su horario quedan guardados por si lo reactivas más adelante.`
+            : ''
+        }
+        textoConfirmar="Sí, dar de baja"
+        variante="peligro"
+        confirmando={Boolean(dandoDeBajaId)}
+        onConfirmar={confirmarDarDeBaja}
+        onCerrar={() => setBarberoDandoDeBaja(null)}
+      />
     </div>
   )
 }

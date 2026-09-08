@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { useAuth } from '../../hooks/useAuth'
 import { ModalFormulario } from '../../components/panel/ModalFormulario'
+import { IconoLlave } from '../../components/panel/IconoLlave'
+import { IconoGoogle } from '../../components/common/IconoGoogle'
 import { cambiarPasswordPropia } from '../../services/authService'
 
 const LARGO_MINIMO_PASSWORD = 8
@@ -113,8 +115,9 @@ export function PanelCuenta() {
         <button
           type="button"
           onClick={() => setModalPasswordAbierto(true)}
-          className="mt-3 rounded-md border border-gris-calido-200 px-4 py-2 text-sm text-negro-barbero transition-colors hover:border-cobre hover:text-cobre-texto"
+          className="mt-3 flex items-center gap-2 rounded-md border border-gris-calido-200 px-4 py-2 text-sm text-negro-barbero transition-colors hover:border-cobre hover:text-cobre-texto"
         >
+          <IconoLlave className="h-4 w-4" />
           Cambiar contraseña
         </button>
       </section>
@@ -131,8 +134,9 @@ export function PanelCuenta() {
             type="button"
             onClick={alVincularGoogle}
             disabled={googleVinculado}
-            className="mt-3 rounded-md border border-gris-calido-200 px-4 py-2 text-sm text-negro-barbero transition-colors hover:border-cobre hover:text-cobre-texto disabled:opacity-50"
+            className="mt-3 flex items-center gap-2 rounded-md border border-gris-calido-200 px-4 py-2 text-sm text-negro-barbero transition-colors hover:border-cobre hover:text-cobre-texto disabled:opacity-50"
           >
+            <IconoGoogle className="h-4 w-4" />
             {googleVinculado ? 'Google vinculado' : 'Vincular con Google'}
           </button>
         </section>

@@ -3,18 +3,22 @@ import { useAuth } from '../../hooks/useAuth'
 import { Loader } from '../../components/common/Loader'
 import { Button } from '../../components/common/Button'
 import { useServiciosAdmin, useCrearServicio, useActualizarServicioAdmin } from './hooks/useServiciosAdmin'
+import { useBarberosAdmin } from './hooks/useBarberosAdmin'
 import { FilaServicioAdmin } from './components/FilaServicioAdmin'
+import { ModalAsignarBarberos } from './components/ModalAsignarBarberos'
 
-const SERVICIO_VACIO = { nombre: '', duracion_minutos: '30', precio_clp: '' }
+const SERVICIO_VACIO = { nombre: '', duracion_minutos: '30', precio_clp: '', barbero_ids: [] }
 
 export function PanelServicios() {
   const { perfil } = useAuth()
   const { data: servicios, isLoading, isError } = useServiciosAdmin(perfil.barberia_id)
+  const { data: barberos } = useBarberosAdmin(perfil.barberia_id)
   const crearServicio = useCrearServicio(perfil.barberia_id)
   const actualizarServicio = useActualizarServicioAdmin(perfil.barberia_id)
 
   const [nuevo, setNuevo] = useState(SERVICIO_VACIO)
   const [errorEnvio, setErrorEnvio] = useState(null)
+  const [modalBarberosAbierto, setModalBarberosAbierto] = useState(false)
 
   async function agregarServicio(evento) {
     evento.preventDefault()
@@ -32,6 +36,7 @@ export function PanelServicios() {
         precio_clp: precio,
         precio_oferta: null,
         oferta_activa: false,
+        barbero_ids: nuevo.barbero_ids,
       })
       setNuevo(SERVICIO_VACIO)
     } catch {
@@ -73,6 +78,8 @@ export function PanelServicios() {
               <FilaServicioAdmin
                 key={servicio.id}
                 servicio={servicio}
+                barberiaId={perfil.barberia_id}
+                barberos={barberos}
                 onGuardar={(cambios) => actualizarServicio.mutateAsync({ id: servicio.id, cambios })}
               />
             ))}
@@ -125,6 +132,24 @@ export function PanelServicios() {
               {crearServicio.isPending ? 'Creando…' : 'Crear servicio'}
             </Button>
           </div>
+          <div className="mt-4">
+            <span className="versalitas text-xs text-gris-calido-500">Barberos asignados</span>
+            <p className="mt-1 text-sm text-negro-barbero">
+              {nuevo.barbero_ids.length === 0
+                ? 'Compartido — cualquier barbero'
+                : (barberos ?? [])
+                    .filter((barbero) => nuevo.barbero_ids.includes(barbero.id))
+                    .map((barbero) => barbero.nombre)
+                    .join(', ')}
+            </p>
+            <button
+              type="button"
+              onClick={() => setModalBarberosAbierto(true)}
+              className="mt-2 rounded-md border border-gris-calido-200 px-4 py-2 text-sm text-negro-barbero transition-colors hover:border-cobre hover:text-cobre-texto"
+            >
+              Asignar servicio
+            </button>
+          </div>
           {errorEnvio && (
             <p role="alert" className="mt-3 text-sm text-red-700">
               {errorEnvio}
@@ -132,6 +157,15 @@ export function PanelServicios() {
           )}
         </form>
       </div>
+
+      <ModalAsignarBarberos
+        abierto={modalBarberosAbierto}
+        servicioNombre={nuevo.nombre.trim() || 'nuevo servicio'}
+        barberos={barberos}
+        barberoIds={nuevo.barbero_ids}
+        onGuardar={(barbero_ids) => setNuevo((n) => ({ ...n, barbero_ids }))}
+        onCerrar={() => setModalBarberosAbierto(false)}
+      />
     </div>
   )
 }

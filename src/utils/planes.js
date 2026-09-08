@@ -5,10 +5,10 @@ export const PLAN_EQUIPO = 2
 export const PLAN_ESTUDIO = 3
 
 // Secciones "operativas" — vienen con tener más de un barbero, no son un
-// plus de marca: mostrar el equipo, el horario de atención, y la galería de
-// fotos (con tope de cantidad, ver `maxFotosGaleria`). Disponibles desde el
-// plan Equipo.
-const SECCIONES_DESDE_EQUIPO = ['equipo', 'horario', 'galeria']
+// plus de marca: mostrar el equipo, el horario de atención, los servicios y
+// precios, y la galería de fotos (con tope de cantidad, ver
+// `maxFotosGaleria`). Disponibles desde el plan Equipo.
+const SECCIONES_DESDE_EQUIPO = ['equipo', 'horario', 'servicios', 'galeria']
 // El resto (imagen y texto, testimonios) — bloques de texto libre y reseñas
 // con color/tipografía propios, pensados para reforzar identidad más que
 // para dar información básica del negocio — quedan exclusivos de Estudio.

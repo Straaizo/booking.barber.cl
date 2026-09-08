@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { IconoLlave } from './IconoLlave'
 
 // Mismo mínimo que valida la Edge Function `gestionar-usuario` (fuente de
 // verdad real) — repetido acá solo para avisar antes de gastar una llamada
@@ -54,8 +55,9 @@ export function CambiarPassword({ onGuardar }) {
       <button
         type="button"
         onClick={() => setAbierto(true)}
-        className="versalitas text-xs text-gris-calido-500 transition-colors hover:text-cobre-texto"
+        className="versalitas flex items-center gap-1.5 text-xs text-gris-calido-500 transition-colors hover:text-cobre-texto"
       >
+        <IconoLlave className="h-3.5 w-3.5" />
         Cambiar contraseña
       </button>
     )

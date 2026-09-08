@@ -83,8 +83,13 @@ export function PanelShell({ nav, children, ancho = 'normal', rutaCuenta }) {
             <>
               <NavLink
                 to={rutaCuenta}
+                end
                 aria-label="Cuenta"
-                className="versalitas flex items-center gap-1.5 text-xs text-gris-calido-400 transition-colors hover:text-cobre"
+                className={({ isActive }) =>
+                  `versalitas flex items-center gap-1.5 text-xs transition-colors hover:text-cobre ${
+                    isActive ? 'text-cobre' : 'text-gris-calido-400'
+                  }`
+                }
               >
                 <IconoCuenta className="h-5 w-5" />
                 <span className="hidden sm:inline">Cuenta</span>

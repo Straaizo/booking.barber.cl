@@ -6,7 +6,7 @@
 // intercalar libremente con las galerías/imagen-y-texto — antes del trabajo,
 // después, en el medio — en vez de vivir fija siempre en el mismo lugar,
 // justamente para que no todas las páginas terminen con la misma forma.
-export const TIPOS_SECCION = ['galeria', 'imagen_texto', 'equipo', 'testimonios', 'horario']
+export const TIPOS_SECCION = ['galeria', 'imagen_texto', 'equipo', 'testimonios', 'horario', 'servicios']
 
 // Cada foto de una sección de galería es un objeto (url + tamaño + leyenda),
 // no un string suelto — permite que la barbería destaque unas fotos más que
@@ -77,6 +77,18 @@ function normalizarSeccion(seccion) {
       ...seccion,
     }
   }
+  if (seccion.tipo === 'servicios') {
+    // Igual que "horario": el contenido en sí (la tabla de servicios y
+    // precios) se calcula siempre de los servicios reales, esta sección
+    // solo guarda título, posición, e imagen opcional.
+    return {
+      titulo: 'Servicios y precios',
+      posicion: 'centro',
+      imagen: null,
+      imagen_tamano: 'mediana',
+      ...seccion,
+    }
+  }
   if (seccion.tipo === 'testimonios') {
     // 'carrusel' (de siempre, una reseña a la vez) o 'lista' (todas visibles
     // a la vez, en tarjetas — mejor con varias reseñas cargadas). `null` en
@@ -129,6 +141,15 @@ export function normalizarPersonalizacion(personalizacion) {
   if (!secciones.some((s) => s.tipo === 'horario')) {
     secciones = [...secciones, { id: 'sec-horario-migrada', tipo: 'horario', titulo: 'Horario de atención' }]
   }
+  // "servicios" pasa de un toggle fijo (`mostrar_servicios`, siempre última
+  // sección antes de "Reserva tu hora") a ser una sección más — mismo
+  // criterio que horario, con un matiz: si alguien ya la había OCULTADO a
+  // propósito (`mostrar_servicios === 0`), se respeta esa elección y no se
+  // agrega nada; si estaba visible (`1`, o nunca se tocó el toggle), se
+  // agrega para no perderla, en la misma posición que ya tenía (al final).
+  if (!secciones.some((s) => s.tipo === 'servicios') && p.mostrar_servicios !== 0) {
+    secciones = [...secciones, { id: 'sec-servicios-migrada', tipo: 'servicios', titulo: 'Servicios y precios' }]
+  }
   return {
     color_primario: null,
     color_header: null,
@@ -150,10 +171,6 @@ export function normalizarPersonalizacion(personalizacion) {
     // uno explícito se independiza del resto de la identidad.
     whatsapp_color: null,
     whatsapp_tamano: 'mediana',
-    // La vidriera de servicios es un dato real (no contenido escrito a
-    // mano), pero a diferencia de "horario" no necesita posición/imagen
-    // propia todavía — se queda como un toggle simple. `1` = visible.
-    mostrar_servicios: 1,
     ...p,
     secciones,
   }

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Button } from '../../../components/common/Button'
 import { Interruptor } from '../../../components/panel/Interruptor'
+import { IconoPapelera } from '../../../components/panel/IconoPapelera'
 import {
   useExcepcionesDeBarbero,
   useCrearExcepcion,
@@ -92,8 +93,9 @@ export function ExcepcionesHorario({ barberoId }) {
               <button
                 type="button"
                 onClick={() => eliminarExcepcion.mutate(e.id)}
-                className="versalitas text-xs text-gris-calido-500 transition-colors hover:text-red-700"
+                className="versalitas flex items-center gap-1.5 text-xs text-gris-calido-500 transition-colors hover:text-red-700"
               >
+                <IconoPapelera className="h-3.5 w-3.5" />
                 Quitar
               </button>
             </li>

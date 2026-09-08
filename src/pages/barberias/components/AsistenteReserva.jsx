@@ -1,8 +1,7 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { PasoServicio } from './PasoServicio'
-import { PasoBarbero } from './PasoBarbero'
-import { PasoHorario } from './PasoHorario'
+import { PasoBarberoHorario } from './PasoBarberoHorario'
 import { PasoDatos } from './PasoDatos'
 import { Confirmacion } from './Confirmacion'
 import { useCrearReserva } from '../hooks/useCrearReserva'
@@ -55,45 +54,41 @@ export function AsistenteReserva({ barberia }) {
   const barberosActivos = barberia.barberos.filter((barbero) => barbero.activo)
   const serviciosActivos = barberia.servicios.filter((servicio) => servicio.activo)
 
-  // El barbero se elige primero (no el servicio) porque cada barbero puede
-  // ofrecer un catálogo de servicios distinto — recién con el barbero
-  // elegido se sabe qué servicios corresponde mostrar en el paso siguiente.
-  // Este paso se muestra siempre, aunque la barbería tenga un solo barbero:
-  // deja claro desde el principio quién atiende, en vez de asumirlo en
-  // silencio.
-  const [paso, setPaso] = useState('barbero')
+  // El servicio se elige primero: recién con el servicio elegido se sabe
+  // quién lo hace (ver `barberosQueOfrecen` más abajo) — así se puede
+  // mostrar TODOS los barberos que lo ofrecen con sus horas de un mismo día,
+  // en vez de comprometerse con un barbero a ciegas antes de saber si tiene
+  // hora (el flujo viejo, "elige barbero" → "elige servicio" → "elige
+  // horario", uno a la vez).
+  const [paso, setPaso] = useState('servicio')
   const [barbero, setBarbero] = useState(null)
   const [servicio, setServicio] = useState(null)
   const [horario, setHorario] = useState(null)
 
   const crearReserva = useCrearReserva()
 
-  // Si el barbero tiene catálogo propio (lo habilitó el dueño), solo se le
-  // ofrecen SUS servicios (`servicio.barbero_id === barbero.id`) — si no,
-  // el catálogo compartido de la barbería (`servicio.barbero_id` vacío).
-  const serviciosDelBarbero = barbero
-    ? serviciosActivos.filter((servicio) =>
-        barbero.usa_catalogo_propio ? servicio.barbero_id === barbero.id : !servicio.barbero_id
-      )
+  // Un servicio COMPARTIDO (`barbero_ids` vacío) lo ofrece cualquier barbero
+  // activo; uno asignado a uno o varios barberos puntuales (el dueño los
+  // elige desde Servicios, ver PanelServicios.jsx) solo lo ofrecen esos.
+  const barberosQueOfrecen = servicio
+    ? servicio.barbero_ids?.length > 0
+      ? barberosActivos.filter((b) => servicio.barbero_ids.includes(b.id))
+      : barberosActivos
     : []
 
-  const secuenciaPasos = ['barbero', 'servicio', 'horario', 'datos']
-  const etiquetasPasos = ['Barbero', 'Servicio', 'Horario', 'Tus datos']
+  const secuenciaPasos = ['servicio', 'barbero_horario', 'datos']
+  const etiquetasPasos = ['Servicio', 'Barbero y hora', 'Tus datos']
   const indiceActivo = secuenciaPasos.indexOf(paso)
-
-  function elegirBarbero(barberoElegido) {
-    setBarbero(barberoElegido)
-    setServicio(null)
-    setPaso('servicio')
-  }
 
   function elegirServicio(servicioElegido) {
     setServicio(servicioElegido)
-    setPaso('horario')
+    setBarbero(null)
+    setPaso('barbero_horario')
   }
 
-  function elegirHorario(horarioElegido) {
-    setHorario(horarioElegido)
+  function elegirBarberoYHorario({ barbero: barberoElegido, fecha, hora }) {
+    setBarbero(barberoElegido)
+    setHorario({ fecha, hora })
     setPaso('datos')
   }
 
@@ -137,17 +132,15 @@ export function AsistenteReserva({ barberia }) {
 
   return (
     <div className="border-t-2 border-cobre bg-[var(--pb-superficie)]/50 px-5 py-7 md:px-7 md:py-9">
-      {/* Alto fijo (medido contra el paso más alto real: "Elige día y hora"
-          con varios horarios disponibles) en vez de uno que crece según qué
-          pasos se visitaron — con el enfoque anterior, volver a un paso
-          corto después de haber visto uno alto lo dejaba con un hueco vacío
-          enorme, porque el mínimo nunca se achicaba. Uno fijo es siempre
-          igual sin importar el orden de navegación. El contenido de cada
-          paso queda arriba (no centrado en el alto disponible): es donde el
-          ojo llega primero, justo debajo de la barra de progreso — un paso
-          corto (ej. un solo barbero) deja el resto del espacio fijo vacío
-          abajo, en vez de forzar todo al medio. */}
-      <div className="min-h-[600px] md:min-h-[520px]">
+      {/* Nada de alto fijo ni scroll interno — con varios servicios (cada
+          uno con foto grande) o muchos horarios, la lista tiene que poder
+          crecer como una lista normal, no quedar recortada en una cajita
+          con scroll (se ve poco profesional, y corta el encabezado "01/03"
+          de arriba). `layout`: Framer Motion mide el alto real en cada
+          cambio de paso y anima la transición — así el contenedor sigue
+          creciendo/achicándose libremente según el contenido, pero el salto
+          entre un paso y otro es suave en vez de un corte de golpe. */}
+      <motion.div layout transition={{ duration: 0.35, ease: EASE_ENTRADA }}>
         {paso !== 'confirmado' && (
           <ProgresoAsistente etiquetas={etiquetasPasos} indiceActivo={indiceActivo} />
         )}
@@ -161,22 +154,15 @@ export function AsistenteReserva({ barberia }) {
             exit="sale"
             transition={{ duration: 0.3, ease: EASE_ENTRADA }}
           >
-            {paso === 'barbero' && (
-              <PasoBarbero barberos={barberosActivos} onSeleccionar={elegirBarbero} />
-            )}
             {paso === 'servicio' && (
-              <PasoServicio
-                servicios={serviciosDelBarbero}
-                onSeleccionar={elegirServicio}
-                onVolver={() => volverA('barbero')}
-              />
+              <PasoServicio servicios={serviciosActivos} onSeleccionar={elegirServicio} />
             )}
-            {paso === 'horario' && (
-              <PasoHorario
-                barbero={barbero}
+            {paso === 'barbero_horario' && (
+              <PasoBarberoHorario
                 servicio={servicio}
+                barberos={barberosQueOfrecen}
                 diasMaximosReserva={barberia.dias_maximos_reserva}
-                onSeleccionar={elegirHorario}
+                onSeleccionar={elegirBarberoYHorario}
                 onVolver={() => volverA('servicio')}
               />
             )}
@@ -185,13 +171,13 @@ export function AsistenteReserva({ barberia }) {
                 resumen={resumen}
                 enviando={crearReserva.isPending}
                 onConfirmar={confirmar}
-                onVolver={() => volverA('horario')}
+                onVolver={() => volverA('barbero_horario')}
               />
             )}
             {paso === 'confirmado' && <Confirmacion resumen={resumen} />}
           </motion.div>
         </AnimatePresence>
-      </div>
+      </motion.div>
 
       {crearReserva.isError && (
         <p className="mt-4 text-sm text-red-700" role="alert">

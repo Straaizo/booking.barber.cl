@@ -68,18 +68,17 @@ const BARBERIAS_SEED = [
       banner_url: null,
       secciones: [],
     },
-    // `barbero_id: null` = servicio compartido de la barbería (lo que ve
-    // cualquier barbero por defecto). Un servicio con `barbero_id` puesto es
-    // del catálogo PROPIO de ese barbero — solo existe si el dueño le activó
-    // "servicios propios" (ver `activarCatalogoPropioProvisorio` más abajo).
+    // `barbero_ids: []` = servicio compartido (cualquier barbero lo ofrece).
+    // Con ids puestos, solo esos barberos lo ofrecen — los asigna el dueño
+    // desde el panel de Servicios.
     servicios: [
-      { id: 'prov-servicio-1', nombre: 'Corte clásico', duracion_minutos: 30, precio_clp: 8000, precio_oferta: null, oferta_activa: false, oferta_vence: null, activo: true, barbero_id: null },
-      { id: 'prov-servicio-2', nombre: 'Corte + Barba', duracion_minutos: 45, precio_clp: 13000, precio_oferta: 11000, oferta_activa: true, oferta_vence: null, activo: true, barbero_id: null },
-      { id: 'prov-servicio-3', nombre: 'Afeitado a la antigua', duracion_minutos: 25, precio_clp: 7500, precio_oferta: null, oferta_activa: false, oferta_vence: null, activo: true, barbero_id: null },
+      { id: 'prov-servicio-1', nombre: 'Corte clásico', duracion_minutos: 30, precio_clp: 8000, precio_oferta: null, oferta_activa: false, oferta_vence: null, activo: true, barbero_ids: [] },
+      { id: 'prov-servicio-2', nombre: 'Corte + Barba', duracion_minutos: 45, precio_clp: 13000, precio_oferta: 11000, oferta_activa: true, oferta_vence: null, activo: true, barbero_ids: [] },
+      { id: 'prov-servicio-3', nombre: 'Afeitado a la antigua', duracion_minutos: 25, precio_clp: 7500, precio_oferta: null, oferta_activa: false, oferta_vence: null, activo: true, barbero_ids: [] },
     ],
     barberos: [
-      { id: 'prov-barbero-1', nombre: 'Manuel Rojas', activo: true, foto_url: null, especialidad: 'Cortes clásicos y degradados', usa_catalogo_propio: false, intervalo_reserva_minutos: 30, usuario: 'mrojas', password_provisoria: 'barbero123' },
-      { id: 'prov-barbero-2', nombre: 'Ignacio Soto', activo: true, foto_url: null, especialidad: 'Barba y afeitado a la antigua', usa_catalogo_propio: false, intervalo_reserva_minutos: 30, usuario: 'isoto', password_provisoria: 'barbero123' },
+      { id: 'prov-barbero-1', nombre: 'Manuel Rojas', activo: true, foto_url: null, especialidad: 'Cortes clásicos y degradados', intervalo_reserva_minutos: 30, usuario: 'mrojas', password_provisoria: 'barbero123' },
+      { id: 'prov-barbero-2', nombre: 'Ignacio Soto', activo: true, foto_url: null, especialidad: 'Barba y afeitado a la antigua', intervalo_reserva_minutos: 30, usuario: 'isoto', password_provisoria: 'barbero123' },
     ],
     historial: [],
   },
@@ -401,7 +400,6 @@ export async function crearBarberoProvisorio(barberiaId, nombre, password) {
     activo: true,
     foto_url: null,
     especialidad: '',
-    usa_catalogo_propio: false,
     intervalo_reserva_minutos: 30,
     usuario,
     password_provisoria: password,
@@ -504,78 +502,21 @@ export function validarCredencialesProvisorias(usuario, password) {
   return null
 }
 
-// Al activar "servicios propios" por primera vez, el barbero arranca con
-// una COPIA editable del catálogo compartido (no de cero) — así puede seguir
-// cobrando lo mismo que ya cobraba y ajustar desde ahí, en vez de tener que
-// armar su lista entera antes de poder seguir recibiendo reservas. Si ya
-// tenía servicios propios de una activación anterior (los desactivó y volvió
-// a activar), no se duplican — se reusan los que ya tenía.
-export async function activarCatalogoPropioProvisorio(barberiaId, barberoId) {
-  const estado = leerEstado()
-  const barberia = estado.barberias.find((b) => b.id === barberiaId)
-  if (!barberia) throw new Error('Barbería provisoria no encontrada: ' + barberiaId)
-  const barbero = barberia.barberos.find((b) => b.id === barberoId)
-  if (!barbero) throw new Error('Barbero provisorio no encontrado: ' + barberoId)
-
-  const yaTieneCatalogoPropio = barberia.servicios.some((s) => s.barbero_id === barberoId)
-  if (!yaTieneCatalogoPropio) {
-    const copias = barberia.servicios
-      .filter((s) => !s.barbero_id)
-      .map((s) => ({ ...s, id: idNuevo('prov-servicio'), barbero_id: barberoId }))
-    barberia.servicios = [...barberia.servicios, ...copias]
-  }
-  barbero.usa_catalogo_propio = true
-  guardarEstado(estado)
-  return barbero
-}
-
-// Se guardan los servicios propios (no se borran) al desactivar — si el
-// dueño lo vuelve a activar más adelante, el barbero recupera lo que ya
-// tenía armado en vez de partir de cero otra vez.
-export async function desactivarCatalogoPropioProvisorio(barberiaId, barberoId) {
-  const estado = leerEstado()
-  const barberia = estado.barberias.find((b) => b.id === barberiaId)
-  if (!barberia) throw new Error('Barbería provisoria no encontrada: ' + barberiaId)
-  const barbero = barberia.barberos.find((b) => b.id === barberoId)
-  if (!barbero) throw new Error('Barbero provisorio no encontrado: ' + barberoId)
-  barbero.usa_catalogo_propio = false
-  guardarEstado(estado)
-  return barbero
-}
-
-// Catálogo COMPARTIDO de la barbería (`barbero_id` vacío) — lo que administra
-// el dueño desde la pestaña "Servicios" del panel admin.
+// TODOS los servicios de la barbería — compartidos (`barbero_ids` vacío) y
+// los asignados a uno o varios barberos puntuales: el dueño administra el
+// catálogo completo desde acá.
 export async function listarServiciosAdminProvisorios(barberiaId) {
   const { barberias } = leerEstado()
   const barberia = barberias.find((b) => b.id === barberiaId)
   if (!barberia) throw new Error('Barbería provisoria no encontrada: ' + barberiaId)
-  return barberia.servicios.filter((s) => !s.barbero_id).sort((a, b) => a.nombre.localeCompare(b.nombre))
+  return [...barberia.servicios].sort((a, b) => a.nombre.localeCompare(b.nombre))
 }
 
 export async function crearServicioAdminProvisorio(barberiaId, datos) {
   const estado = leerEstado()
   const barberia = estado.barberias.find((b) => b.id === barberiaId)
   if (!barberia) throw new Error('Barbería provisoria no encontrada: ' + barberiaId)
-  const nuevo = { id: idNuevo('prov-servicio'), activo: true, barbero_id: null, ...datos }
-  barberia.servicios = [...barberia.servicios, nuevo]
-  guardarEstado(estado)
-  return nuevo
-}
-
-// Catálogo PROPIO de un barbero (`barbero_id` puesto) — lo administra el
-// barbero mismo desde su panel, solo si el dueño le activó "servicios propios".
-export async function listarServiciosDeBarberoProvisorios(barberiaId, barberoId) {
-  const { barberias } = leerEstado()
-  const barberia = barberias.find((b) => b.id === barberiaId)
-  if (!barberia) throw new Error('Barbería provisoria no encontrada: ' + barberiaId)
-  return barberia.servicios.filter((s) => s.barbero_id === barberoId).sort((a, b) => a.nombre.localeCompare(b.nombre))
-}
-
-export async function crearServicioDeBarberoProvisorio(barberiaId, barberoId, datos) {
-  const estado = leerEstado()
-  const barberia = estado.barberias.find((b) => b.id === barberiaId)
-  if (!barberia) throw new Error('Barbería provisoria no encontrada: ' + barberiaId)
-  const nuevo = { id: idNuevo('prov-servicio'), activo: true, barbero_id: barberoId, ...datos }
+  const nuevo = { id: idNuevo('prov-servicio'), activo: true, barbero_ids: [], ...datos }
   barberia.servicios = [...barberia.servicios, nuevo]
   guardarEstado(estado)
   return nuevo

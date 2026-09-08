@@ -1,104 +1,39 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../../../services/supabaseClient'
-import {
-  HAY_BACKEND_REAL,
-  listarServiciosAdminProvisorios,
-  listarServiciosDeBarberoProvisorios,
-  crearServicioDeBarberoProvisorio,
-  actualizarServicioProvisorio,
-} from '../../../mocks/datosProvisoriosSuperadmin'
-import { comoColumnasReales } from '../../../utils/booleanosReales'
+import { HAY_BACKEND_REAL, listarServiciosAdminProvisorios } from '../../../mocks/datosProvisoriosSuperadmin'
+import { conBarberoIds } from '../../../utils/servicios'
 
-const COLUMNAS = 'id, nombre, duracion_minutos, precio_clp, precio_oferta, oferta_activa, activo, barbero_id'
+const COLUMNAS =
+  'id, nombre, descripcion, imagen_url, duracion_minutos, precio_clp, precio_oferta, oferta_activa, activo'
 
-function claveServicios(barberiaId) {
-  return ['servicios_panel', barberiaId]
+function claveServicios(barberoId) {
+  return ['servicios_panel_barbero', barberoId]
 }
 
-// El catálogo COMPARTIDO de la barbería — lo que ve, en solo lectura, un
-// barbero al que el dueño no le activó "servicios propios": lo administra el
-// dueño, no hay edición posible desde este lado.
-async function obtenerServiciosCompartidos(barberiaId) {
+// Lo que ve un barbero en su propia pestaña "Servicios": los compartidos (sin
+// barberos asignados, para cualquiera) más los que el dueño le asignó a él
+// puntualmente — siempre de solo lectura, el catálogo lo administra el dueño
+// desde su panel (ver PanelServicios.jsx). Reemplaza al viejo "catálogo
+// propio" editable por barbero, que se sacó del todo.
+async function obtenerServiciosDelBarbero(barberiaId, barberoId) {
   const { data, error } = await supabase
     .from('servicios')
     .select(COLUMNAS)
     .eq('barberia_id', barberiaId)
-    .is('barbero_id', null)
     .order('nombre')
 
   if (error) throw error
-  return data
+  const servicios = await conBarberoIds(data)
+  return servicios.filter((s) => s.barbero_ids.length === 0 || s.barbero_ids.includes(barberoId))
 }
 
-export function useServiciosDeBarberia(barberiaId) {
+export function useServiciosDeBarberia(barberiaId, barberoId) {
   return useQuery({
-    queryKey: claveServicios(barberiaId),
-    queryFn: () =>
-      HAY_BACKEND_REAL ? obtenerServiciosCompartidos(barberiaId) : listarServiciosAdminProvisorios(barberiaId),
-    enabled: Boolean(barberiaId),
-  })
-}
-
-// El catálogo PROPIO de un barbero — solo existe si el dueño le activó
-// "servicios propios" desde la pestaña Barberos; ahí el barbero tiene CRUD
-// completo (no solo precio), igual que el dueño sobre el catálogo compartido.
-function claveCatalogoPropio(barberoId) {
-  return ['catalogo_propio_barbero', barberoId]
-}
-
-async function obtenerCatalogoPropio(barberoId) {
-  const { data, error } = await supabase
-    .from('servicios')
-    .select(COLUMNAS)
-    .eq('barbero_id', barberoId)
-    .order('nombre')
-
-  if (error) throw error
-  return data
-}
-
-export function useCatalogoPropioBarbero(barberiaId, barberoId) {
-  return useQuery({
-    queryKey: claveCatalogoPropio(barberoId),
+    queryKey: claveServicios(barberoId),
     queryFn: () =>
       HAY_BACKEND_REAL
-        ? obtenerCatalogoPropio(barberoId)
-        : listarServiciosDeBarberoProvisorios(barberiaId, barberoId),
+        ? obtenerServiciosDelBarbero(barberiaId, barberoId)
+        : listarServiciosAdminProvisorios(barberiaId),
     enabled: Boolean(barberiaId && barberoId),
-  })
-}
-
-export function useCrearServicioPropio(barberiaId, barberoId) {
-  const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: async (servicio) => {
-      if (!HAY_BACKEND_REAL) return crearServicioDeBarberoProvisorio(barberiaId, barberoId, servicio)
-      const { data, error } = await supabase
-        .from('servicios')
-        .insert({ ...comoColumnasReales(servicio), barberia_id: barberiaId, barbero_id: barberoId, activo: 1 })
-        .select(COLUMNAS)
-        .single()
-      if (error) throw error
-      return data
-    },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: claveCatalogoPropio(barberoId) }),
-  })
-}
-
-export function useActualizarServicioPropio(barberiaId, barberoId) {
-  const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: async ({ id, cambios }) => {
-      if (!HAY_BACKEND_REAL) return actualizarServicioProvisorio(barberiaId, id, cambios)
-      const { data, error } = await supabase
-        .from('servicios')
-        .update(comoColumnasReales(cambios))
-        .eq('id', id)
-        .select(COLUMNAS)
-        .single()
-      if (error) throw error
-      return data
-    },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: claveCatalogoPropio(barberoId) }),
   })
 }

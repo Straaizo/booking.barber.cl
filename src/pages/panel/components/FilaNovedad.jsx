@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Interruptor } from '../../../components/panel/Interruptor'
+import { IconoPapelera } from '../../../components/panel/IconoPapelera'
 
 const ESTADOS = { guardando: 'Guardando…', guardado: 'Guardado', error: 'No se pudo guardar' }
 
@@ -149,8 +150,9 @@ export function FilaNovedad({ novedad, onGuardar, onEliminar }) {
           <button
             type="button"
             onClick={onEliminar}
-            className="versalitas text-xs text-gris-calido-500 hover:text-red-700"
+            className="versalitas flex items-center gap-1.5 text-xs text-gris-calido-500 hover:text-red-700"
           >
+            <IconoPapelera className="h-3.5 w-3.5" />
             Eliminar
           </button>
         </div>

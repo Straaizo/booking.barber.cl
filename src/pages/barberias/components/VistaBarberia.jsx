@@ -766,58 +766,89 @@ function SeccionHorario({ titulo, barberos, posicion, imagen, imagenTamano, esOs
 // El menú de precios de siempre en cualquier negocio de servicios — tabla
 // con encabezado, no una lista clickeable que imita el paso del asistente
 // (eso generaba la sensación de "ya vi esto" apenas se llegaba a reservar).
-// Un solo link al final ("Reservar tu hora →"), no uno por fila.
-function SeccionServicios({ servicios, esOscuro }) {
+// Un solo link al final ("Reservar tu hora →"), no uno por fila. Se calcula
+// sola a partir de los servicios reales — nunca se edita a mano — pero es
+// una sección más, reordenable, con la misma `posicion`/`imagen` que
+// "Horario de atención" (ver SeccionHorario, mismo patrón exacto).
+function SeccionServicios({ titulo, servicios, posicion, imagen, imagenTamano, esOscuro }) {
   const activos = (servicios ?? []).filter((s) => s.activo)
   if (activos.length === 0) return null
 
+  const conImagen = posicion !== 'centro' && Boolean(imagen)
+
+  const tabla = (
+    <div className="w-full overflow-hidden rounded-md border border-[var(--pb-borde)]">
+      <EncabezadoTabla
+        columnas={{ plantilla: '1fr auto auto', etiquetas: ['Servicio', 'Duración', 'Precio'] }}
+      />
+      {activos.map((servicio, i) => {
+        const enOferta = ofertaVigente(servicio)
+        return (
+          <div
+            key={servicio.id}
+            className={`numeros-tabulares grid grid-cols-[1fr_auto_auto] items-center gap-4 px-4 py-3 ${
+              i % 2 === 1 ? 'bg-[var(--pb-superficie-sutil)]' : ''
+            }`}
+          >
+            <span className="font-display truncate text-base font-normal text-[var(--pb-texto)] md:text-lg">
+              {servicio.nombre}
+            </span>
+            <span className="text-right text-xs text-[var(--pb-texto-terciario)] md:text-sm">
+              {servicio.duracion_minutos} min
+            </span>
+            <span className="text-right">
+              {enOferta ? (
+                <>
+                  <span className="block text-xs text-[var(--pb-texto-sutil)] line-through">
+                    {formatoCLP(servicio.precio_clp)}
+                  </span>
+                  <span className="block text-base font-semibold text-[var(--pb-acento-texto)]">
+                    {formatoCLP(servicio.precio_oferta)}
+                  </span>
+                </>
+              ) : (
+                <span className="block text-base font-semibold text-[var(--pb-texto)]">
+                  {formatoCLP(servicio.precio_clp)}
+                </span>
+              )}
+            </span>
+          </div>
+        )
+      })}
+    </div>
+  )
+
   return (
     <>
-      <SectionRule indice="—" texto="Servicios y precios" tono={esOscuro ? 'claro' : 'oscuro'} />
-      <div className="mx-auto max-w-lg px-6 py-8 md:px-10">
-        <div className="overflow-hidden rounded-md border border-[var(--pb-borde)]">
-          <EncabezadoTabla
-            columnas={{ plantilla: '1fr auto auto', etiquetas: ['Servicio', 'Duración', 'Precio'] }}
+      <SectionRule indice="—" texto={titulo || 'Servicios y precios'} tono={esOscuro ? 'claro' : 'oscuro'} />
+      {conImagen ? (
+        <div
+          className={`flex flex-col gap-8 px-6 py-8 md:items-center md:gap-10 md:px-10 ${
+            posicion === 'derecha' ? 'md:flex-row-reverse' : 'md:flex-row'
+          }`}
+        >
+          <img
+            src={imagen}
+            alt=""
+            className={`aspect-[4/3] w-full rounded-lg object-cover ${
+              ANCHOS_CARRUSEL_CON_TEXTO[imagenTamano] ?? ANCHOS_CARRUSEL_CON_TEXTO.mediana
+            } ${ALTURAS_CARRUSEL_CON_TEXTO[imagenTamano] ?? ALTURAS_CARRUSEL_CON_TEXTO.mediana}`}
           />
-          {activos.map((servicio, i) => {
-            const enOferta = ofertaVigente(servicio)
-            return (
-              <div
-                key={servicio.id}
-                className={`numeros-tabulares grid grid-cols-[1fr_auto_auto] items-center gap-4 px-4 py-3 ${
-                  i % 2 === 1 ? 'bg-[var(--pb-superficie-sutil)]' : ''
-                }`}
-              >
-                <span className="font-display truncate text-base font-normal text-[var(--pb-texto)] md:text-lg">
-                  {servicio.nombre}
-                </span>
-                <span className="text-right text-xs text-[var(--pb-texto-terciario)] md:text-sm">
-                  {servicio.duracion_minutos} min
-                </span>
-                <span className="text-right">
-                  {enOferta ? (
-                    <>
-                      <span className="block text-xs text-[var(--pb-texto-sutil)] line-through">
-                        {formatoCLP(servicio.precio_clp)}
-                      </span>
-                      <span className="block text-base font-semibold text-[var(--pb-acento-texto)]">
-                        {formatoCLP(servicio.precio_oferta)}
-                      </span>
-                    </>
-                  ) : (
-                    <span className="block text-base font-semibold text-[var(--pb-texto)]">
-                      {formatoCLP(servicio.precio_clp)}
-                    </span>
-                  )}
-                </span>
-              </div>
-            )
-          })}
+          <div className="w-full md:flex-1">
+            {tabla}
+            <HoverLink href="#reservar" tono="cobre" className="mt-6 inline-block text-sm font-medium">
+              Reservar tu hora →
+            </HoverLink>
+          </div>
         </div>
-        <HoverLink href="#reservar" tono="cobre" className="mt-6 inline-block text-sm font-medium">
-          Reservar tu hora →
-        </HoverLink>
-      </div>
+      ) : (
+        <div className="mx-auto max-w-lg px-6 py-8 md:px-10">
+          {tabla}
+          <HoverLink href="#reservar" tono="cobre" className="mt-6 inline-block text-sm font-medium">
+            Reservar tu hora →
+          </HoverLink>
+        </div>
+      )}
     </>
   )
 }
@@ -841,12 +872,6 @@ export function VistaBarberia({ barberia }) {
   )
   const fuenteElegida = personalizacion.fuente_display || 'fraunces'
   const esOscuro = personalizacion.tema === 'oscuro'
-  // La vista previa en vivo del panel (ver PreviewBarberia.jsx) renderiza
-  // este mismo componente dentro de un <iframe> en la ruta `/_preview-barberia`
-  // — la marca de agua de la plataforma no tiene sentido ahí, solo en la
-  // página pública real.
-  const esVistaPrevia = typeof window !== 'undefined' && window.location.pathname === '/_preview-barberia'
-
   useEffect(() => {
     asegurarFuenteCargada(fuenteElegida)
   }, [fuenteElegida])
@@ -878,29 +903,6 @@ export function VistaBarberia({ barberia }) {
           style={{ background: 'radial-gradient(circle, var(--color-cobre) 0%, transparent 70%)' }}
         />
 
-        {!esVistaPrevia && (
-          // `HoverLink` ya trae `relative` incorporado (lo necesita para su
-          // propio subrayado animado) — por eso el posicionamiento fijo va
-          // en este `<div>` que lo envuelve, no en el propio `HoverLink`:
-          // poner `absolute` ahí compite con su `relative` interno y, según
-          // el orden en que Tailwind emite esas dos clases en su hoja de
-          // estilos, `relative` puede ganar la pelea de cascada — dejando
-          // esto en el flujo normal (arriba a la izquierda) en vez de fijo
-          // en la esquina.
-          <div className={`absolute right-6 top-6 md:right-10 md:top-8 ${claseTexto}`}>
-            {/* La marca de la plataforma no es de la barbería: se fija la
-                pila de Fraunces a mano en vez de la clase `font-display`,
-                igual que `Header.jsx`, para no depender de que nadie cambie
-                ese token global más adelante. */}
-            <HoverLink
-              href="/"
-              className="text-xl font-semibold italic tracking-tight"
-              style={{ fontFamily: '"Fraunces", ui-serif, Georgia, serif' }}
-            >
-              booking<span className="text-cobre-texto">.</span>barber.cl
-            </HoverLink>
-          </div>
-        )}
 
         <div className="relative mx-auto flex max-w-lg flex-col items-center text-center md:max-w-none md:flex-row md:items-center md:gap-6 md:text-left">
           {barberia.logo_url ? (
@@ -1026,16 +1028,29 @@ export function VistaBarberia({ barberia }) {
             />
           )
         }
+        if (seccion.tipo === 'servicios') {
+          return (
+            <SeccionServicios
+              key={seccion.id}
+              titulo={seccion.titulo}
+              servicios={barberia.servicios}
+              posicion={seccion.posicion}
+              imagen={seccion.imagen}
+              imagenTamano={seccion.imagen_tamano}
+              esOscuro={esOscuro}
+            />
+          )
+        }
         return null
       })}
 
-      {Boolean(personalizacion.mostrar_servicios) && (
-        <SeccionServicios servicios={barberia.servicios} esOscuro={esOscuro} />
-      )}
-
       <SectionRule indice="—" texto="Reserva tu hora" tono={esOscuro ? 'claro' : 'oscuro'} />
 
-      <main id="reservar" className="mx-auto max-w-lg px-6 py-10 md:py-14">
+      {/* max-w-2xl (antes max-w-lg): con las tarjetas de servicio con imagen
+          y varias filas de barbero + horas lado a lado, el asistente
+          necesita más aire del que le alcanzaba a la tabla de precios de
+          arriba — angosto ahí se ve bien, acá se sentía apretado. */}
+      <main id="reservar" className="mx-auto max-w-2xl px-6 py-10 md:py-14">
         {personalizacion.descripcion && (
           <ScrollReveal>
             <p className="mb-8 text-center text-sm leading-relaxed text-[var(--pb-texto-secundario)] md:text-base">

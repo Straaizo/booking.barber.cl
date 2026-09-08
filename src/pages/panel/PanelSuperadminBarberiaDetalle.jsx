@@ -5,6 +5,7 @@ import { HoverLink } from '../../components/common/HoverLink'
 import { Button } from '../../components/common/Button'
 import { ModalFormulario } from '../../components/panel/ModalFormulario'
 import { IconoLapiz } from '../../components/panel/IconoLapiz'
+import { IconoPapelera } from '../../components/panel/IconoPapelera'
 import {
   useBarberiaDetalle,
   useCambiarEstadoBarberia,
@@ -75,6 +76,7 @@ function ModalEditarCuenta({
   const [estadoNombre, setEstadoNombre] = useState(null) // 'guardando' | 'guardado' | 'error'
   const [password, setPassword] = useState('')
   const [estado, setEstado] = useState(null) // 'guardando' | 'guardado' | 'error' | 'debil'
+  const [confirmandoEliminar, setConfirmandoEliminar] = useState(false)
 
   async function guardarNombre(evento) {
     evento.preventDefault()
@@ -174,14 +176,40 @@ function ModalEditarCuenta({
         )}
       </form>
       <div className="mt-5 border-t border-gris-calido-100 pt-4">
-        <button
-          type="button"
-          onClick={onEliminar}
-          disabled={eliminando}
-          className="versalitas text-xs text-gris-calido-500 transition-colors hover:text-red-700 disabled:opacity-50"
-        >
-          {eliminando ? 'Eliminando…' : 'Eliminar cuenta'}
-        </button>
+        {/* Confirmación EN LÍNEA, no un modal aparte encima de este mismo
+            modal — anidar dos flotantes es peor UX que un paso extra acá
+            mismo (mismo motivo que "no hagas confirm() nativo del navegador":
+            se ve y se siente como el resto de la app). */}
+        {confirmandoEliminar ? (
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="text-xs text-gris-calido-700">¿Eliminar esta cuenta?</span>
+            <button
+              type="button"
+              onClick={onEliminar}
+              disabled={eliminando}
+              className="versalitas text-xs font-semibold text-red-700 transition-colors hover:text-red-800 disabled:opacity-50"
+            >
+              {eliminando ? 'Eliminando…' : 'Sí, eliminar'}
+            </button>
+            <button
+              type="button"
+              onClick={() => setConfirmandoEliminar(false)}
+              disabled={eliminando}
+              className="versalitas text-xs text-gris-calido-500 transition-colors hover:text-negro-barbero disabled:opacity-50"
+            >
+              Cancelar
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setConfirmandoEliminar(true)}
+            className="versalitas flex items-center gap-1.5 text-xs text-gris-calido-500 transition-colors hover:text-red-700"
+          >
+            <IconoPapelera className="h-3.5 w-3.5" />
+            Eliminar cuenta
+          </button>
+        )}
       </div>
     </ModalFormulario>
   )
@@ -221,10 +249,6 @@ function SeccionCuentaDueno({ barberiaId }) {
   }
 
   async function eliminarCuenta() {
-    const confirmado = window.confirm(
-      '¿Eliminar la cuenta del dueño? Ya no va a poder entrar a su panel hasta que le crees una nueva.'
-    )
-    if (!confirmado) return
     await eliminar.mutateAsync()
     setModalEditarAbierto(false)
   }
@@ -369,10 +393,6 @@ function FilaBarberoUsuario({ barbero, barberiaId }) {
   }
 
   async function eliminar() {
-    const confirmado = window.confirm(
-      `¿Eliminar la cuenta de ${barbero.nombre}? Sigue existiendo como barbero, pero no va a poder entrar a su panel hasta que le crees una nueva.`
-    )
-    if (!confirmado) return
     await eliminarCuenta.mutateAsync(barbero.id)
     setModalEditarAbierto(false)
   }

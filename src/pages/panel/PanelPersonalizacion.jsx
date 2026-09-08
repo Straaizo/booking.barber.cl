@@ -37,7 +37,6 @@ function construirVistaPrevia(barberia, form) {
       estilo_whatsapp: form.estilo_whatsapp,
       whatsapp_color: form.whatsapp_color || null,
       whatsapp_tamano: form.whatsapp_tamano,
-      mostrar_servicios: form.mostrar_servicios,
     },
   }
 }
@@ -61,7 +60,6 @@ function formularioDesdeBarberia(barberia) {
     estilo_whatsapp: p.estilo_whatsapp || 'enlace',
     whatsapp_color: p.whatsapp_color ?? '',
     whatsapp_tamano: p.whatsapp_tamano || 'mediana',
-    mostrar_servicios: p.mostrar_servicios ?? 1,
   }
 }
 
@@ -101,6 +99,16 @@ function nuevaSeccion(tipo) {
       imagen_tamano: 'mediana',
     }
   }
+  if (tipo === 'servicios') {
+    return {
+      id,
+      tipo: 'servicios',
+      titulo: 'Servicios y precios',
+      posicion: 'centro',
+      imagen: null,
+      imagen_tamano: 'mediana',
+    }
+  }
   if (tipo === 'testimonios') {
     return {
       id,
@@ -119,6 +127,7 @@ const ETIQUETA_TIPO_SECCION = {
   imagen_texto: 'Imagen y texto',
   equipo: 'Equipo',
   horario: 'Horario de atención',
+  servicios: 'Servicios y precios',
   testimonios: 'Testimonios',
 }
 
@@ -126,13 +135,16 @@ function nuevoTestimonio() {
   return { id: 'test-' + Date.now() + '-' + Math.floor(Math.random() * 1000), nombre: '', texto: '', estrellas: 5 }
 }
 
-function resumenSeccion(seccion, cantidadBarberos) {
+function resumenSeccion(seccion, cantidadBarberos, cantidadServicios) {
   if (seccion.tipo === 'galeria') {
     const n = seccion.imagenes?.length ?? 0
     return `${seccion.titulo || 'Sin título'} — ${n} foto${n === 1 ? '' : 's'}`
   }
   if (seccion.tipo === 'equipo') {
     return `${seccion.titulo || 'Nuestro equipo'} — ${cantidadBarberos} barbero${cantidadBarberos === 1 ? '' : 's'}`
+  }
+  if (seccion.tipo === 'servicios') {
+    return `${seccion.titulo || 'Servicios y precios'} — ${cantidadServicios} servicio${cantidadServicios === 1 ? '' : 's'}`
   }
   if (seccion.tipo === 'testimonios') {
     const n = seccion.items?.length ?? 0
@@ -238,14 +250,33 @@ export function PanelPersonalizacion() {
     return () => clearTimeout(temporizador)
   }, [estadoToast])
 
-  function alCargarIframe() {
-    if (form && barberia) {
-      iframeRef.current?.contentWindow?.postMessage(
-        { tipo: 'preview-barberia', barberia: construirVistaPrevia(barberia, form) },
-        '*'
-      )
+  // El bug real detrás de "la vista previa a veces queda en blanco": el
+  // <iframe> avisa que ya está listo para recibir mensajes (postMessage
+  // 'preview-barberia-listo', ver PreviewBarberia.jsx) pero antes NADIE lo
+  // escuchaba acá — el único envío real dependía de `onLoad` del <iframe> o
+  // del efecto de arriba, ambos disparados por el lado del PANEL sin sabor
+  // ninguna garantía de que el listener de mensajes del iframe ya estuviera
+  // registrado en ESE preciso instante. Si el mensaje llegaba un instante
+  // antes de que el iframe terminara de montar su propio listener, se
+  // perdía para siempre — nada lo reintentaba hasta el próximo cambio real
+  // en el formulario (por eso "arreglaba solo" al tocar cualquier campo,
+  // secciones incluidas: cualquier edición volvía a disparar el efecto de
+  // arriba). Escuchar el aviso de "listo" y recién ahí mandar los datos
+  // cierra la carrera del todo, sin depender de ningún timing.
+  useEffect(() => {
+    function alAvisoDeIframeListo(evento) {
+      if (evento.origin !== window.location.origin) return
+      if (evento.data?.tipo !== 'preview-barberia-listo') return
+      if (form && barberia) {
+        iframeRef.current?.contentWindow?.postMessage(
+          { tipo: 'preview-barberia', barberia: construirVistaPrevia(barberia, form) },
+          window.location.origin
+        )
+      }
     }
-  }
+    window.addEventListener('message', alAvisoDeIframeListo)
+    return () => window.removeEventListener('message', alAvisoDeIframeListo)
+  }, [form, barberia])
 
   // Compara contra la última versión guardada — así queda inequívoco cuándo
   // lo que se ve en la vista previa todavía no es lo que ve un cliente real
@@ -470,7 +501,6 @@ export function PanelPersonalizacion() {
         estilo_whatsapp: form.estilo_whatsapp,
         whatsapp_color: form.whatsapp_color || null,
         whatsapp_tamano: form.whatsapp_tamano,
-        mostrar_servicios: form.mostrar_servicios,
       })
       setFormGuardado(JSON.stringify(form))
       setEstadoToast('ok')
@@ -845,8 +875,9 @@ export function PanelPersonalizacion() {
                 <p className="-mt-2 text-xs text-gris-calido-500">
                   Click en una sección para abrirla y editarla — el orden de la lista es el orden real en
                   tu página, entre el encabezado y el formulario de reserva. Incluye galerías, bloques de
-                  imagen y texto, y tu equipo de barberos — todo se puede reordenar entre sí, por ejemplo
-                  para mostrar el equipo antes o después de las fotos del trabajo.
+                  imagen y texto, tu equipo de barberos, tu horario de atención, y tus servicios y
+                  precios — todo se puede reordenar entre sí, por ejemplo para mostrar el equipo antes o
+                  después de las fotos del trabajo.
                 </p>
                 {!seccionDisponibleParaPlan('imagen_texto', planId) && (
                   <p className="-mt-2 flex items-center gap-1.5 text-xs text-gris-calido-500">
@@ -882,7 +913,9 @@ export function PanelPersonalizacion() {
                         {ETIQUETA_TIPO_SECCION[seccion.tipo]}
                       </span>
                       <span className="truncate text-sm text-negro-barbero">
-                        {disponible ? resumenSeccion(seccion, equipoOrdenado.length) : 'Disponible desde el plan Estudio'}
+                        {disponible
+                          ? resumenSeccion(seccion, equipoOrdenado.length, barberia.servicios?.length ?? 0)
+                          : 'Disponible desde el plan Estudio'}
                       </span>
                     </button>
                     <div className="flex shrink-0 gap-2 text-xs text-gris-calido-500">
@@ -1502,6 +1535,96 @@ export function PanelPersonalizacion() {
                         </div>
                       )}
 
+                      {seccion.tipo === 'servicios' && (
+                        <div className="flex flex-col gap-3">
+                          <input
+                            type="text"
+                            name="seccion_titulo"
+                            value={seccion.titulo}
+                            onChange={(e) => actualizarSeccion(seccion.id, { titulo: e.target.value })}
+                            placeholder="Título de la sección — ej: Servicios y precios"
+                            className="min-h-11 border-b border-gris-calido-200 bg-transparent py-2 text-sm text-negro-barbero outline-none transition-colors focus:border-cobre"
+                          />
+                          <p className="text-xs text-gris-calido-500">
+                            Se calcula sola a partir de tus servicios reales — no se edita a mano acá,
+                            solo se puede ocultar quitando la sección.
+                          </p>
+
+                          <div className="flex flex-col gap-1">
+                            <span className="versalitas text-xs text-gris-calido-500">Posición</span>
+                            <div className="flex gap-2">
+                              {[
+                                ['izquierda', 'Izquierda'],
+                                ['centro', 'Centro'],
+                                ['derecha', 'Derecha'],
+                              ].map(([valor, etiqueta]) => (
+                                <button
+                                  key={valor}
+                                  type="button"
+                                  onClick={() => actualizarSeccion(seccion.id, { posicion: valor })}
+                                  className={`versalitas rounded-md border px-3 py-2 text-xs transition-colors ${
+                                    (seccion.posicion ?? 'centro') === valor
+                                      ? 'border-cobre text-cobre-texto'
+                                      : 'border-gris-calido-200 text-gris-calido-500'
+                                  }`}
+                                >
+                                  {etiqueta}
+                                </button>
+                              ))}
+                            </div>
+                            <span className="text-xs text-gris-calido-500">
+                              "Centro" muestra solo la tabla, sin foto. En "Izquierda"/"Derecha" podés
+                              agregar una foto al lado — de tu local, de un corte, lo que quieras mostrar.
+                            </span>
+                          </div>
+
+                          {(seccion.posicion ?? 'centro') !== 'centro' && (
+                            <>
+                              <div className="flex items-center gap-3">
+                                {seccion.imagen ? (
+                                  <img src={seccion.imagen} alt="" className="h-14 w-14 rounded object-cover" />
+                                ) : (
+                                  <span className="flex h-14 w-14 items-center justify-center rounded border border-gris-calido-200 text-xs text-gris-calido-400">
+                                    Sin foto
+                                  </span>
+                                )}
+                                <SelectorArchivo
+                                  etiqueta="Seleccionar imagen"
+                                  cargando={subiendo}
+                                  onChange={(e) => subirImagenDeSeccion(seccion.id, e)}
+                                />
+                              </div>
+
+                              <div className="flex flex-col gap-1">
+                                <span className="versalitas text-xs text-gris-calido-500">
+                                  Tamaño de la foto
+                                </span>
+                                <div className="flex gap-2">
+                                  {[
+                                    ['chica', 'Chica'],
+                                    ['mediana', 'Mediana'],
+                                    ['grande', 'Grande'],
+                                  ].map(([valor, etiqueta]) => (
+                                    <button
+                                      key={valor}
+                                      type="button"
+                                      onClick={() => actualizarSeccion(seccion.id, { imagen_tamano: valor })}
+                                      className={`versalitas rounded-md border px-3 py-2 text-xs transition-colors ${
+                                        (seccion.imagen_tamano ?? 'mediana') === valor
+                                          ? 'border-cobre text-cobre-texto'
+                                          : 'border-gris-calido-200 text-gris-calido-500'
+                                      }`}
+                                    >
+                                      {etiqueta}
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      )}
+
                       {seccion.tipo === 'testimonios' && (
                         <div className="flex flex-col gap-4">
                           <input
@@ -1750,6 +1873,19 @@ export function PanelPersonalizacion() {
                   + Horario de atención
                 </button>
               )}
+              {/* Mismo criterio que "equipo"/"horario": normalmente ya existe
+                  una (se agrega sola al cargar esta pantalla, ver
+                  normalizarPersonalizacion), este botón solo hace falta si
+                  se la borró a propósito. */}
+              {!form.secciones.some((s) => s.tipo === 'servicios') && (
+                <button
+                  type="button"
+                  onClick={() => agregarSeccion('servicios')}
+                  className="versalitas rounded-md border border-gris-calido-200 px-3 py-2 text-xs text-gris-calido-700 hover:border-cobre hover:text-cobre-texto"
+                >
+                  + Servicios y precios
+                </button>
+              )}
               <BotonAgregarSeccion
                 etiqueta="Testimonios"
                 disponible={seccionDisponibleParaPlan('testimonios', planId)}
@@ -1761,26 +1897,7 @@ export function PanelPersonalizacion() {
           </section>
 
           <section className="flex flex-col gap-6">
-            <TituloGrupo numero="04">Servicios</TituloGrupo>
-            <p className="-mt-2 text-xs text-gris-calido-500">
-              Se calcula sola a partir de tus servicios reales — no se edita a mano acá, solo se puede
-              ocultar. El encabezado de la tabla usa el color de marca de arriba. El horario de
-              atención ahora se agrega/reordena junto a las demás secciones, en "Secciones de la
-              página" más arriba.
-            </p>
-
-            <div className="flex items-center gap-3">
-              <Interruptor
-                activo={Boolean(form.mostrar_servicios)}
-                etiqueta="Mostrar vidriera de servicios y precios"
-                onCambiar={(valor) => setForm((f) => ({ ...f, mostrar_servicios: valor ? 1 : 0 }))}
-              />
-              <span className="versalitas text-xs text-gris-calido-500">Servicios y precios</span>
-            </div>
-          </section>
-
-          <section className="flex flex-col gap-6">
-            <TituloGrupo numero="05">Reglas de reserva</TituloGrupo>
+            <TituloGrupo numero="04">Reglas de reserva</TituloGrupo>
             <label className="flex flex-col gap-2">
               <span className="versalitas text-xs text-gris-calido-500">Anticipación máxima para reservar</span>
               <select
@@ -1879,7 +1996,6 @@ export function PanelPersonalizacion() {
                   ref={iframeRef}
                   src="/_preview-barberia"
                   title="Vista previa de la página pública"
-                  onLoad={alCargarIframe}
                   className={`h-[80vh] border-0 bg-hueso ${
                     modoVista === 'movil'
                       ? esMobile

@@ -17,7 +17,7 @@ async function obtenerExcepciones(barberoId) {
 }
 
 // Fechas puntuales donde el barbero dejó un bloque distinto al de su
-// horario semanal (o marcó el día entero cerrado) — ver PasoHorario.jsx,
+// horario semanal (o marcó el día entero cerrado) — ver FilaBarberoServicio.jsx,
 // que las cruza con `horarios_disponibles` al calcular las horas ofrecidas.
 export function useExcepcionesHorario(barberoId) {
   return useQuery({

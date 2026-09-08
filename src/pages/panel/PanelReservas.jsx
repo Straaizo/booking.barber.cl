@@ -8,6 +8,7 @@ import { ModalConfirmacion } from '../../components/panel/ModalConfirmacion'
 import { CalendarioReservas } from '../../components/panel/CalendarioReservas'
 import { IconoLapiz } from '../../components/panel/IconoLapiz'
 import { IconoX } from '../../components/panel/IconoX'
+import { IconoRefrescar } from '../../components/panel/IconoRefrescar'
 import {
   useReservasBandeja,
   useCancelarReserva,
@@ -63,11 +64,11 @@ function horaParaInput(fecha) {
 // Editar hora y/o servicio de una reserva ya confirmada — para cuando el
 // cliente se equivocó y avisó directamente a la barbería. El barbero no se
 // puede cambiar acá (eso sería una reserva distinta) — el servicio se limita
-// al catálogo real de ESE barbero (propio o compartido), igual que en el
-// asistente de reserva público.
+// a lo que ESE barbero realmente ofrece: compartidos + los que el dueño le
+// asignó puntualmente, igual que en el asistente de reserva público.
 function ModalReprogramarReserva({ reserva, servicios, onGuardar, onCerrar }) {
-  const serviciosDelBarbero = servicios.filter((s) =>
-    reserva.barberos?.usa_catalogo_propio ? s.barbero_id === reserva.barbero_id : !s.barbero_id
+  const serviciosDelBarbero = servicios.filter(
+    (s) => s.barbero_ids.length === 0 || s.barbero_ids.includes(reserva.barbero_id)
   )
   const fechaActual = new Date(reserva.fecha_hora)
   const [servicioId, setServicioId] = useState(reserva.servicio_id)
@@ -226,8 +227,9 @@ function FilaReservaCancelada({ reserva, onPedirReactivar, reactivando }) {
           type="button"
           onClick={onPedirReactivar}
           disabled={reactivando}
-          className="versalitas text-xs text-cobre-texto underline decoration-cobre-texto/40 hover:decoration-cobre-texto disabled:opacity-50"
+          className="versalitas flex items-center gap-1.5 text-xs text-cobre-texto underline decoration-cobre-texto/40 hover:decoration-cobre-texto disabled:opacity-50"
         >
+          <IconoRefrescar className="h-3.5 w-3.5" />
           Reactivar
         </button>
       </div>
