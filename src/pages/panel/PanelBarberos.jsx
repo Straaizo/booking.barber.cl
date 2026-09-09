@@ -8,6 +8,8 @@ import { CambiarPassword } from '../../components/panel/CambiarPassword'
 import { ModalConfirmacion } from '../../components/panel/ModalConfirmacion'
 import { IconoPapelera } from '../../components/panel/IconoPapelera'
 import { IconoLapiz } from '../../components/panel/IconoLapiz'
+import { IconoAjustar } from '../../components/panel/IconoAjustar'
+import { ModalPosicionFoto } from './components/ModalPosicionFoto'
 import { subirImagenBarberia, borrarImagenBarberia } from '../../services/storageImagenes'
 import { useBarberiaAdmin } from './hooks/useBarberiaAdmin'
 import {
@@ -33,6 +35,8 @@ function TarjetaBarbero({
   onCambiarPassword,
 }) {
   const [subiendo, setSubiendo] = useState(false)
+  const [modalPosicionAbierto, setModalPosicionAbierto] = useState(false)
+  const [confirmandoQuitarFoto, setConfirmandoQuitarFoto] = useState(false)
 
   async function subirFoto(evento) {
     const archivo = evento.target.files?.[0]
@@ -41,8 +45,11 @@ function TarjetaBarbero({
     try {
       const urlAnterior = barbero.foto_url
       const url = await subirImagenBarberia(archivo, { barberiaId, maxAncho: 500, maxAlto: 500 })
-      onCambiar({ foto_url: url })
+      // Centrada por defecto — recién con la foto puesta el dueño puede ver
+      // cómo queda recortada y decidir si quiere ajustarla.
+      onCambiar({ foto_url: url, foto_posicion_x: 50, foto_posicion_y: 50 })
       if (urlAnterior) borrarImagenBarberia(urlAnterior)
+      setModalPosicionAbierto(true)
     } finally {
       setSubiendo(false)
       evento.target.value = ''
@@ -51,7 +58,8 @@ function TarjetaBarbero({
 
   function quitarFoto() {
     if (barbero.foto_url) borrarImagenBarberia(barbero.foto_url)
-    onCambiar({ foto_url: null })
+    onCambiar({ foto_url: null, foto_posicion_x: 50, foto_posicion_y: 50 })
+    setConfirmandoQuitarFoto(false)
   }
 
   return (
@@ -62,45 +70,69 @@ function TarjetaBarbero({
           especialidad (antes los 3 vivían apretados en una sola fila). */}
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-4">
-          {/* La foto vive DENTRO del mismo círculo del avatar — "Agregar
-              foto" ya no es un botón aparte que ocupa su propio espacio: el
-              círculo entero es el botón (el `<label>` cubre todo el
-              círculo), con un ícono de cámara que aparece al pasar el mouse
-              como pista de que es clickeable. Para QUITAR la foto (no
-              reemplazarla) hay un botón redondo chico de basura superpuesto
-              en la esquina — separado a propósito, para no confundir
-              "cambiar" con "borrar sin reemplazo". */}
-          <div className="group/foto relative h-14 w-14 shrink-0">
-            <label
-              className={`relative block h-14 w-14 cursor-pointer overflow-hidden rounded-full border border-gris-calido-200 ${subiendo ? 'opacity-60' : ''}`}
-            >
-              {barbero.foto_url ? (
-                <img src={barbero.foto_url} alt={barbero.nombre} className="h-full w-full object-cover" />
-              ) : (
-                <span className="flex h-full w-full items-center justify-center text-lg text-gris-calido-400">
-                  {barbero.nombre.trim().charAt(0).toUpperCase()}
-                </span>
-              )}
-              <span className="absolute inset-0 flex items-center justify-center bg-negro-barbero/0 opacity-0 transition-all group-hover/foto:bg-negro-barbero/40 group-hover/foto:opacity-100">
-                <IconoLapiz className="h-4 w-4 text-hueso" />
-              </span>
-              <input
-                type="file"
-                accept="image/*"
-                className="hidden"
-                disabled={subiendo}
-                onChange={subirFoto}
-              />
-            </label>
-            {barbero.foto_url && (
-              <button
-                type="button"
-                onClick={quitarFoto}
-                aria-label={`Quitar foto de ${barbero.nombre}`}
-                className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full border border-gris-calido-200 bg-white text-gris-calido-500 transition-colors hover:border-red-700 hover:text-red-700"
+          {/* La foto vive DENTRO del mismo círculo del avatar. El lápiz de
+              la esquina está SIEMPRE visible (no solo al pasar el mouse) —
+              en el celular no hay hover, así que una pista que dependa de
+              eso nunca se ve; este círculo chico es el mismo lenguaje que ya
+              conoce cualquiera de una foto de perfil (WhatsApp, Instagram),
+              así no hace falta explicarlo. "Ajustar" y "Quitar" van como
+              chips con fondo propio — se notan como botones de verdad
+              (más superficie para tocar, no solo texto suelto) y no se
+              confunden con una etiqueta decorativa. */}
+          <div className="flex shrink-0 flex-col items-center gap-2">
+            <div className="relative">
+              <label
+                title="Cambiar foto"
+                className={`block h-14 w-14 cursor-pointer overflow-hidden rounded-full border border-gris-calido-200 transition-colors hover:border-cobre ${subiendo ? 'opacity-60' : ''}`}
               >
-                <IconoPapelera className="h-3 w-3" />
-              </button>
+                {barbero.foto_url ? (
+                  <img
+                    src={barbero.foto_url}
+                    alt={barbero.nombre}
+                    className="h-full w-full object-cover"
+                    style={{ objectPosition: `${barbero.foto_posicion_x ?? 50}% ${barbero.foto_posicion_y ?? 50}%` }}
+                  />
+                ) : (
+                  <span className="flex h-full w-full items-center justify-center text-lg text-gris-calido-400">
+                    {barbero.nombre.trim().charAt(0).toUpperCase()}
+                  </span>
+                )}
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  disabled={subiendo}
+                  onChange={subirFoto}
+                />
+              </label>
+              <span
+                aria-hidden="true"
+                className="pointer-events-none absolute -bottom-0.5 -right-0.5 flex h-5 w-5 items-center justify-center rounded-full border-2 border-white bg-cobre-oscuro text-hueso shadow-sm"
+              >
+                <IconoLapiz className="h-2.5 w-2.5" />
+              </span>
+            </div>
+            {barbero.foto_url && (
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setModalPosicionAbierto(true)}
+                  title="Ajustar cómo se ve la foto dentro del círculo"
+                  className="versalitas flex items-center gap-1 rounded-full bg-gris-calido-100 px-2 py-1 text-[10px] text-gris-calido-600 transition-colors hover:bg-cobre/10 hover:text-cobre-texto"
+                >
+                  <IconoAjustar className="h-3 w-3" />
+                  Ajustar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setConfirmandoQuitarFoto(true)}
+                  title="Quitar esta foto"
+                  className="versalitas flex items-center gap-1 rounded-full bg-gris-calido-100 px-2 py-1 text-[10px] text-gris-calido-600 transition-colors hover:bg-red-50 hover:text-red-700"
+                >
+                  <IconoPapelera className="h-3 w-3" />
+                  Quitar
+                </button>
+              </div>
             )}
           </div>
           <div className="flex flex-col gap-1">
@@ -157,6 +189,24 @@ function TarjetaBarbero({
           {dandoDeBaja ? 'Dando de baja…' : 'Dar de baja'}
         </button>
       </div>
+
+      <ModalPosicionFoto
+        abierto={modalPosicionAbierto}
+        fotoUrl={barbero.foto_url}
+        posicionInicial={{ x: barbero.foto_posicion_x ?? 50, y: barbero.foto_posicion_y ?? 50 }}
+        onGuardar={({ x, y }) => onCambiar({ foto_posicion_x: x, foto_posicion_y: y })}
+        onCerrar={() => setModalPosicionAbierto(false)}
+      />
+
+      <ModalConfirmacion
+        abierto={confirmandoQuitarFoto}
+        titulo="Quitar foto"
+        mensaje={`¿Quitar la foto de ${barbero.nombre}? Va a volver a mostrarse su inicial en vez de la foto, en el panel y en tu página pública.`}
+        textoConfirmar="Sí, quitar"
+        variante="peligro"
+        onConfirmar={quitarFoto}
+        onCerrar={() => setConfirmandoQuitarFoto(false)}
+      />
     </div>
   )
 }

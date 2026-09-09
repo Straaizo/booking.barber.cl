@@ -1,5 +1,6 @@
 import { motion } from 'framer-motion'
 import { BackButton } from '../../../components/common/BackButton'
+import { IconoTijeras } from '../../../components/common/IconoTijeras'
 import { formatoCLP, ofertaVigente } from '../../../utils/formatos'
 
 // Primer paso del asistente — sin `onVolver` cuando no hay paso anterior
@@ -40,7 +41,12 @@ export function PasoServicio({ servicios, onSeleccionar, onVolver }) {
                   className="ml-3 h-24 w-24 shrink-0 rounded-md object-cover md:h-28 md:w-28"
                 />
               ) : (
-                <span className="ml-3 h-24 w-24 shrink-0 rounded-md bg-cobre/5 md:h-28 md:w-28" aria-hidden="true" />
+                <span
+                  className="ml-3 flex h-24 w-24 shrink-0 items-center justify-center rounded-md bg-cobre/5 text-cobre/40 md:h-28 md:w-28"
+                  aria-hidden="true"
+                >
+                  <IconoTijeras className="h-8 w-8" />
+                </span>
               )}
               <span className="min-w-0 flex-1">
                 <span className="font-display block text-base font-normal text-[var(--pb-texto)] md:text-lg">

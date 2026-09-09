@@ -1,17 +1,17 @@
 import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Footer } from '../../../components/layout/Footer'
+import { FooterBarberia } from './FooterBarberia'
 import { HoverLink } from '../../../components/common/HoverLink'
 import { SectionRule } from '../../../components/common/SectionRule'
 import { TextReveal } from '../../../components/animations/TextReveal'
 import { ScrollReveal } from '../../../components/animations/ScrollReveal'
 import { AsistenteReserva } from '../components/AsistenteReserva'
 import { LightboxGaleria } from '../components/LightboxGaleria'
-import { oscurecerHex, esColorClaro } from '../../../utils/color'
+import { oscurecerHex, aclararHex, esColorClaro } from '../../../utils/color'
 import { linkWhatsApp, linkGoogleMaps, formatoCLP, ofertaVigente } from '../../../utils/formatos'
 import { asegurarFuenteCargada, pilaFuente } from '../../../utils/fuentes'
 import { usePrefersReducedMotion } from '../../../hooks/usePrefersReducedMotion'
-import { ordenarEquipo } from '../../../utils/personalizacion'
+import { ordenarEquipo, clasesTarjeta } from '../../../utils/personalizacion'
 import { seccionDisponibleParaPlan } from '../../../utils/planes'
 import { resumenHorarioSemanal } from '../../../utils/horarios'
 
@@ -284,7 +284,7 @@ function CarruselGaleria({
 // (`seccion.tipo === 'equipo'`, ver el `secciones.map` de VistaBarberia) para
 // que cada barbería pueda ubicarla donde quiera — antes o después de sus
 // fotos de trabajo, por ejemplo — en vez de vivir fija siempre en el mismo lugar.
-function SeccionEquipo({ titulo, barberos, ordenEquipo, estilo, esOscuro }) {
+function SeccionEquipo({ titulo, barberos, ordenEquipo, estilo, esOscuro, estiloTarjetas }) {
   const equipo = ordenarEquipo(barberos, ordenEquipo)
   if (equipo.length === 0) return null
 
@@ -295,33 +295,46 @@ function SeccionEquipo({ titulo, barberos, ordenEquipo, estilo, esOscuro }) {
   return (
     <>
       <SectionRule indice="—" texto={titulo || 'Nuestro equipo'} tono={esOscuro ? 'claro' : 'oscuro'} />
-      {/* `flex-wrap` + centrado, no `grid` de columnas fijas — con pocos
-          barberos (1 o 2) una grilla de 3-4 columnas los deja pegados a un
-          costado con un vacío enorme al lado; así siempre quedan
-          centrados, sea 1 o 12, y se acomodan solos en varias filas cuando
-          hace falta. */}
-      <div className="flex flex-wrap justify-center gap-x-10 gap-y-8 px-6 py-8 md:px-10">
-        {equipo.map((barbero) => (
-          <div key={barbero.id} className="flex w-24 flex-col items-center gap-3 text-center md:w-28">
-            {barbero.foto_url ? (
-              <img
-                src={barbero.foto_url}
-                alt={barbero.nombre}
-                className="h-24 w-24 rounded-full object-cover md:h-28 md:w-28"
-              />
-            ) : (
-              <span className="font-display flex h-24 w-24 items-center justify-center rounded-full border border-cobre/40 text-2xl italic text-cobre md:h-28 md:w-28">
-                {barbero.nombre.trim().charAt(0).toUpperCase()}
-              </span>
-            )}
-            <div>
-              <p className="text-sm font-medium text-[var(--pb-texto)]">{barbero.nombre}</p>
-              {barbero.especialidad && (
-                <p className="mt-1 text-xs text-[var(--pb-texto-terciario)]">{barbero.especialidad}</p>
+      {/* Antes los círculos flotaban directo sobre el fondo de la página,
+          sin ningún borde ni superficie propia — con 1 o 2 barberos, era
+          básicamente un espacio vacío enorme con un par de fotitos perdidas
+          en el medio. El panel (mismo tono que las filas de las tablas de
+          horario/servicios, `--pb-superficie-sutil`) le da un límite visual
+          real a la sección. `max-w-4xl` es lo que evita el problema
+          contrario en pantallas anchas: sin un tope, el panel se estiraba a
+          todo el ancho de la sección y con 1-2 barberos quedaba como una
+          caja enorme casi vacía con las fotos perdidas en el medio — acá
+          tope en un ancho cómodo (~5-6 barberos por fila) y se centra solo,
+          en vez de ocupar el 100% siempre. `flex-wrap` + centrado, no `grid`
+          de columnas fijas, sigue siendo lo que evita que pocos barberos
+          queden pegados a un costado dentro del panel. */}
+      <div className="px-6 py-10 md:px-10">
+        <div
+          className={`mx-auto flex max-w-4xl flex-wrap justify-center gap-x-10 gap-y-8 bg-[var(--pb-superficie-sutil)] px-6 py-10 md:px-12 ${clasesTarjeta(estiloTarjetas, esOscuro)}`}
+        >
+          {equipo.map((barbero) => (
+            <div key={barbero.id} className="flex w-24 flex-col items-center gap-3 text-center md:w-28">
+              {barbero.foto_url ? (
+                <img
+                  src={barbero.foto_url}
+                  alt={barbero.nombre}
+                  className="h-24 w-24 rounded-full object-cover shadow-sm ring-4 ring-[var(--pb-superficie)] md:h-28 md:w-28"
+                  style={{ objectPosition: `${barbero.foto_posicion_x ?? 50}% ${barbero.foto_posicion_y ?? 50}%` }}
+                />
+              ) : (
+                <span className="font-display flex h-24 w-24 items-center justify-center rounded-full border border-cobre/40 text-2xl italic text-cobre shadow-sm ring-4 ring-[var(--pb-superficie)] md:h-28 md:w-28">
+                  {barbero.nombre.trim().charAt(0).toUpperCase()}
+                </span>
               )}
+              <div>
+                <p className="text-sm font-medium text-[var(--pb-texto)]">{barbero.nombre}</p>
+                {barbero.especialidad && (
+                  <p className="mt-1 text-xs text-[var(--pb-texto-terciario)]">{barbero.especialidad}</p>
+                )}
+              </div>
             </div>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
     </>
   )
@@ -371,6 +384,7 @@ function CarruselEquipo({ titulo, equipo, esOscuro }) {
                   src={barbero.foto_url}
                   alt={barbero.nombre}
                   className="h-40 w-40 rounded-full object-cover"
+                  style={{ objectPosition: `${barbero.foto_posicion_x ?? 50}% ${barbero.foto_posicion_y ?? 50}%` }}
                 />
               ) : (
                 <span className="font-display flex h-40 w-40 items-center justify-center rounded-full border border-cobre/40 text-4xl italic text-cobre">
@@ -455,7 +469,7 @@ function BurbujaWhatsApp({ telefono, nombreBarberia, color, tamano }) {
       target="_blank"
       rel="noreferrer"
       aria-label="Escribir por WhatsApp"
-      className={`fixed bottom-5 right-5 z-40 flex items-center justify-center rounded-full text-hueso shadow-lg transition-transform duration-200 hover:scale-105 ${caja} ${color ? '' : 'bg-cobre-oscuro'}`}
+      className={`fixed bottom-5 right-5 z-40 flex items-center justify-center rounded-full text-hueso shadow-[0_6px_20px_rgba(0,0,0,0.35)] ring-4 ring-hueso/80 transition-transform duration-200 hover:scale-105 ${caja} ${color ? '' : 'bg-cobre-oscuro'}`}
       style={estiloColor}
     >
       <span
@@ -557,7 +571,7 @@ const TAMANOS_TESTIMONIO = {
   enorme: 'text-2xl md:text-3xl',
 }
 
-function SeccionTestimonios({ titulo, items, estilo, tamano, fuente, colorTexto, colorFondo, esOscuro }) {
+function SeccionTestimonios({ titulo, items, estilo, tamano, fuente, colorTexto, colorFondo, esOscuro, estiloTarjetas }) {
   useEffect(() => {
     if (fuente) asegurarFuenteCargada(fuente)
   }, [fuente])
@@ -573,7 +587,14 @@ function SeccionTestimonios({ titulo, items, estilo, tamano, fuente, colorTexto,
     <>
       <SectionRule indice="—" texto={titulo || 'Lo que dicen nuestros clientes'} tono={esOscuro ? 'claro' : 'oscuro'} />
       {estilo === 'lista' ? (
-        <ListaTestimonios items={items} tamano={tamano} estiloTexto={estiloTexto} colorFondo={colorFondo} />
+        <ListaTestimonios
+          items={items}
+          tamano={tamano}
+          estiloTexto={estiloTexto}
+          colorFondo={colorFondo}
+          estiloTarjetas={estiloTarjetas}
+          esOscuro={esOscuro}
+        />
       ) : (
         <CarruselTestimonios items={items} tamano={tamano} estiloTexto={estiloTexto} />
       )}
@@ -627,7 +648,12 @@ function CarruselTestimonios({ items, tamano, estiloTexto }) {
             “{testimonio.texto}”
           </p>
           {testimonio.nombre && (
-            <p className="versalitas text-xs text-[var(--pb-texto-terciario)]">{testimonio.nombre}</p>
+            <div className="flex items-center gap-2">
+              <span className="font-display flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-cobre/40 text-[10px] italic text-cobre">
+                {testimonio.nombre.trim().charAt(0).toUpperCase()}
+              </span>
+              <p className="versalitas text-xs text-[var(--pb-texto-terciario)]">{testimonio.nombre}</p>
+            </div>
           )}
         </motion.div>
       </AnimatePresence>
@@ -655,13 +681,17 @@ function CarruselTestimonios({ items, tamano, estiloTexto }) {
 // la vez, cada una en su propia tarjeta — mejor cuando hay varias (4+) y no
 // tiene sentido hacer esperar al autoplay para verlas todas. Patrón de
 // tarjetas independientes, el más común en sitios de servicios reales.
-function ListaTestimonios({ items, tamano, estiloTexto, colorFondo }) {
+function ListaTestimonios({ items, tamano, estiloTexto, colorFondo, estiloTarjetas, esOscuro }) {
   return (
     <div className="grid grid-cols-1 gap-6 px-6 py-10 md:grid-cols-2 md:px-10 lg:grid-cols-3">
       {items.map((testimonio) => (
         <div
           key={testimonio.id}
-          className="flex flex-col gap-3 rounded-lg border border-[var(--pb-borde)] bg-[var(--pb-superficie)] p-5"
+          // El avatar con la inicial le pone una persona real detrás de la
+          // reseña, en vez de un nombre suelto flotando abajo — el
+          // borde/sombra en sí lo decide `estilo_tarjetas` (Identidad), la
+          // misma elección que el resto de las tarjetas de la página.
+          className={`flex flex-col gap-3 bg-[var(--pb-superficie)] p-5 ${clasesTarjeta(estiloTarjetas, esOscuro)}`}
           style={{ backgroundColor: colorFondo || undefined }}
         >
           <Estrellas cantidad={testimonio.estrellas} color={estiloTexto.color} />
@@ -676,7 +706,12 @@ function ListaTestimonios({ items, tamano, estiloTexto, colorFondo }) {
             “{testimonio.texto}”
           </p>
           {testimonio.nombre && (
-            <p className="versalitas text-xs text-[var(--pb-texto-terciario)]">{testimonio.nombre}</p>
+            <div className="mt-1 flex items-center gap-2">
+              <span className="font-display flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-cobre/40 text-[10px] italic text-cobre">
+                {testimonio.nombre.trim().charAt(0).toUpperCase()}
+              </span>
+              <p className="versalitas text-xs text-[var(--pb-texto-terciario)]">{testimonio.nombre}</p>
+            </div>
           )}
         </div>
       ))}
@@ -690,9 +725,15 @@ function ListaTestimonios({ items, tamano, estiloTexto, colorFondo }) {
 // ya vi al reservar" repetido dos veces con el mismo look. El encabezado
 // usa el color de marca de siempre (`bg-cobre/10`, ya tiñe la variable CSS
 // `--color-cobre` que fija `color_primario`) — sin un color propio aparte.
-function EncabezadoTabla({ columnas }) {
+function EncabezadoTabla({ columnas, esOscuro }) {
+  // /10 (mismo tinte para claro y oscuro) se notaba en fondo claro pero
+  // casi desaparecía sobre el fondo casi negro del tema oscuro — el
+  // encabezado de la tabla quedaba indistinguible de las filas.
   return (
-    <div className="grid gap-4 rounded-t-md bg-cobre/10 px-4 py-2" style={{ gridTemplateColumns: columnas.plantilla }}>
+    <div
+      className={`grid gap-4 rounded-t-md px-4 py-2 ${esOscuro ? 'bg-cobre/25' : 'bg-cobre/10'}`}
+      style={{ gridTemplateColumns: columnas.plantilla }}
+    >
       {columnas.etiquetas.map((etiqueta, i) => (
         <span
           key={etiqueta}
@@ -712,7 +753,7 @@ function EncabezadoTabla({ columnas }) {
 // si la tabla va sola y centrada ('centro', de siempre) o en una columna
 // con una foto del local al lado ('izquierda'/'derecha', para darle más
 // credibilidad) — mismo patrón que "Imagen y texto".
-function SeccionHorario({ titulo, barberos, posicion, imagen, imagenTamano, esOscuro }) {
+function SeccionHorario({ titulo, barberos, posicion, imagen, imagenTamano, esOscuro, estiloTarjetas }) {
   const horarios = (barberos ?? [])
     .filter((b) => b.activo)
     .flatMap((b) => b.horarios_disponibles ?? [])
@@ -722,8 +763,8 @@ function SeccionHorario({ titulo, barberos, posicion, imagen, imagenTamano, esOs
   const conImagen = posicion !== 'centro' && Boolean(imagen)
 
   const tabla = (
-    <div className="w-full overflow-hidden rounded-md border border-[var(--pb-borde)]">
-      <EncabezadoTabla columnas={{ plantilla: '1fr auto', etiquetas: ['Día', 'Horario'] }} />
+    <div className={`w-full overflow-hidden ${clasesTarjeta(estiloTarjetas, esOscuro)}`}>
+      <EncabezadoTabla columnas={{ plantilla: '1fr auto', etiquetas: ['Día', 'Horario'] }} esOscuro={esOscuro} />
       {resumen.map((linea, i) => (
         <div
           key={linea.etiqueta}
@@ -770,16 +811,17 @@ function SeccionHorario({ titulo, barberos, posicion, imagen, imagenTamano, esOs
 // sola a partir de los servicios reales — nunca se edita a mano — pero es
 // una sección más, reordenable, con la misma `posicion`/`imagen` que
 // "Horario de atención" (ver SeccionHorario, mismo patrón exacto).
-function SeccionServicios({ titulo, servicios, posicion, imagen, imagenTamano, esOscuro }) {
+function SeccionServicios({ titulo, servicios, posicion, imagen, imagenTamano, esOscuro, estiloTarjetas }) {
   const activos = (servicios ?? []).filter((s) => s.activo)
   if (activos.length === 0) return null
 
   const conImagen = posicion !== 'centro' && Boolean(imagen)
 
   const tabla = (
-    <div className="w-full overflow-hidden rounded-md border border-[var(--pb-borde)]">
+    <div className={`w-full overflow-hidden ${clasesTarjeta(estiloTarjetas, esOscuro)}`}>
       <EncabezadoTabla
         columnas={{ plantilla: '1fr auto auto', etiquetas: ['Servicio', 'Duración', 'Precio'] }}
+        esOscuro={esOscuro}
       />
       {activos.map((servicio, i) => {
         const enOferta = ofertaVigente(servicio)
@@ -836,7 +878,11 @@ function SeccionServicios({ titulo, servicios, posicion, imagen, imagenTamano, e
           />
           <div className="w-full md:flex-1">
             {tabla}
-            <HoverLink href="#reservar" tono="cobre" className="mt-6 inline-block text-sm font-medium">
+            <HoverLink
+            href="#reservar"
+            tono="cobre"
+            className="mt-6 inline-block text-sm font-medium text-[var(--pb-texto)]"
+          >
               Reservar tu hora →
             </HoverLink>
           </div>
@@ -844,7 +890,11 @@ function SeccionServicios({ titulo, servicios, posicion, imagen, imagenTamano, e
       ) : (
         <div className="mx-auto max-w-lg px-6 py-8 md:px-10">
           {tabla}
-          <HoverLink href="#reservar" tono="cobre" className="mt-6 inline-block text-sm font-medium">
+          <HoverLink
+            href="#reservar"
+            tono="cobre"
+            className="mt-6 inline-block text-sm font-medium text-[var(--pb-texto)]"
+          >
             Reservar tu hora →
           </HoverLink>
         </div>
@@ -876,35 +926,77 @@ export function VistaBarberia({ barberia }) {
     asegurarFuenteCargada(fuenteElegida)
   }, [fuenteElegida])
 
+  // `--color-cobre-texto`/`--color-cobre-claro` son variantes de TEXTO (no
+  // gráficas) del color de marca — sin pisarlas acá, el eslogan y los links
+  // del encabezado (`claseEslogan`/`tono="cobre"` en HoverLink) seguían
+  // usando el naranja fijo de siempre sin importar qué color eligiera la
+  // barbería, aunque el resto de la página (precios, dots, la burbuja) sí
+  // cambiara — quedaba una marca a medias. Si el color elegido ya es oscuro,
+  // sirve tal cual sobre fondo claro (`texto`) pero hay que aclararlo para
+  // que se lea sobre fondo oscuro (`claro`), y viceversa si es un color claro.
   const estiloMarca = {
     ...(personalizacion.color_primario && {
       '--color-cobre': personalizacion.color_primario,
       '--color-cobre-oscuro': oscurecerHex(personalizacion.color_primario),
+      '--color-cobre-texto': esColorClaro(personalizacion.color_primario)
+        ? oscurecerHex(personalizacion.color_primario, 0.35)
+        : personalizacion.color_primario,
+      '--color-cobre-claro': esColorClaro(personalizacion.color_primario)
+        ? personalizacion.color_primario
+        : aclararHex(personalizacion.color_primario, 0.35),
     }),
   }
 
   // Si eligió un color de header claro, el texto (pensado para el
   // negro-barbero por defecto) pasa a tonos oscuros — sin esto, un header
-  // blanco con letras blancas quedaría ilegible.
-  const headerClaro = personalizacion.color_header ? esColorClaro(personalizacion.color_header) : false
+  // blanco con letras blancas quedaría ilegible. Con foto de portada, el
+  // texto siempre queda claro: la foto es impredecible (no sabemos si es
+  // clara u oscura), pero el degradado de acá abajo siempre la oscurece lo
+  // suficiente como para que el texto claro se lea encima sin depender de
+  // adivinar el contraste de la foto.
+  const tieneBanner = Boolean(personalizacion.banner_url)
+  const headerClaro = !tieneBanner && personalizacion.color_header ? esColorClaro(personalizacion.color_header) : false
   const claseTexto = headerClaro ? 'text-negro-barbero' : 'text-hueso'
   const claseEslogan = headerClaro ? 'text-cobre-texto' : 'text-cobre-claro'
   const claseContacto = headerClaro ? 'text-gris-calido-700' : 'text-gris-calido-200'
+  // El degradado de la portada usa el color de header (o su reemplazo de
+  // siempre) como tinte — así la foto no queda con el mismo velo negro
+  // genérico en todas las barberías, sigue la paleta que cada una eligió.
+  const colorVelo = personalizacion.color_header || 'var(--color-negro-barbero)'
 
   return (
     <div className="min-h-screen bg-[var(--pb-fondo)]" data-tema={esOscuro ? 'oscuro' : 'claro'} style={estiloMarca}>
       <header
-        className={`relative overflow-hidden px-6 pb-12 pt-10 md:px-10 md:pb-16 md:pt-14 ${claseTexto} ${personalizacion.color_header ? '' : 'bg-negro-barbero'}`}
-        style={personalizacion.color_header ? { backgroundColor: personalizacion.color_header } : undefined}
+        // El borde inferior color de marca es el mismo en las dos modalidades
+        // (foto o color sólido) y en modo oscuro — sin él, header y fondo de
+        // página pueden quedar casi del mismo negro y la página se ve como un
+        // solo bloque plano, sin dónde termina uno y empieza el otro.
+        className={`relative overflow-hidden border-b-2 border-cobre/50 bg-cover bg-center px-6 pb-12 pt-10 md:px-10 md:pb-16 md:pt-14 ${tieneBanner ? 'pb-20 pt-16 md:pb-28 md:pt-24' : ''} ${claseTexto} ${!tieneBanner && !personalizacion.color_header ? 'bg-negro-barbero' : ''}`}
+        style={
+          tieneBanner
+            ? { backgroundImage: `url(${personalizacion.banner_url})` }
+            : personalizacion.color_header
+              ? { backgroundColor: personalizacion.color_header }
+              : undefined
+        }
       >
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute -right-20 -top-20 h-64 w-64 rounded-full opacity-20 blur-3xl"
-          style={{ background: 'radial-gradient(circle, var(--color-cobre) 0%, transparent 70%)' }}
-        />
+        {tieneBanner ? (
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0"
+            style={{
+              background: `linear-gradient(to top, ${colorVelo} 15%, color-mix(in srgb, ${colorVelo} 55%, transparent) 65%, color-mix(in srgb, ${colorVelo} 25%, transparent) 100%)`,
+            }}
+          />
+        ) : (
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute -right-20 -top-20 h-64 w-64 rounded-full opacity-20 blur-3xl"
+            style={{ background: 'radial-gradient(circle, var(--color-cobre) 0%, transparent 70%)' }}
+          />
+        )}
 
-
-        <div className="relative mx-auto flex max-w-lg flex-col items-center text-center md:max-w-none md:flex-row md:items-center md:gap-6 md:text-left">
+        <div className="relative z-10 mx-auto flex max-w-lg flex-col items-center text-center md:max-w-none md:flex-row md:items-center md:gap-6 md:text-left">
           {barberia.logo_url ? (
             <img
               src={barberia.logo_url}
@@ -944,7 +1036,7 @@ export function VistaBarberia({ barberia }) {
 
         {(barberia.direccion || (barberia.telefono_whatsapp && personalizacion.estilo_whatsapp !== 'burbuja')) && (
           <ScrollReveal delay={0.15}>
-            <div className={`relative mx-auto mt-8 flex max-w-lg flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm md:mx-0 md:max-w-none md:justify-start ${claseContacto}`}>
+            <div className={`relative z-10 mx-auto mt-8 flex max-w-lg flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm md:mx-0 md:max-w-none md:justify-start ${claseContacto}`}>
               {barberia.direccion && <span>{barberia.direccion}</span>}
               {barberia.direccion && (
                 <HoverLink
@@ -997,6 +1089,7 @@ export function VistaBarberia({ barberia }) {
               ordenEquipo={personalizacion.orden_equipo}
               estilo={seccion.estilo}
               esOscuro={esOscuro}
+              estiloTarjetas={personalizacion.estilo_tarjetas}
             />
           )
         }
@@ -1012,6 +1105,7 @@ export function VistaBarberia({ barberia }) {
               colorTexto={seccion.color_texto}
               colorFondo={seccion.color_fondo}
               esOscuro={esOscuro}
+              estiloTarjetas={personalizacion.estilo_tarjetas}
             />
           )
         }
@@ -1025,6 +1119,7 @@ export function VistaBarberia({ barberia }) {
               imagen={seccion.imagen}
               imagenTamano={seccion.imagen_tamano}
               esOscuro={esOscuro}
+              estiloTarjetas={personalizacion.estilo_tarjetas}
             />
           )
         }
@@ -1038,6 +1133,7 @@ export function VistaBarberia({ barberia }) {
               imagen={seccion.imagen}
               imagenTamano={seccion.imagen_tamano}
               esOscuro={esOscuro}
+              estiloTarjetas={personalizacion.estilo_tarjetas}
             />
           )
         }
@@ -1062,7 +1158,7 @@ export function VistaBarberia({ barberia }) {
         <AsistenteReserva barberia={barberia} />
       </main>
 
-      <Footer variante="minimal" />
+      <FooterBarberia barberia={barberia} colorHeader={personalizacion.color_header} />
 
       {barberia.telefono_whatsapp && personalizacion.estilo_whatsapp === 'burbuja' && (
         <BurbujaWhatsApp

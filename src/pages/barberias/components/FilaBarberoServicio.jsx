@@ -42,7 +42,12 @@ export function FilaBarberoServicio({ barbero, servicio, fecha, onSeleccionar })
     <div className="border-b border-[var(--pb-borde)] py-5 first:border-t first:border-t-[var(--pb-borde)]">
       <div className="flex items-center gap-3">
         {barbero.foto_url ? (
-          <img src={barbero.foto_url} alt={barbero.nombre} className="h-10 w-10 shrink-0 rounded-full object-cover" />
+          <img
+            src={barbero.foto_url}
+            alt={barbero.nombre}
+            className="h-10 w-10 shrink-0 rounded-full object-cover"
+            style={{ objectPosition: `${barbero.foto_posicion_x ?? 50}% ${barbero.foto_posicion_y ?? 50}%` }}
+          />
         ) : (
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-cobre/10 text-sm font-medium text-[var(--pb-acento-texto)]">
             {barbero.nombre.charAt(0).toUpperCase()}

@@ -27,6 +27,7 @@ function construirVistaPrevia(barberia, form) {
     personalizacion: {
       color_primario: form.color_primario || null,
       color_header: form.color_header || null,
+      banner_url: form.banner_url || null,
       fuente_display: form.fuente_display,
       tema: form.tema,
       eslogan: form.eslogan,
@@ -37,6 +38,7 @@ function construirVistaPrevia(barberia, form) {
       estilo_whatsapp: form.estilo_whatsapp,
       whatsapp_color: form.whatsapp_color || null,
       whatsapp_tamano: form.whatsapp_tamano,
+      estilo_tarjetas: form.estilo_tarjetas,
     },
   }
 }
@@ -50,6 +52,7 @@ function formularioDesdeBarberia(barberia) {
     dias_maximos_reserva: barberia.dias_maximos_reserva ?? 3,
     color_primario: p.color_primario ?? '',
     color_header: p.color_header ?? '',
+    banner_url: p.banner_url ?? null,
     fuente_display: p.fuente_display || 'fraunces',
     tema: p.tema || 'claro',
     eslogan: p.eslogan ?? '',
@@ -60,6 +63,7 @@ function formularioDesdeBarberia(barberia) {
     estilo_whatsapp: p.estilo_whatsapp || 'enlace',
     whatsapp_color: p.whatsapp_color ?? '',
     whatsapp_tamano: p.whatsapp_tamano || 'mediana',
+    estilo_tarjetas: p.estilo_tarjetas || 'bordes',
   }
 }
 
@@ -67,6 +71,88 @@ function formularioDesdeBarberia(barberia) {
 // base — un select de opciones fijas, no un número libre, para no poder
 // mandar un valor que la base va a rechazar igual.
 const OPCIONES_DIAS_MAXIMOS_RESERVA = [1, 2, 3, 5, 7, 10, 14, 21, 30]
+
+// Un punto de partida completo, no solo de color — cada plantilla aplica
+// paleta + tipografía + estilo de tarjetas + cómo se ven las secciones que
+// ya tienes armadas (galería, equipo, testimonios, horario, servicios), todo
+// junto y coherente entre sí. Nunca AGREGA ni BORRA secciones (respeta qué
+// contenido eligió cargar la barbería) — solo les cambia el estilo a las que
+// ya existen. Sigue siendo 100% editable después, campo por campo: esto es
+// un punto de partida para no arrancar de cero, no un modo aparte.
+//
+// Las 3 están pensadas sobre patrones reales de barberías (no una moda de
+// diseño genérica): negro+dorado/bronce para las de gama alta con historia
+// ("Truefitt & Hill", est. 1805; "Gentlemen Barberclubs"), blanco y negro con
+// tipografía clásica para el archivo/vintage de oficio ("Bruno's Barbers",
+// "B&H Barber Shop" — "timeless retro style"), y oscura con tipografía sans
+// limpia para la barbería moderna de barrio alto (sitios como "ManStop",
+// clubes de grooming premium). Ver conversación — fuentes: colorlib.com,
+// thesalonbusiness.com, glossgenius.com.
+const PLANTILLAS_COMPLETAS = [
+  {
+    nombre: 'Clásica',
+    descripcion: 'La de siempre — cobre, tarjetas con borde, todo centrado.',
+    color_primario: '',
+    color_header: '',
+    tema: 'claro',
+    fuente_display: 'fraunces',
+    estilo_tarjetas: 'bordes',
+    secciones: {
+      galeria: { estilo: 'grilla' },
+      equipo: { estilo: 'grilla' },
+      testimonios: { estilo: 'lista' },
+      horario: { posicion: 'centro' },
+      servicios: { posicion: 'centro' },
+    },
+  },
+  {
+    nombre: 'Vintage',
+    descripcion: 'Blanco, negro y bronce — el archivo de una barbería de oficio.',
+    color_primario: '#8a7148',
+    color_header: '',
+    tema: 'claro',
+    fuente_display: 'baskerville',
+    estilo_tarjetas: 'plano',
+    secciones: {
+      galeria: { estilo: 'grilla' },
+      equipo: { estilo: 'grilla' },
+      testimonios: { estilo: 'lista' },
+      horario: { posicion: 'centro' },
+      servicios: { posicion: 'centro' },
+    },
+  },
+  {
+    nombre: 'Moderna',
+    descripcion: 'Oscura, tipografía sans, tarjetas flotantes con sombra.',
+    color_primario: '#c9974e',
+    color_header: '',
+    tema: 'oscuro',
+    fuente_display: 'bricolage',
+    estilo_tarjetas: 'flotante',
+    secciones: {
+      galeria: { estilo: 'grilla' },
+      equipo: { estilo: 'grilla' },
+      testimonios: { estilo: 'lista' },
+      horario: { posicion: 'centro' },
+      servicios: { posicion: 'centro' },
+    },
+  },
+]
+
+// Punto de partida para quien no quiere elegir colores a mano — un clic
+// aplica marca + header + tema juntos, coherentes entre sí (no solo un color
+// suelto). Sigue siendo 100% editable después: esto no es un modo aparte,
+// solo carga valores en los mismos campos de abajo. `color_primario: ''` en
+// "Cobre clásico" es el valor por defecto real del sitio (no un hex fijo) —
+// clickearlo es, en los hechos, "restablecer" sin tener que limpiar cada
+// campo por separado.
+const PALETAS_SUGERIDAS = [
+  { nombre: 'Cobre clásico', muestraPrimario: '#a85c32', muestraHeader: '#1c1b19', color_primario: '', color_header: '', tema: 'claro' },
+  { nombre: 'Verde barbería', muestraPrimario: '#3c5b46', muestraHeader: '#132018', color_primario: '#3c5b46', color_header: '#132018', tema: 'claro' },
+  { nombre: 'Azul marino', muestraPrimario: '#35577e', muestraHeader: '#111c2b', color_primario: '#35577e', color_header: '#111c2b', tema: 'claro' },
+  { nombre: 'Vino', muestraPrimario: '#8a3b49', muestraHeader: '#1c1b19', color_primario: '#8a3b49', color_header: '#1c1b19', tema: 'claro' },
+  { nombre: 'Nocturna', muestraPrimario: '#c9974e', muestraHeader: '#1c1b19', color_primario: '#c9974e', color_header: '', tema: 'oscuro' },
+]
 
 function etiquetaDiasMaximosReserva(dias) {
   return dias === 1 ? '1 día' : `${dias} días`
@@ -325,6 +411,44 @@ export function PanelPersonalizacion() {
     }
   }
 
+  // 1600×900 (16:9) alcanza de sobra para el ancho del header en cualquier
+  // pantalla — no hace falta el tamaño completo de una foto de cámara, y
+  // mantiene la subida liviana.
+  async function subirBanner(evento) {
+    const archivo = evento.target.files?.[0]
+    if (!archivo) return
+    setSubiendo(true)
+    try {
+      const urlAnterior = form.banner_url
+      const url = await subirImagenBarberia(archivo, { barberiaId: barberia.id, maxAncho: 1600, maxAlto: 900 })
+      setForm((f) => ({ ...f, banner_url: url }))
+      if (urlAnterior) borrarImagenBarberia(urlAnterior)
+    } finally {
+      setSubiendo(false)
+      evento.target.value = ''
+    }
+  }
+
+  // Le cambia el ESTILO a las secciones que ya existen (por tipo), nunca
+  // agrega ni borra ninguna — la plantilla completa es un punto de partida
+  // de apariencia, no una forma de tocar el contenido que la barbería ya
+  // decidió tener o no tener.
+  function aplicarPlantillaCompleta(plantilla) {
+    asegurarFuenteCargada(plantilla.fuente_display)
+    setForm((f) => ({
+      ...f,
+      color_primario: plantilla.color_primario,
+      color_header: plantilla.color_header,
+      tema: plantilla.tema,
+      fuente_display: plantilla.fuente_display,
+      estilo_tarjetas: plantilla.estilo_tarjetas,
+      secciones: f.secciones.map((s) => {
+        const ajuste = plantilla.secciones[s.tipo]
+        return ajuste ? { ...s, ...ajuste } : s
+      }),
+    }))
+  }
+
   function actualizarSeccion(id, cambios) {
     setForm((f) => ({ ...f, secciones: f.secciones.map((s) => (s.id === id ? { ...s, ...cambios } : s)) }))
   }
@@ -491,6 +615,7 @@ export function PanelPersonalizacion() {
         dias_maximos_reserva: form.dias_maximos_reserva,
         color_primario: form.color_primario || null,
         color_header: form.color_header || null,
+        banner_url: form.banner_url || null,
         fuente_display: form.fuente_display,
         tema: form.tema,
         eslogan: form.eslogan,
@@ -501,6 +626,7 @@ export function PanelPersonalizacion() {
         estilo_whatsapp: form.estilo_whatsapp,
         whatsapp_color: form.whatsapp_color || null,
         whatsapp_tamano: form.whatsapp_tamano,
+        estilo_tarjetas: form.estilo_tarjetas,
       })
       setFormGuardado(JSON.stringify(form))
       setEstadoToast('ok')
@@ -566,7 +692,7 @@ export function PanelPersonalizacion() {
 
         {hayCambiosSinGuardar && (
           <p className="mt-4 flex items-center gap-2 rounded-md border border-cobre/40 bg-cobre/10 px-3 py-2 text-xs text-cobre-texto">
-            <span aria-hidden="true">●</span> Tenés cambios sin guardar — la página pública todavía
+            <span aria-hidden="true">●</span> Tienes cambios sin guardar — la página pública todavía
             muestra la versión anterior.
           </p>
         )}
@@ -579,6 +705,38 @@ export function PanelPersonalizacion() {
           <div className="flex max-w-lg flex-col gap-12 lg:max-w-none">
           <section className="flex flex-col gap-6">
             <TituloGrupo numero="01">Identidad</TituloGrupo>
+
+            <div className="flex flex-col gap-2">
+              <span className="versalitas text-xs text-gris-calido-500">Plantillas completas</span>
+              <p className="text-xs text-gris-calido-500">
+                Un punto de partida real, no solo de color: aplica paleta, tipografía, estilo de
+                tarjetas y cómo se ven tus secciones, todo junto. Sin agregar ni sacar ninguna — solo
+                les cambia el estilo a las que ya tienes. Después sigues pudiendo ajustar cualquier
+                cosa por separado, campo por campo.
+              </p>
+              <div className="flex flex-wrap gap-3">
+                {PLANTILLAS_COMPLETAS.map((plantilla) => (
+                  <button
+                    key={plantilla.nombre}
+                    type="button"
+                    onClick={() => aplicarPlantillaCompleta(plantilla)}
+                    title={plantilla.descripcion}
+                    className="flex w-32 flex-col gap-2 rounded-md border border-gris-calido-200 p-3 text-left transition-colors hover:border-cobre"
+                  >
+                    <span
+                      className="h-10 w-full rounded"
+                      style={{
+                        background: `linear-gradient(135deg, ${plantilla.color_primario || '#a85c32'} 50%, ${plantilla.color_header || '#1c1b19'} 50%)`,
+                      }}
+                    />
+                    <span className="text-xs font-medium text-negro-barbero">{plantilla.nombre}</span>
+                    <span className="text-[10px] leading-snug text-gris-calido-500">
+                      {plantilla.descripcion}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
 
             <div className="flex flex-col gap-2">
               <span className="versalitas text-xs text-gris-calido-500">Logo</span>
@@ -603,6 +761,99 @@ export function PanelPersonalizacion() {
                     Quitar
                   </button>
                 )}
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <span className="versalitas text-xs text-gris-calido-500">Foto de portada</span>
+              <p className="text-xs text-gris-calido-500">
+                Se muestra de fondo en el encabezado, detrás del nombre — si no subes una, el
+                encabezado queda con el color de abajo, como hasta ahora.
+              </p>
+              <div className="flex items-center gap-4">
+                {form.banner_url ? (
+                  <img src={form.banner_url} alt="Portada" className="h-14 w-24 rounded-md object-cover" />
+                ) : (
+                  <span className="flex h-14 w-24 items-center justify-center rounded-md border border-dashed border-gris-calido-200 text-xs text-gris-calido-400">
+                    Sin portada
+                  </span>
+                )}
+                <SelectorArchivo etiqueta="Seleccionar imagen" cargando={subiendo} onChange={subirBanner} />
+                {form.banner_url && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (form.banner_url) borrarImagenBarberia(form.banner_url)
+                      setForm((f) => ({ ...f, banner_url: null }))
+                    }}
+                    className="text-xs text-gris-calido-500 underline-offset-2 hover:text-red-700 hover:underline"
+                  >
+                    Quitar
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <span className="versalitas text-xs text-gris-calido-500">Paletas sugeridas</span>
+              <p className="text-xs text-gris-calido-500">
+                Un clic aplica color de marca + color del header + modo oscuro/claro juntos, ya
+                combinados — sigues pudiendo tocar cada uno por separado después.
+              </p>
+              <div className="flex flex-wrap gap-3">
+                {PALETAS_SUGERIDAS.map((paleta) => (
+                  <button
+                    key={paleta.nombre}
+                    type="button"
+                    onClick={() =>
+                      setForm((f) => ({
+                        ...f,
+                        color_primario: paleta.color_primario,
+                        color_header: paleta.color_header,
+                        tema: paleta.tema,
+                      }))
+                    }
+                    title={paleta.nombre}
+                    className="flex flex-col items-center gap-1.5 rounded-md p-1.5 transition-colors hover:bg-gris-calido-100"
+                  >
+                    <span
+                      className="h-8 w-8 rounded-full border border-gris-calido-200"
+                      style={{
+                        background: `linear-gradient(135deg, ${paleta.muestraPrimario} 50%, ${paleta.muestraHeader} 50%)`,
+                      }}
+                    />
+                    <span className="text-[10px] text-gris-calido-500">{paleta.nombre}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <span className="versalitas text-xs text-gris-calido-500">Estilo de tarjetas</span>
+              <p className="text-xs text-gris-calido-500">
+                Cómo se ven las tarjetas y tablas de toda tu página — testimonios, equipo, horario,
+                servicios y el formulario de reserva cambian todos juntos.
+              </p>
+              <div className="flex gap-2">
+                {[
+                  ['bordes', 'Bordes', 'Borde fino, el look de siempre'],
+                  ['flotante', 'Flotante', 'Sin borde, más sombra — se despegan de la página. Se ajusta solo en modo oscuro.'],
+                  ['plano', 'Plano', 'Sin borde ni sombra, el más minimalista'],
+                ].map(([valor, etiqueta, descripcion]) => (
+                  <button
+                    key={valor}
+                    type="button"
+                    onClick={() => setForm((f) => ({ ...f, estilo_tarjetas: valor }))}
+                    title={descripcion}
+                    className={`versalitas rounded-md border px-3 py-2 text-xs transition-colors ${
+                      (form.estilo_tarjetas ?? 'bordes') === valor
+                        ? 'border-cobre text-cobre-texto'
+                        : 'border-gris-calido-200 text-gris-calido-500'
+                    }`}
+                  >
+                    {etiqueta}
+                  </button>
+                ))}
               </div>
             </div>
 
@@ -1410,7 +1661,12 @@ export function PanelPersonalizacion() {
                                 >
                                   <div className="flex items-center gap-3">
                                     {barbero.foto_url ? (
-                                      <img src={barbero.foto_url} alt={barbero.nombre} className="h-9 w-9 rounded-full object-cover" />
+                                      <img
+                                        src={barbero.foto_url}
+                                        alt={barbero.nombre}
+                                        className="h-9 w-9 rounded-full object-cover"
+                                        style={{ objectPosition: `${barbero.foto_posicion_x ?? 50}% ${barbero.foto_posicion_y ?? 50}%` }}
+                                      />
                                     ) : (
                                       <span className="flex h-9 w-9 items-center justify-center rounded-full border border-gris-calido-200 text-xs text-gris-calido-400">
                                         {barbero.nombre.trim().charAt(0).toUpperCase()}
@@ -1483,7 +1739,7 @@ export function PanelPersonalizacion() {
                               ))}
                             </div>
                             <span className="text-xs text-gris-calido-500">
-                              "Centro" muestra solo la tabla, sin foto. En "Izquierda"/"Derecha" podés
+                              "Centro" muestra solo la tabla, sin foto. En "Izquierda"/"Derecha" puedes
                               agregar una foto del local al lado, para darle más credibilidad.
                             </span>
                           </div>
@@ -1573,7 +1829,7 @@ export function PanelPersonalizacion() {
                               ))}
                             </div>
                             <span className="text-xs text-gris-calido-500">
-                              "Centro" muestra solo la tabla, sin foto. En "Izquierda"/"Derecha" podés
+                              "Centro" muestra solo la tabla, sin foto. En "Izquierda"/"Derecha" puedes
                               agregar una foto al lado — de tu local, de un corte, lo que quieras mostrar.
                             </span>
                           </div>
@@ -1917,7 +2173,7 @@ export function PanelPersonalizacion() {
             </label>
             <p className="-mt-2 text-xs text-gris-calido-500">
               Hasta cuántos días hacia adelante puede reservar un cliente en tu página pública.
-              Ayuda a mantener la agenda ordenada — vos igual puedes agendar por teléfono o en
+              Ayuda a mantener la agenda ordenada — igual puedes agendar por teléfono o en
               persona más lejos si hace falta.
             </p>
           </section>

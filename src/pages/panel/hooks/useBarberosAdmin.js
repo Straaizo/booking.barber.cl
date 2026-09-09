@@ -21,7 +21,8 @@ async function idDeCuentaDelBarbero(barberoId) {
   return data.id
 }
 
-const COLUMNAS = 'id, nombre, activo, foto_url, especialidad, intervalo_reserva_minutos'
+const COLUMNAS =
+  'id, nombre, activo, foto_url, foto_posicion_x, foto_posicion_y, especialidad, intervalo_reserva_minutos'
 
 function clave(barberiaId) {
   return ['barberos_admin', barberiaId]

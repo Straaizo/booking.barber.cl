@@ -26,7 +26,7 @@ export function linkWhatsApp(telefono, mensaje = '') {
 
 // Búsqueda de Google Maps por texto — no hace falta que la barbería pegue
 // ningún link a mano: Google resuelve la dirección igual que si la
-// buscaras vos mismo en el buscador de Maps.
+// buscaras tú mismo en el buscador de Maps.
 export function linkGoogleMaps(direccion) {
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(direccion)}`
 }

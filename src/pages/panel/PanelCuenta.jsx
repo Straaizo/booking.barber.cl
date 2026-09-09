@@ -127,8 +127,8 @@ export function PanelCuenta() {
           <h2 className="versalitas text-xs text-cobre">Inicio de sesión con Google</h2>
           <p className="mt-1 text-sm text-gris-calido-500">
             {googleVinculado
-              ? 'Ya podés entrar con tu cuenta de Google, además de tu usuario y contraseña.'
-              : 'Vinculá tu cuenta de Google para poder entrar con ella, sin dejar de usar tu usuario y contraseña.'}
+              ? 'Ya puedes entrar con tu cuenta de Google, además de tu usuario y contraseña.'
+              : 'Vincula tu cuenta de Google para poder entrar con ella, sin dejar de usar tu usuario y contraseña.'}
           </p>
           <button
             type="button"

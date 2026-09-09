@@ -79,7 +79,7 @@ export function PanelBarberoReservas() {
         Mis reservas
       </h1>
       <p className="mt-2 max-w-lg text-sm text-gris-calido-700">
-        Las reservas que tus clientes hicieron con vos, ordenadas por fecha.
+        Las reservas que tus clientes hicieron contigo, ordenadas por fecha.
       </p>
 
       <div className="mt-8">

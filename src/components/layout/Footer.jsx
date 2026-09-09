@@ -7,62 +7,52 @@ import { linkWhatsApp } from '../../utils/formatos'
 
 const NUMERO_WHATSAPP_CONTACTO = import.meta.env.VITE_WHATSAPP_CONTACTO
 
-export function Footer({ showModelCredit = false, variante = 'marketing' }) {
-  const esMinimal = variante === 'minimal'
-
+export function Footer({ showModelCredit = false }) {
   return (
-    <footer className={`bg-negro-barbero text-hueso ${esMinimal ? 'pb-8 pt-14' : 'pb-8 pt-20 md:pt-28'}`}>
-      {!esMinimal && (
-        <div className="px-6 md:px-10">
-          <ScrollReveal>
-            <HoverLink
-              href="/"
-              className="font-display text-2xl font-semibold italic tracking-tight text-hueso"
+    <footer className="bg-negro-barbero pb-8 pt-20 text-hueso md:pt-28">
+      <div className="px-6 md:px-10">
+        <ScrollReveal>
+          <HoverLink
+            href="/"
+            className="font-display text-2xl font-semibold italic tracking-tight text-hueso"
+          >
+            booking<span className="text-cobre-claro">.</span>barber.cl
+          </HoverLink>
+        </ScrollReveal>
+        <TextReveal
+          texto="¿Qué esperas para llevar tu barbería al siguiente nivel?"
+          as="h2"
+          className="mt-6 max-w-3xl font-display text-4xl font-light leading-[1.05] tracking-tight md:text-6xl"
+        />
+        {NUMERO_WHATSAPP_CONTACTO && (
+          <ScrollReveal delay={0.15} className="mt-8">
+            <Button
+              href={linkWhatsApp(
+                NUMERO_WHATSAPP_CONTACTO,
+                'Hola, quiero información sobre booking.barber.cl para mi barbería'
+              )}
+              target="_blank"
+              rel="noreferrer"
             >
-              booking<span className="text-cobre-claro">.</span>barber.cl
-            </HoverLink>
+              Contáctanos
+            </Button>
           </ScrollReveal>
-          <TextReveal
-            texto="¿Qué esperas para llevar tu barbería al siguiente nivel?"
-            as="h2"
-            className="mt-6 max-w-3xl font-display text-4xl font-light leading-[1.05] tracking-tight md:text-6xl"
-          />
-          {NUMERO_WHATSAPP_CONTACTO && (
-            <ScrollReveal delay={0.15} className="mt-8">
-              <Button
-                href={linkWhatsApp(
-                  NUMERO_WHATSAPP_CONTACTO,
-                  'Hola, quiero información sobre booking.barber.cl para mi barbería'
-                )}
-                target="_blank"
-                rel="noreferrer"
-              >
-                Contáctanos
-              </Button>
-            </ScrollReveal>
-          )}
-        </div>
-      )}
+        )}
+      </div>
 
-      <div className={esMinimal ? '' : 'mt-20 md:mt-28'}>
+      <div className="mt-20 md:mt-28">
         <SectionRule indice="—" texto="Emia Studios" tono="claro" />
       </div>
 
       <div className="mt-8 flex flex-col gap-4 px-6 text-xs text-gris-calido-400 md:flex-row md:items-center md:justify-between md:px-10">
-        {esMinimal ? (
-          <HoverLink href="/" className="versalitas">
-            booking.barber.cl
+        <div className="flex gap-6">
+          <HoverLink href="#como-funciona" className="versalitas">
+            Cómo funciona
           </HoverLink>
-        ) : (
-          <div className="flex gap-6">
-            <HoverLink href="#como-funciona" className="versalitas">
-              Cómo funciona
-            </HoverLink>
-            <HoverLink href="#planes" className="versalitas">
-              Planes
-            </HoverLink>
-          </div>
-        )}
+          <HoverLink href="#planes" className="versalitas">
+            Planes
+          </HoverLink>
+        </div>
 
         <p className="versalitas">
           Un proyecto de <span className="text-gris-calido-200">Emia Studios</span>

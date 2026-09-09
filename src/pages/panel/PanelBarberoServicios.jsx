@@ -40,7 +40,7 @@ export function PanelBarberoServicios() {
 
         {servicios && servicios.length === 0 && (
           <p className="py-8 text-sm text-gris-calido-700">
-            Todavía no tenés servicios asignados. Pídele a tu dueño que los cree.
+            Todavía no tienes servicios asignados. Pídele a tu dueño que los cree.
           </p>
         )}
 

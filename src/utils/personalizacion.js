@@ -171,9 +171,37 @@ export function normalizarPersonalizacion(personalizacion) {
     // uno explícito se independiza del resto de la identidad.
     whatsapp_color: null,
     whatsapp_tamano: 'mediana',
+    // Cómo se ven las tarjetas/tablas de toda la página (testimonios, equipo,
+    // horario, servicios, el asistente de reserva) — el mismo valor para
+    // todas a la vez, para que la página se sienta de una sola pieza en vez
+    // de una mezcla. Ver `clasesTarjeta` más abajo.
+    estilo_tarjetas: 'bordes',
     ...p,
     secciones,
   }
+}
+
+// 'bordes' (de siempre): borde fino + sombra apenas perceptible — el look
+// más neutro. 'flotante': sin borde, sombra más marcada — se sienten
+// despegadas de la página, más editorial. 'plano': sin borde ni sombra, solo
+// el cambio de tono de fondo (`--pb-superficie`) — el más minimalista, para
+// quien prefiere que nada "compita" visualmente con las fotos/texto.
+//
+// 'flotante' necesita `esOscuro`: la sombra es negra, y una sombra negra
+// sobre un fondo que ya es casi negro (modo oscuro) no tiene con qué
+// contrastar — la tarjeta se queda sin ningún límite visible. En oscuro se
+// suma un borde clarito bien sutil (`border-white/10`) que hace ese mismo
+// trabajo de "separar la tarjeta" cuando la sombra sola no alcanza.
+export function clasesTarjeta(estilo, esOscuro) {
+  if (estilo === 'flotante') {
+    return esOscuro
+      ? 'rounded-xl border border-white/10 shadow-[0_20px_40px_-20px_rgba(0,0,0,0.6),0_2px_10px_rgba(0,0,0,0.25)]'
+      : 'rounded-xl border-0 shadow-[0_20px_40px_-20px_rgba(0,0,0,0.3),0_2px_10px_rgba(0,0,0,0.1)]'
+  }
+  if (estilo === 'plano') {
+    return 'rounded-lg border-0 shadow-none'
+  }
+  return 'rounded-lg border border-[var(--pb-borde)] shadow-[0_1px_3px_rgba(0,0,0,0.06),0_10px_28px_-16px_rgba(0,0,0,0.18)]'
 }
 
 // Orden de "Nuestro equipo" en la página pública: `ordenIds` guarda los ids

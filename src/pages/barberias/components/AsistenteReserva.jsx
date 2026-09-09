@@ -7,6 +7,7 @@ import { Confirmacion } from './Confirmacion'
 import { useCrearReserva } from '../hooks/useCrearReserva'
 import { formatoCLP } from '../../../utils/formatos'
 import { EASE_ENTRADA } from '../../../components/animations/easing'
+import { clasesTarjeta } from '../../../utils/personalizacion'
 
 const VARIANTES_PASO = {
   entra: { opacity: 0, x: 20 },
@@ -131,7 +132,13 @@ export function AsistenteReserva({ barberia }) {
   }
 
   return (
-    <div className="border-t-2 border-cobre bg-[var(--pb-superficie)]/50 px-5 py-7 md:px-7 md:py-9">
+    // El acento superior color de marca (`border-t-cobre`) queda siempre,
+    // sea cual sea `estilo_tarjetas` — es la pista de "acá se reserva",
+    // la misma en toda la página; lo que cambia con el estilo es el resto
+    // del borde/sombra, igual que en testimonios/equipo/tablas.
+    <div
+      className={`${clasesTarjeta(barberia.personalizacion?.estilo_tarjetas, barberia.personalizacion?.tema === 'oscuro')} border-t-2 border-t-cobre bg-[var(--pb-superficie)] px-5 py-7 md:px-7 md:py-9`}
+    >
       {/* Nada de alto fijo ni scroll interno — con varios servicios (cada
           uno con foto grande) o muchos horarios, la lista tiene que poder
           crecer como una lista normal, no quedar recortada en una cajita

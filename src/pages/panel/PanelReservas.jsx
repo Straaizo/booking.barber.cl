@@ -515,7 +515,7 @@ export function PanelReservas() {
         titulo="Cancelar reserva"
         mensaje={
           reservaCancelando
-            ? `¿Cancelar la reserva de ${reservaCancelando.cliente_nombre} (${formatoFechaHora(reservaCancelando.fecha_hora)})? Podés reactivarla después desde "Canceladas" si fue un error.`
+            ? `¿Cancelar la reserva de ${reservaCancelando.cliente_nombre} (${formatoFechaHora(reservaCancelando.fecha_hora)})? Puedes reactivarla después desde "Canceladas" si fue un error.`
             : ''
         }
         textoConfirmar="Sí, cancelar"

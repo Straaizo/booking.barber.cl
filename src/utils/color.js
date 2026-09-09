@@ -15,6 +15,25 @@ export function oscurecerHex(hex, porcentaje = 0.22) {
   return `#${canal(0)}${canal(2)}${canal(4)}`
 }
 
+// Inverso de `oscurecerHex` — acerca el color al blanco en vez de al negro.
+// Hace falta para derivar una variante de `color_primario` que siga siendo
+// legible como texto sobre fondo oscuro (`--color-cobre-claro`) cuando la
+// barbería eligió un color de marca oscuro (ej. un vino o un verde muy
+// cerrado): oscurecerlo más lo dejaría todavía más ilegible.
+export function aclararHex(hex, porcentaje = 0.35) {
+  const limpio = hex.replace('#', '')
+  if (limpio.length !== 6) return hex
+
+  const canal = (inicio) => {
+    const valor = parseInt(limpio.slice(inicio, inicio + 2), 16)
+    return Math.min(255, Math.round(valor + (255 - valor) * porcentaje))
+      .toString(16)
+      .padStart(2, '0')
+  }
+
+  return `#${canal(0)}${canal(2)}${canal(4)}`
+}
+
 // Luminancia relativa (fórmula WCAG) — para decidir si el texto sobre un
 // color de fondo elegido libremente (ej. el color del header) debe ser claro
 // u oscuro, en vez de asumir siempre un fondo oscuro como el resto del sitio.
