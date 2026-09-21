@@ -8,6 +8,7 @@ import { useCrearReserva } from '../hooks/useCrearReserva'
 import { formatoCLP } from '../../../utils/formatos'
 import { EASE_ENTRADA } from '../../../components/animations/easing'
 import { clasesTarjeta } from '../../../utils/personalizacion'
+import { santiagoAFechaUTC } from '../../../utils/horaLocal'
 
 const VARIANTES_PASO = {
   entra: { opacity: 0, x: 20 },
@@ -98,9 +99,19 @@ export function AsistenteReserva({ barberia }) {
   }
 
   async function confirmar(datosCliente) {
-    const fechaHora = new Date(horario.fecha)
     const [horas, minutos] = horario.hora.split(':').map(Number)
-    fechaHora.setHours(horas, minutos, 0, 0)
+    // La hora elegida ES hora de Chile — con `new Date(...).setHours(...)`
+    // (lo que había antes) se interpretaba con el huso del dispositivo del
+    // cliente. Si el celular no tenía bien configurado el huso (pasa más de
+    // lo que parece), la reserva se guardaba en un instante distinto al que
+    // se veía en pantalla, y el servidor terminaba rechazándola.
+    const fechaHora = santiagoAFechaUTC(
+      horario.fecha.getFullYear(),
+      horario.fecha.getMonth() + 1,
+      horario.fecha.getDate(),
+      horas,
+      minutos
+    )
 
     const reserva = await crearReserva.mutateAsync({
       barberia_id: barberia.id,

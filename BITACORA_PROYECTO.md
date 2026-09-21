@@ -4578,3 +4578,191 @@ La identidad básica (color de marca, color de header, tipografía del nombre, t
 - `vercel.json` (+ bloque `headers` con 4 cabeceras de seguridad).
 
 **Pendiente / próximos pasos:** Content-Security-Policy real, con pruebas dedicadas (queda explícitamente fuera de hoy). Enzo va a rotar la contraseña del superadmin `esabattini` pronto (expuesta en una sesión anterior) — no es urgente según él, pero sigue siendo lo primero de la lista. Los mismos pendientes de siempre (Deployment Protection — parece resuelto, confirmado que `booking-barber-coral.vercel.app` ya no pide login).
+
+---
+
+## 2026-09-02 (67) - Optimización de bundle: code-splitting por ruta + chunks de vendor + fuentes
+
+**Qué se hizo:** el bundle principal pesaba 982KB — Enzo pidió reducirlo. Se aplicó `lazy()` de React por ruta (cada página del panel/superadmin/barbero y la vista pública de barbería se separa en su propio chunk, se carga solo cuando se navega a ella) y se separaron `vendor-react`, `vendor-supabase` y `vendor-query` (TanStack Query) como chunks propios — así el navegador los cachea aparte y no se vuelven a descargar completos en cada deploy si solo cambió código de la app.
+
+**Fuentes:** se encontró que las tipografías se cargaban con `@import` dentro de un archivo CSS — eso bloquea el render hasta que el CSS entero termina de bajar. Se movieron a `<link>` en el `<head>` de `index.html`, que el navegador puede empezar a pedir en paralelo desde el arranque.
+
+**Resultado:** el bundle principal bajó de 982KB a ~100KB.
+
+**Cómo se probó:** `npm run build` limpio, tamaños de chunk revisados en la salida del build; navegación real por las rutas principales confirmando que cada chunk se pide solo cuando hace falta (Network del navegador).
+
+**Archivos afectados:**
+- `src/routes/AppRouter.jsx` (`lazy()` por ruta).
+- `vite.config.js` (chunks manuales de vendor).
+- `index.html`, hojas de estilo con `@import` de fuentes (movidas a `<link>`).
+
+**Pendiente / próximos pasos:** los mismos de siempre.
+
+---
+
+## 2026-09-04 (68) - Filtración real en GitGuardian + Google Sign-In completo
+
+**Qué se pidió:** antes de un commit, Enzo pidió confirmar que no se filtrara nada sensible. Con eso resuelto, llegó un correo real de GitGuardian avisando de una "Company Email Password" filtrada.
+
+**El hallazgo:** dos scripts de QA temporales (`qa-crear-reservas-prueba-temp.mjs`, `qa-check-estado-temp.mjs`) se habían commiteado con una credencial de prueba hardcodeada (`jluis@usuarios.booking.barber.cl` + contraseña) y después borrado — pero seguían vivos en el historial de git. Enzo decidió no borrar la cuenta de prueba todavía; se le explicó cómo purgarla del historial con `git filter-repo` (clon limpio obligatorio) sin ejecutar nada, ya que no lo pidió.
+
+**Decisión de seguridad — Google Sign-In:** conversando sobre 2FA (SMS quedó descartado por costo/complejidad), Enzo optó por sumar inicio de sesión con Google, vinculado a la cuenta real de cada persona.
+
+**Implementación:**
+- Botón "Iniciar sesión con Google" en el login, mismo tamaño que "Ingresar".
+- `authService.js`: `iniciarSesionConGoogle()` (`signInWithOAuth`) y `vincularGoogle()` (`linkIdentity()` — clave: vincula Google a la MISMA fila de `auth.users` de la sesión ya autenticada, en vez de crear una fila nueva sin fila en `usuarios`, que es lo que pasaría con un login directo por Google sin vincular antes).
+- Nueva sección "Cuenta" en los 3 paneles (`/panel/cuenta`, `/panel/barbero/cuenta`, `/admin/cuenta`): cambio de contraseña propia y "Vincular con Google".
+- Encabezado con "Bienvenido, nombre apellido" + fecha.
+- **Bug encontrado y arreglado — cuentas huérfanas:** si alguien clickeaba "Iniciar sesión con Google" sin haber vinculado antes, Supabase creaba una fila en `auth.users` sin fila correspondiente en `usuarios` (imposible de resolver un perfil). Se agregó la acción `eliminar_cuenta_huerfana` en la Edge Function `gestionar-usuario` (autoborrado, solo si el que llama no tiene fila en `usuarios`) + una llamada automática desde `AuthContext.jsx` cuando el perfil no resuelve.
+- **Bug de carrera encontrado y arreglado:** esa limpieza se llamaba en paralelo con `signOut()`, perdiendo el token antes de llegar a la Edge Function — se pasó a `await` antes de cerrar sesión.
+- Configuración de Google Cloud Console + Supabase Dashboard documentada para Enzo paso a paso (OAuth consent screen, callback URL, "Allow manual linking").
+
+**Cómo se probó:** flujo completo de login con Google, vinculación desde cuenta ya logueada, y el caso de cuenta huérfana forzado a mano — confirmado que se autoborra y no deja rastros. `npm run lint`/`build` limpios en cada paso.
+
+**Archivos afectados:**
+- `src/pages/Login.jsx`, `src/services/authService.js`, `src/context/AuthContext.jsx`.
+- `src/pages/panel/PanelCuenta.jsx` (nuevo, compartido por los 3 paneles) + rutas nuevas.
+- `src/components/common/IconoGoogle.jsx`, `IconoCuenta.jsx`, `IconoErrorAnimado.jsx` (nuevos).
+- `supabase/functions/gestionar-usuario/index.ts` (+ `eliminar_cuenta_huerfana`).
+- `src/services/usuariosService.js` (+ `eliminarCuentaHuerfanaPropia`).
+
+**Pendiente / próximos pasos:** Enzo no quiso borrar la cuenta de prueba filtrada todavía, ni purgar el historial de git — sigue en su lista. Rotar la contraseña del superadmin `esabattini` (no urgente según él). Los mismos de siempre.
+
+---
+
+## 2026-09-06 (69) - Personalización: "Servicios y precios" pasa a ser una sección + arreglo de vista previa en blanco + se saca el watermark de la plataforma
+
+**Qué se hizo:** "Servicios y precios" vivía como un toggle fijo (`mostrar_servicios`) aparte del sistema de secciones reordenables ya existente (galería, horario, equipo). Se migró al mismo sistema `secciones`, con migración automática del lado del cliente (si el toggle viejo estaba en `true`, se inyecta una sección "servicios" al normalizar — mismo patrón ya usado para "equipo"/"horario" cuando pasaron por lo mismo antes — no hizo falta ninguna migración SQL de datos).
+
+**Bug encontrado y arreglado — vista previa en blanco:** Enzo reportó que la vista previa de Personalización a veces quedaba en blanco. Causa real: `PreviewBarberia.jsx` (el iframe) manda un mensaje `'preview-barberia-listo'` cuando termina de montarse, pero `PanelPersonalizacion.jsx` nunca escuchaba ese mensaje — mandaba los datos por `postMessage` antes de que el iframe estuviera listo para recibirlos, y se perdían. Se agregó el listener correspondiente y se sacó el mecanismo viejo basado en `onLoad` del iframe (que disparaba en el momento equivocado). Diagnosticado forzando modo mock + `console.log` temporal en ambos lados hasta confirmar que el iframe nunca recibía datos reales.
+
+**Watermark de la plataforma:** Enzo pidió sacar el link a "booking.barber.cl" del encabezado público de cada barbería — "le quita imagen a la barbería".
+
+**Cómo se probó:** reproducido el bug de la vista en blanco a propósito en modo mock antes de arreglarlo; confirmado arreglado con Playwright (el iframe recibe y pinta los datos reales al primer intento). `npm run lint`/`build` limpios.
+
+**Archivos afectados:**
+- `src/utils/personalizacion.js` (migración de `mostrar_servicios` → sección `servicios`).
+- `src/pages/panel/PanelPersonalizacion.jsx`, `src/pages/panel/PreviewBarberia.jsx` (listener de `preview-barberia-listo`).
+- `src/pages/barberias/components/VistaBarberia.jsx` (se saca el link a booking.barber.cl del header público).
+
+**Pendiente / próximos pasos:** los mismos de siempre.
+
+---
+
+## 2026-09-07 (70) - Nuevo flujo de reserva (Servicio → Barbero y hora → Datos) + fotos y descripción en servicios
+
+**Qué se hizo:** el asistente de reserva pública pasaba por Barbero → Servicio → Horario, comprometiendo a un barbero a ciegas antes de saber si tenía hora. Se reordenó a Servicio → Barbero y hora (mostrando TODOS los barberos que ofrecen ese servicio con sus horas disponibles del día, de una vez) → Datos.
+
+**Servicios con imagen y descripción:** migración nueva (`agregar_descripcion_imagen_servicios.sql`) agregando `descripcion`/`imagen_url` a `servicios`; UI de carga en el panel de administración de servicios.
+
+**Archivos nuevos:** `PasoBarberoHorario.jsx`, `FilaBarberoServicio.jsx`. Se borraron `PasoBarbero.jsx` y `PasoHorario.jsx` (reemplazados). `PasoServicio.jsx` y `AsistenteReserva.jsx` reescritos para el nuevo orden.
+
+**Cómo se probó:** flujo completo de reserva de punta a punta en modo mock y contra Supabase real, confirmando que aparecen todos los barberos calificados con sus horas del día elegido. `npm run lint`/`build` limpios.
+
+**Archivos afectados:**
+- `src/pages/barberias/components/AsistenteReserva.jsx`, `PasoServicio.jsx` (reescritos).
+- `src/pages/barberias/components/PasoBarberoHorario.jsx`, `FilaBarberoServicio.jsx` (nuevos).
+- `src/pages/barberias/components/PasoBarbero.jsx`, `PasoHorario.jsx` (borrados).
+- `supabase/migrations/20260907000000_agregar_descripcion_imagen_servicios.sql` (nueva).
+- `src/pages/panel/components/FilaServicioAdmin.jsx` (carga de imagen/descripción).
+
+**Pendiente / próximos pasos:** los mismos de siempre.
+
+---
+
+## 2026-09-08 (71) - Pulido de UX: alto del asistente, diálogos nativos → modales, iconos en acciones, rediseño de la tarjeta de Barberos
+
+**Qué se hizo (varios pedidos seguidos en la misma sesión):**
+
+**Alto del asistente de reserva:** Enzo reportó que el pie de página "saltaba" cada vez que el asistente cambiaba de tamaño entre pasos. Primer intento — alto fijo con scroll interno — Enzo lo rechazó ("le quita profesionalismo, prefiero que crezca como una lista normal"). Se revirtió a alto natural + `layout` de Framer Motion, que anima la transición de alto entre pasos sin scroll ni alto fijo.
+
+**Diálogos nativos → modales propios:** los 3 `window.confirm()` que quedaban (dar de baja un barbero, eliminar cuenta de dueño/barbero desde superadmin ×2) se reemplazaron por `ModalConfirmacion` (o un confirm-toggle inline dentro del modal ya existente, en los 2 casos anidados).
+
+**Iconos en acciones de solo texto:** Enzo mostró una acción de texto plano ("no se nota que es una acción clickeable") y pidió el mismo trato para todas las parecidas. Se crearon `IconoLlave`, `IconoPapelera`, `IconoRefrescar` y se aplicaron a "Cambiar contraseña", "Dar de baja", "Eliminar cuenta", "Reactivar", "Quitar", "Eliminar", "Vincular con Google".
+
+**Rediseño de la tarjeta de Barberos (varias rondas de feedback seguidas):** de una fila apretada a 4 filas separadas (identidad / foto+especialidad / catálogo propio / acciones); el contador "2/10 según tu plan" pasó de texto suelto a una píldora con borde; la foto pasó a subirse haciendo click directo en el círculo del avatar (antes un botón aparte), con una insignia de basura para quitarla sin reemplazarla — bug encontrado y arreglado en el camino: el ícono de lápiz al pasar el mouse se salía del círculo (al `<label>` le faltaba `position: relative`, así que el overlay `absolute inset-0` se posicionaba contra un ancestro equivocado). Última ronda: se fusionó la fila de "catálogo compartido" con la de acciones y se sacó una línea divisoria sobrante.
+
+**Cómo se probó:** cada cambio visual se verificó con Playwright en modo mock (capturas antes/después, zoom en el caso del ícono que se salía del círculo). `npm run lint`/`build` limpios en cada paso.
+
+**Archivos afectados:**
+- `src/pages/barberias/components/AsistenteReserva.jsx` (alto natural + `layout`).
+- `src/pages/panel/PanelBarberos.jsx`, `src/pages/panel/PanelSuperadminBarberiaDetalle.jsx` (modales en vez de `window.confirm`).
+- `src/components/panel/IconoLlave.jsx`, `IconoPapelera.jsx`, `IconoRefrescar.jsx` (nuevos) + aplicados en varios componentes.
+- `src/pages/panel/PanelBarberos.jsx` (rediseño completo de la tarjeta, en varias rondas).
+
+**Pendiente / próximos pasos:** los mismos de siempre.
+
+---
+
+## 2026-09-09 (72) - Se saca el catálogo propio por barbero → un servicio se asigna a uno o varios barberos
+
+**Qué se pidió:** el toggle de "catálogo compartido / catálogo propio" por barbero dejó de funcionar bien al mezclarse con los cambios recientes de servicios. Enzo pidió sacarlo del todo: "al final lo mejor sería por cada servicio asignarle un barbero puntual". Después de implementarlo con un solo barbero por servicio, Enzo pidió poder asignar varios barberos a un mismo servicio, no solo uno.
+
+**Cambio de esquema:** se reemplazó `servicios.barbero_id` (una columna, un barbero o ninguno) por una tabla puente `servicio_barberos` (servicio_id, barberia_id, barbero_id) — sin filas para un servicio = compartido (cualquier barbero activo lo ofrece), con filas = solo esos barberos. Se sacaron las columnas/triggers/políticas del viejo esquema de "catálogo propio" (`usa_catalogo_propio`, sus 2 triggers de validación, las ramas de política RLS que dejaban a un barbero escribir su propio catálogo).
+
+**Bug real encontrado en producción — embed roto contra Supabase real:** la nueva FK de `servicio_barberos` hacia `servicios` es compuesta (`servicio_id, barberia_id`) — PostgREST no arma el embed automático sobre una FK compuesta (mismo problema ya documentado antes para `usuarios_barbero_fk`), así que `servicios ( servicio_barberos (barbero_id) )` volvía siempre con la lista vacía, sin ningún error visible. En modo mock (sin PostgREST) se veía perfecto, lo que ocultó el bug hasta probarlo contra la barbería real de Enzo. Se reemplazó el embed por una consulta separada, agrupada del lado del cliente, en los 5 lugares que lo usaban.
+
+**UI:** en el panel de Servicios, un botón "Asignar servicio" abre una tarjeta modal con checkboxes por barbero y el texto explicativo de qué significa marcar uno, varios, o ninguno.
+
+**Cómo se probó:** contra la barbería real de prueba (jluis) con Playwright — asignar uno y varios barberos, guardar, recargar, confirmar que se mantiene. Error de migración real encontrado en el camino (orden equivocado: intentaba borrar la columna vieja antes de reemplazar las políticas RLS que todavía la referenciaban) y corregido.
+
+**Archivos afectados:**
+- `supabase/migrations/20260908000000_servicios_multiples_barberos.sql` (nueva).
+- `src/pages/panel/hooks/useServiciosAdmin.js`, `useServiciosPanel.js`, `useBarberosAdmin.js` (reescritos).
+- `src/pages/panel/components/FilaServicioAdmin.jsx`, `ModalAsignarBarberos.jsx` (nuevo), `PanelServicios.jsx`.
+- `src/pages/barberias/components/AsistenteReserva.jsx`, `src/pages/panel/PanelReservas.jsx`, `useReservasBandeja.js` (filtran por la nueva lista de barberos asignados).
+- `src/utils/servicios.js` (nuevo, `conBarberoIds`).
+
+**Pendiente / próximos pasos:** los mismos de siempre.
+
+---
+
+## 2026-09-09 (73) - Ajustar la foto de cada barbero (arrastrar para centrar) + confirmación antes de borrarla
+
+**Qué se pidió:** Enzo pidió poder ajustar cómo se recorta la foto de perfil de un barbero dentro del círculo del avatar (en vez de siempre el centro), y que borrar una foto pida confirmación en vez de borrarla directo.
+
+**Editor de posición:** modal nuevo con la foto mostrada a tamaño real dentro de un círculo fijo — se arrastra directo con el mouse (o el dedo) hasta la posición deseada, sin sliders. El resultado se guarda como `foto_posicion_x`/`foto_posicion_y` (0-100 cada eje) y se aplica vía `object-position` en cada lugar donde se muestra la foto (panel de Barberos, página pública, asistente de reserva, vista previa de Personalización).
+
+**Bug encontrado y arreglado en el camino:** la foto arrastrable se veía recortada al ancho del círculo en vez de exceder sus bordes — Tailwind le pone `max-width: 100%` a todo `<img>` por defecto (preflight), que ganaba por sobre el ancho puesto a mano; se anuló con `maxWidth: 'none'` explícito.
+
+**Confirmación al borrar + claridad de los controles:** "Quitar"/"Ajustar" pasaron de dos círculos de ícono solo (poco claros, Enzo los reportó "se ven feo y poco profesionales" a ese tamaño) a chips con texto + ícono, siempre visibles (no solo al pasar el mouse) — en el celular nunca hay hover, así que una pista que dependiera de eso no se veía nunca ahí.
+
+**Cómo se probó:** con Playwright en modo mock, flujo completo de arrastrar-guardar-confirmar visualmente, con capturas a escala 2x para revisar la nitidez de los íconos después de que Enzo los reportara borrosos a 12px (se subieron a 14px).
+
+**Archivos afectados:**
+- `supabase/migrations/20260909000000_agregar_posicion_foto_barbero.sql` (nueva).
+- `src/pages/panel/components/ModalPosicionFoto.jsx` (nuevo).
+- `src/components/panel/IconoAjustar.jsx` (nuevo).
+- `src/pages/panel/PanelBarberos.jsx` (integración del editor + confirmación + chips de texto).
+- Todos los puntos donde se pinta `foto_url` de un barbero (aplicando `foto_posicion_x/y`).
+
+**Pendiente / próximos pasos:** los mismos de siempre.
+
+---
+
+## 2026-09-09 (74) - Auditoría UX/UI de Personalización (con inspiración real del rubro) + portada, pie propio, estilo de tarjetas, plantillas completas
+
+**Qué se pidió:** Enzo pidió una auditoría completa de qué tan genérica se ve la página pública de una barbería, usando Playwright y su propia barbería de prueba real, con ideas concretas para mejorar.
+
+**Diagnóstico:** con acceso real (barbería de prueba de Enzo) se armó un catálogo completo del sistema de personalización (colores, fuentes, secciones, sus sub-opciones) vía un agente de investigación, más un recorrido visual real. Conclusión: lo único que de verdad variaba entre barberías era color y fuente — la estructura (header, divisores, tablas, tarjetas) era la misma "forma" siempre. Se armaron 10 combinaciones completas en modo mock para mapear el rango real ya alcanzable, guardadas como capturas en una carpeta de revisión (borrada al final, ya cumplió su función).
+
+**Cambios implementados en esa auditoría:**
+- **Portada (`banner_url`):** campo que existía en la base hacía tiempo pero nunca se conectó a nada — ahora se puede subir una foto de portada real para el encabezado, con un degradado que usa el color de marca en vez de un velo negro genérico igual para todos.
+- **Pie de página propio de cada barbería** (nombre, dirección, WhatsApp — mismo color del header) en vez del pie de marketing de la plataforma que aparecía siempre ("Un proyecto de Emia Studios").
+- **Paletas sugeridas** y luego **plantillas completas** (Clásica / Vintage / Moderna): un clic aplica color + tipografía + estilo de tarjetas + cómo se ven las secciones, todo junto — sin agregar ni sacar ninguna sección, solo el estilo de las que ya existen. La plantilla "Vintage" se rehizo tomando como referencia patrones reales del rubro (negro+dorado en barberías de gama alta, blanco y negro con tipografía clásica en las de oficio/vintage) en vez de un "editorial" genérico que a Enzo no le convenció al principio.
+- **"Estilo de tarjetas"** (Bordes / Flotante / Plano), aplicado a la vez a testimonios, equipo, horario, servicios y el asistente de reserva.
+- **Bugs de contraste en modo oscuro encontrados y arreglados:** el encabezado de las tablas casi no se distinguía de las filas; el link "Reservar tu hora →" (variante sin foto al lado) no tenía color de texto propio y quedaba invisible en oscuro; la sombra negra de "Flotante" no tenía con qué contrastar sobre un fondo ya casi negro — se le sumó un borde clarito solo en oscuro en vez de dejarlo sin ningún límite visible.
+- **Panel de "Nuestro equipo" corregido:** con pocos barberos, en pantallas anchas el panel se estiraba a todo el ancho de la sección y quedaba como una caja enorme casi vacía — se le puso un tope de ancho cómodo.
+- **Limpieza de voseo argentino:** 13 instancias de "vos/tenés/podés/vinculá/seguís" encontradas en textos de usuario y comentarios (acumuladas en sesiones anteriores) pasadas a "tú" neutro, a pedido explícito de Enzo.
+
+**Cómo se probó:** cada pieza con Playwright, mayormente en modo mock (10 plantillas + variantes de estilo de tarjetas en claro/oscuro) y puntualmente contra la barbería real de Enzo para el flujo de subir portada + elegir paleta. **Error propio durante la prueba:** un script de QA le borró el logo real de la barbería de prueba por apuntar al primer botón "Quitar" que encontró (el del logo) en vez del de la portada — Enzo fue avisado, no se pudo restaurar (no había una copia del archivo original).
+
+**Archivos afectados:**
+- `src/pages/panel/PanelPersonalizacion.jsx` (portada, paletas, estilo de tarjetas, plantillas completas).
+- `src/pages/barberias/components/VistaBarberia.jsx`, `FooterBarberia.jsx` (nuevo), `AsistenteReserva.jsx`.
+- `src/utils/personalizacion.js` (`clasesTarjeta`), `src/utils/color.js` (`aclararHex`).
+- `src/components/common/IconoTijeras.jsx` (nuevo, reemplaza el placeholder vacío de un servicio sin foto).
+- `supabase/migrations/20260910000000_agregar_estilo_tarjetas.sql` (nueva).
+- Limpieza de voseo en 6 archivos (`formatos.js`, `PanelCuenta.jsx`, `PanelBarberoServicios.jsx`, `PanelBarberoReservas.jsx`, `PanelPersonalizacion.jsx`, `PanelReservas.jsx`).
+
+**Pendiente / próximos pasos:** la plantilla completa alternativa como rediseño de fondo real (no solo color/tipografía/tarjetas) queda pendiente si Enzo la quiere como su propio trabajo aparte. Subir de nuevo el logo de la barbería de prueba (se perdió por el error de QA de hoy). Los mismos pendientes de siempre (rotar contraseña de `esabattini`, CSP real, purgar historial de git de la credencial filtrada si Enzo lo pide).

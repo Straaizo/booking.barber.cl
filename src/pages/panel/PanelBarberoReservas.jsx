@@ -2,7 +2,14 @@ import { useState } from 'react'
 import { useAuth } from '../../hooks/useAuth'
 import { Loader } from '../../components/common/Loader'
 import { HoverLink } from '../../components/common/HoverLink'
-import { useReservasDeBarbero, useCancelarReserva } from './hooks/useReservasBandeja'
+import { IconoLapiz } from '../../components/panel/IconoLapiz'
+import { ModalReprogramarReserva } from './components/ModalReprogramarReserva'
+import {
+  useReservasDeBarbero,
+  useCancelarReserva,
+  useServiciosParaReprogramar,
+  useReprogramarReserva,
+} from './hooks/useReservasBandeja'
 import { formatoCLP, linkWhatsApp } from '../../utils/formatos'
 
 function formatoFechaHora(iso) {
@@ -15,7 +22,7 @@ function formatoFechaHora(iso) {
   })
 }
 
-function FilaReserva({ reserva, onCancelar, cancelando }) {
+function FilaReserva({ reserva, onEditar, onCancelar, cancelando }) {
   const cancelada = reserva.estado === 'cancelada'
 
   return (
@@ -40,18 +47,28 @@ function FilaReserva({ reserva, onCancelar, cancelando }) {
         </span>
       </div>
 
-      <div className="text-right md:text-left">
+      <div className="flex items-center justify-end gap-4 text-right md:text-left">
         {cancelada ? (
           <span className="versalitas text-xs text-gris-calido-400">Cancelada</span>
         ) : (
-          <button
-            type="button"
-            onClick={() => onCancelar(reserva.id)}
-            disabled={cancelando}
-            className="versalitas text-xs text-red-700 underline decoration-red-700/40 hover:decoration-red-700 disabled:opacity-50"
-          >
-            Cancelar
-          </button>
+          <>
+            <button
+              type="button"
+              onClick={onEditar}
+              className="versalitas flex items-center gap-1.5 text-xs text-cobre-texto underline decoration-cobre-texto/40 hover:decoration-cobre-texto"
+            >
+              <IconoLapiz className="h-3.5 w-3.5" />
+              Editar
+            </button>
+            <button
+              type="button"
+              onClick={() => onCancelar(reserva.id)}
+              disabled={cancelando}
+              className="versalitas text-xs text-red-700 underline decoration-red-700/40 hover:decoration-red-700 disabled:opacity-50"
+            >
+              Cancelar
+            </button>
+          </>
         )}
       </div>
     </div>
@@ -61,8 +78,11 @@ function FilaReserva({ reserva, onCancelar, cancelando }) {
 export function PanelBarberoReservas() {
   const { perfil } = useAuth()
   const { data: reservas, isLoading, isError } = useReservasDeBarbero(perfil.barbero_id)
+  const { data: servicios } = useServiciosParaReprogramar(perfil.barberia_id)
   const cancelarReserva = useCancelarReserva(null, perfil.barbero_id)
+  const reprogramarReserva = useReprogramarReserva(null, perfil.barbero_id)
   const [cancelandoId, setCancelandoId] = useState(null)
+  const [reservaEditando, setReservaEditando] = useState(null)
 
   async function cancelar(id) {
     setCancelandoId(id)
@@ -105,6 +125,7 @@ export function PanelBarberoReservas() {
               <FilaReserva
                 key={reserva.id}
                 reserva={reserva}
+                onEditar={() => setReservaEditando(reserva)}
                 onCancelar={cancelar}
                 cancelando={cancelandoId === reserva.id}
               />
@@ -112,6 +133,17 @@ export function PanelBarberoReservas() {
           </div>
         )}
       </div>
+
+      {reservaEditando && servicios && (
+        <ModalReprogramarReserva
+          reserva={reservaEditando}
+          servicios={servicios.filter(
+            (s) => s.barbero_ids.length === 0 || s.barbero_ids.includes(perfil.barbero_id)
+          )}
+          onGuardar={(cambios) => reprogramarReserva.mutateAsync(cambios)}
+          onCerrar={() => setReservaEditando(null)}
+        />
+      )}
     </div>
   )
 }

@@ -2,13 +2,12 @@ import { useMemo, useState } from 'react'
 import { useAuth } from '../../hooks/useAuth'
 import { Loader } from '../../components/common/Loader'
 import { HoverLink } from '../../components/common/HoverLink'
-import { Button } from '../../components/common/Button'
-import { ModalFormulario } from '../../components/panel/ModalFormulario'
 import { ModalConfirmacion } from '../../components/panel/ModalConfirmacion'
 import { CalendarioReservas } from '../../components/panel/CalendarioReservas'
 import { IconoLapiz } from '../../components/panel/IconoLapiz'
 import { IconoX } from '../../components/panel/IconoX'
 import { IconoRefrescar } from '../../components/panel/IconoRefrescar'
+import { ModalReprogramarReserva } from './components/ModalReprogramarReserva'
 import {
   useReservasBandeja,
   useCancelarReserva,
@@ -17,14 +16,7 @@ import {
   useReprogramarReserva,
 } from './hooks/useReservasBandeja'
 import { formatoCLP, linkWhatsApp } from '../../utils/formatos'
-import {
-  horaMinutoEnSantiago,
-  claveFechaSantiago,
-  diaSantiagoComoFechaLocal,
-  hoyEnSantiago,
-  santiagoAFechaUTC,
-  inicioDeSemanaLunes,
-} from '../../utils/horaLocal'
+import { diaSantiagoComoFechaLocal, hoyEnSantiago, inicioDeSemanaLunes } from '../../utils/horaLocal'
 
 // El negocio corre siempre en hora de Chile — estas dos SIEMPRE la fijan
 // (`timeZone`), en vez de mostrar la hora local de quien esté mirando el
@@ -48,107 +40,6 @@ function formatoFechaHora(iso) {
 // comparan con getters locales de siempre.
 function mismoDia(a, b) {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
-}
-
-// Fecha/hora para prellenar el formulario de "Editar" — en hora de Chile,
-// no la del dispositivo del dueño (si no, editar desde fuera de Chile
-// mostraría, y guardaría, una hora distinta a la real de la reserva).
-function fechaParaInput(fecha) {
-  return claveFechaSantiago(fecha)
-}
-function horaParaInput(fecha) {
-  const { hora, minuto } = horaMinutoEnSantiago(fecha)
-  return `${String(hora).padStart(2, '0')}:${String(minuto).padStart(2, '0')}`
-}
-
-// Editar hora y/o servicio de una reserva ya confirmada — para cuando el
-// cliente se equivocó y avisó directamente a la barbería. El barbero no se
-// puede cambiar acá (eso sería una reserva distinta) — el servicio se limita
-// a lo que ESE barbero realmente ofrece: compartidos + los que el dueño le
-// asignó puntualmente, igual que en el asistente de reserva público.
-function ModalReprogramarReserva({ reserva, servicios, onGuardar, onCerrar }) {
-  const serviciosDelBarbero = servicios.filter(
-    (s) => s.barbero_ids.length === 0 || s.barbero_ids.includes(reserva.barbero_id)
-  )
-  const fechaActual = new Date(reserva.fecha_hora)
-  const [servicioId, setServicioId] = useState(reserva.servicio_id)
-  const [fecha, setFecha] = useState(fechaParaInput(fechaActual))
-  const [hora, setHora] = useState(horaParaInput(fechaActual))
-  const [error, setError] = useState(null)
-  const [guardando, setGuardando] = useState(false)
-
-  async function guardar(evento) {
-    evento.preventDefault()
-    setError(null)
-    if (!fecha || !hora) return
-    setGuardando(true)
-    try {
-      const [horas, minutos] = hora.split(':').map(Number)
-      const [anio, mes, dia] = fecha.split('-').map(Number)
-      // La hora que escribió el dueño ES hora de Chile — sin esto, guardar
-      // desde un dispositivo con otro huso horario movería la reserva a una
-      // hora distinta a la que se ve en pantalla.
-      const nuevaFecha = santiagoAFechaUTC(anio, mes, dia, horas, minutos)
-      await onGuardar({ id: reserva.id, servicio_id: servicioId, fecha_hora: nuevaFecha.toISOString() })
-      onCerrar()
-    } catch (e) {
-      setError(e.message || 'No pudimos guardar el cambio.')
-    } finally {
-      setGuardando(false)
-    }
-  }
-
-  return (
-    <ModalFormulario abierto titulo={`Editar reserva de ${reserva.cliente_nombre}`} onCerrar={onCerrar}>
-      <form onSubmit={guardar} className="flex flex-col gap-4">
-        <label className="flex flex-col gap-1">
-          <span className="versalitas text-xs text-gris-calido-500">Servicio</span>
-          <select
-            value={servicioId}
-            onChange={(e) => setServicioId(Number(e.target.value))}
-            className="min-h-11 border-b border-gris-calido-200 bg-transparent py-2 text-sm text-negro-barbero outline-none transition-colors focus:border-cobre"
-          >
-            {serviciosDelBarbero.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.nombre} — {formatoCLP(s.precio_clp)}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <div className="flex gap-3">
-          <label className="flex flex-1 flex-col gap-1">
-            <span className="versalitas text-xs text-gris-calido-500">Fecha</span>
-            <input
-              type="date"
-              value={fecha}
-              onChange={(e) => setFecha(e.target.value)}
-              className="min-h-11 w-full border-b border-gris-calido-200 bg-transparent py-2 text-sm text-negro-barbero outline-none transition-colors focus:border-cobre"
-            />
-          </label>
-          <label className="flex flex-1 flex-col gap-1">
-            <span className="versalitas text-xs text-gris-calido-500">Hora</span>
-            <input
-              type="time"
-              value={hora}
-              onChange={(e) => setHora(e.target.value)}
-              className="min-h-11 w-full border-b border-gris-calido-200 bg-transparent py-2 text-sm text-negro-barbero outline-none transition-colors focus:border-cobre"
-            />
-          </label>
-        </div>
-
-        {error && (
-          <p role="alert" className="text-sm text-red-700">
-            {error}
-          </p>
-        )}
-
-        <Button as="button" type="submit" disabled={guardando} className="w-fit">
-          {guardando ? 'Guardando…' : 'Guardar cambios'}
-        </Button>
-      </form>
-    </ModalFormulario>
-  )
 }
 
 // Filas apiladas en vez de una grilla de 4 columnas — esta lista vive en la
@@ -504,7 +395,9 @@ export function PanelReservas() {
       {reservaEditando && servicios && (
         <ModalReprogramarReserva
           reserva={reservaEditando}
-          servicios={servicios}
+          servicios={servicios.filter(
+            (s) => s.barbero_ids.length === 0 || s.barbero_ids.includes(reservaEditando.barbero_id)
+          )}
           onGuardar={(cambios) => reprogramarReserva.mutateAsync(cambios)}
           onCerrar={() => setReservaEditando(null)}
         />

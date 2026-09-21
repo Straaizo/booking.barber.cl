@@ -9,7 +9,7 @@ import {
 import { conBarberoIds } from '../../../utils/servicios'
 
 const COLUMNAS =
-  'id, cliente_nombre, cliente_telefono, fecha_hora, fecha_hora_fin, estado, servicio_id, barbero_id, servicios (nombre, precio_clp), barberos (nombre)'
+  'id, cliente_nombre, cliente_telefono, fecha_hora, fecha_hora_fin, estado, servicio_id, barbero_id, servicios (nombre, precio_clp), barberos (nombre, intervalo_reserva_minutos)'
 
 function clave(barberiaId) {
   return ['reservas_bandeja', barberiaId]
@@ -108,7 +108,7 @@ export function useServiciosParaReprogramar(barberiaId) {
       if (!HAY_BACKEND_REAL) return []
       const { data, error } = await supabase
         .from('servicios')
-        .select('id, nombre, precio_clp')
+        .select('id, nombre, precio_clp, duracion_minutos')
         .eq('barberia_id', barberiaId)
         .eq('activo', 1)
       if (error) throw error

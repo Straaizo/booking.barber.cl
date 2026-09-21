@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { BackButton } from '../../../components/common/BackButton'
 import { FilaBarberoServicio } from './FilaBarberoServicio'
 import { formatoFechaCorta } from '../../../utils/formatos'
+import { hoyEnSantiago } from '../../../utils/horaLocal'
 
 // Reemplaza a los antiguos "Elige un barbero" + "Elige día y hora" (2 pasos
 // separados, a ciegas: había que comprometerse con un barbero antes de saber
@@ -9,8 +10,12 @@ import { formatoFechaCorta } from '../../../utils/formatos'
 // que hace este servicio con sus propias horas — se elige por horario, no al
 // revés. Cada fila (`FilaBarberoServicio`) pide sus datos por su cuenta, así
 // que se cargan todas en paralelo.
+//
+// Arranca de `hoyEnSantiago()` (no `new Date()`): el "hoy" del negocio es
+// siempre el de Chile, sin importar el huso configurado en el celular de
+// quien está reservando.
 function proximosDias(cantidad) {
-  const hoy = new Date()
+  const hoy = hoyEnSantiago()
   return Array.from({ length: cantidad }, (_, i) => {
     const fecha = new Date(hoy)
     fecha.setDate(hoy.getDate() + i)

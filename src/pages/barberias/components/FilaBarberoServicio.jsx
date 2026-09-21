@@ -38,27 +38,38 @@ export function FilaBarberoServicio({ barbero, servicio, fecha, onSeleccionar })
 
   const cargando = cargandoHorarios || cargandoReservas
 
+  // Avatar de 56px (no 40px) y la especialidad como subtítulo, igual que el
+  // paso anterior muestra foto grande + descripción por servicio — sin esto,
+  // esta fila queda mucho más liviana que la de "Elige un servicio" y el
+  // formulario se ve como si "se achicara" al pasar de un paso al otro.
   return (
     <div className="border-b border-[var(--pb-borde)] py-5 first:border-t first:border-t-[var(--pb-borde)]">
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-4">
         {barbero.foto_url ? (
           <img
             src={barbero.foto_url}
             alt={barbero.nombre}
-            className="h-10 w-10 shrink-0 rounded-full object-cover"
+            className="h-14 w-14 shrink-0 rounded-full object-cover"
             style={{ objectPosition: `${barbero.foto_posicion_x ?? 50}% ${barbero.foto_posicion_y ?? 50}%` }}
           />
         ) : (
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-cobre/10 text-sm font-medium text-[var(--pb-acento-texto)]">
+          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-cobre/10 text-lg font-medium text-[var(--pb-acento-texto)]">
             {barbero.nombre.charAt(0).toUpperCase()}
           </div>
         )}
-        <span className="font-display text-base font-normal text-[var(--pb-texto)] md:text-lg">
-          {barbero.nombre}
+        <span className="min-w-0">
+          <span className="font-display block text-base font-normal text-[var(--pb-texto)] md:text-lg">
+            {barbero.nombre}
+          </span>
+          {barbero.especialidad && (
+            <span className="mt-0.5 block text-sm leading-snug text-[var(--pb-texto-secundario)]">
+              {barbero.especialidad}
+            </span>
+          )}
         </span>
       </div>
 
-      <div className="mt-3">
+      <div className="mt-4">
         {cargando ? (
           <div className="py-2">
             <Loader label="Cargando horas" />

@@ -49,7 +49,7 @@ export function Login() {
           <IconoErrorAnimado className="h-8 w-8" />
           {errorPerfil?.esGoogleSinVincular ? (
             <p className="text-lg font-medium leading-snug text-negro-barbero">
-              No encontramos una cuenta en booking.barber.cl vinculada a esa cuenta de Google.
+              No encontramos una cuenta en bookingbarber.cl vinculada a esa cuenta de Google.
             </p>
           ) : (
             <p className="text-lg font-medium leading-snug text-negro-barbero">

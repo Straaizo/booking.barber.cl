@@ -19,6 +19,18 @@
       rel="stylesheet"
       href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,100..900;1,9..144,100..900&family=Archivo:wght@100..900&display=swap"
     />
+
+    <!-- La página de cada barbería recién empieza a pedirle datos a Supabase
+         DESPUÉS de bajar y ejecutar el chunk de esa ruta (React Router es
+         lazy — ver AppRouter.jsx) — sin esto, el navegador ni se entera de
+         que existe ese origen hasta ese momento, y recién ahí arranca DNS +
+         TLS antes del primer request real. Con el preconnect, esa conexión
+         se arma en paralelo mientras el JS todavía se está bajando, así que
+         cuando el código pide los datos, la conexión ya está lista. Vite
+         reemplaza %VITE_SUPABASE_URL% por el valor real de cada deploy (ver
+         .env.example) al compilar — no hay URL fija que mantener acá. -->
+    <link rel="preconnect" href="%VITE_SUPABASE_URL%" crossorigin />
+    <link rel="dns-prefetch" href="%VITE_SUPABASE_URL%" />
     <title>Booking Barber — Reservas online para tu barbería</title>
 
     <!-- La ruta "/" es la ÚNICA que nunca pasa por `api/meta.js`: Vercel

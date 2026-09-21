@@ -57,6 +57,8 @@ function SeccionGaleria({ seccion, nombreBarberia, esOscuro }) {
               <img
                 src={foto.url}
                 alt={foto.leyenda || `${nombreBarberia} — foto ${indice + 1}`}
+                loading="lazy"
+                decoding="async"
                 className="h-full w-full object-cover transition-transform duration-500 ease-entrada group-hover:scale-105"
               />
               {foto.leyenda && (
@@ -318,6 +320,8 @@ function SeccionEquipo({ titulo, barberos, ordenEquipo, estilo, esOscuro, estilo
                 <img
                   src={barbero.foto_url}
                   alt={barbero.nombre}
+                  loading="lazy"
+                  decoding="async"
                   className="h-24 w-24 rounded-full object-cover shadow-sm ring-4 ring-[var(--pb-superficie)] md:h-28 md:w-28"
                   style={{ objectPosition: `${barbero.foto_posicion_x ?? 50}% ${barbero.foto_posicion_y ?? 50}%` }}
                 />
@@ -383,6 +387,8 @@ function CarruselEquipo({ titulo, equipo, esOscuro }) {
                 <img
                   src={barbero.foto_url}
                   alt={barbero.nombre}
+                  loading="lazy"
+                  decoding="async"
                   className="h-40 w-40 rounded-full object-cover"
                   style={{ objectPosition: `${barbero.foto_posicion_x ?? 50}% ${barbero.foto_posicion_y ?? 50}%` }}
                 />
@@ -506,6 +512,8 @@ function SeccionImagenTexto({ seccion, esOscuro }) {
           <img
             src={seccion.imagen}
             alt={seccion.titulo || ''}
+            loading="lazy"
+            decoding="async"
             className="aspect-[4/3] w-full rounded-lg object-cover md:w-3/5"
           />
         )}
@@ -791,6 +799,8 @@ function SeccionHorario({ titulo, barberos, posicion, imagen, imagenTamano, esOs
           <img
             src={imagen}
             alt=""
+            loading="lazy"
+            decoding="async"
             className={`aspect-[4/3] w-full rounded-lg object-cover ${
               ANCHOS_CARRUSEL_CON_TEXTO[imagenTamano] ?? ANCHOS_CARRUSEL_CON_TEXTO.mediana
             } ${ALTURAS_CARRUSEL_CON_TEXTO[imagenTamano] ?? ALTURAS_CARRUSEL_CON_TEXTO.mediana}`}
@@ -872,6 +882,8 @@ function SeccionServicios({ titulo, servicios, posicion, imagen, imagenTamano, e
           <img
             src={imagen}
             alt=""
+            loading="lazy"
+            decoding="async"
             className={`aspect-[4/3] w-full rounded-lg object-cover ${
               ANCHOS_CARRUSEL_CON_TEXTO[imagenTamano] ?? ANCHOS_CARRUSEL_CON_TEXTO.mediana
             } ${ALTURAS_CARRUSEL_CON_TEXTO[imagenTamano] ?? ALTURAS_CARRUSEL_CON_TEXTO.mediana}`}

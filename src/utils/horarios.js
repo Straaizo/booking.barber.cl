@@ -1,3 +1,5 @@
+import { hoyEnSantiago, horaMinutoEnSantiago } from './horaLocal'
+
 const MINUTOS_DIA = 24 * 60
 
 function horaAMinutos(hora) {
@@ -11,8 +13,17 @@ function minutosAHora(minutos) {
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
 }
 
+// `fecha` siempre es un marcador de día "puro" (medianoche LOCAL del
+// dispositivo, sin huso real — ver diaSantiagoComoFechaLocal en horaLocal.js)
+// — se arma con sus propios getters (`getFullYear`/`getMonth`/`getDate`), NO
+// con `toISOString()`: eso primero convierte a UTC, y en un dispositivo con
+// huso distinto al de Chile puede correr la fecha al día siguiente o
+// anterior.
 export function fechaISO(fecha) {
-  return fecha.toISOString().slice(0, 10)
+  const anio = fecha.getFullYear()
+  const mes = String(fecha.getMonth() + 1).padStart(2, '0')
+  const dia = String(fecha.getDate()).padStart(2, '0')
+  return `${anio}-${mes}-${dia}`
 }
 
 const NOMBRES_DIA = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
@@ -127,8 +138,14 @@ export function calcularSlotsDisponibles({
     }
   })
 
-  const esHoy = fecha.toDateString() === new Date().toDateString()
-  const minutoActual = esHoy ? new Date().getHours() * 60 + new Date().getMinutes() : 0
+  // "Ahora" es la hora REAL de Chile (no la del dispositivo que mira la
+  // pantalla) — si no, un celular con el huso mal configurado (pasa más
+  // seguido de lo que parece: detección por ubicación que falla o llega
+  // tarde) podía mostrar horas ya pasadas como disponibles, o esconder horas
+  // válidas, y la reserva terminaba rechazada por el servidor.
+  const esHoy = fecha.toDateString() === hoyEnSantiago().toDateString()
+  const { hora: horaActual, minuto: minutoActualDeLaHora } = horaMinutoEnSantiago(new Date())
+  const minutoActual = esHoy ? horaActual * 60 + minutoActualDeLaHora : 0
 
   const slots = []
   for (const horario of horariosDelDia) {

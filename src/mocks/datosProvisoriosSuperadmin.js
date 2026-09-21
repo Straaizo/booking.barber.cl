@@ -672,7 +672,7 @@ function conNombresProvisorios(reserva, barberia) {
   return {
     ...reserva,
     servicios: servicio ? { nombre: servicio.nombre, precio_clp: servicio.precio_clp } : null,
-    barberos: barbero ? { nombre: barbero.nombre } : null,
+    barberos: barbero ? { nombre: barbero.nombre, intervalo_reserva_minutos: barbero.intervalo_reserva_minutos } : null,
   }
 }
 

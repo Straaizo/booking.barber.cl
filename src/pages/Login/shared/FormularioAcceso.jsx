@@ -238,7 +238,7 @@ export function FormularioAcceso({ onCambioFoco, onEscribiendo, compacto = false
                 {' '}
                 Si no puedes contactarlo,{' '}
                 <a
-                  href={linkWhatsApp(NUMERO_CONTACTO, 'Hola, necesito ayuda para ingresar a mi cuenta de booking.barber.cl')}
+                  href={linkWhatsApp(NUMERO_CONTACTO, 'Hola, necesito ayuda para ingresar a mi cuenta de bookingbarber.cl')}
                   target="_blank"
                   rel="noreferrer"
                   className="text-cobre-texto underline"

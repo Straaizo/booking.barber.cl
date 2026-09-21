@@ -4,6 +4,9 @@ import { ModalFormulario } from '../../components/panel/ModalFormulario'
 import { IconoLlave } from '../../components/panel/IconoLlave'
 import { IconoGoogle } from '../../components/common/IconoGoogle'
 import { cambiarPasswordPropia } from '../../services/authService'
+import { SeccionAutenticacionDosPasos } from './components/SeccionAutenticacionDosPasos'
+import { HAY_BACKEND_REAL } from '../../mocks/datosProvisoriosSuperadmin'
+import { ROL_SUPERADMIN } from '../../utils/roles'
 
 const LARGO_MINIMO_PASSWORD = 8
 
@@ -121,6 +124,11 @@ export function PanelCuenta() {
           Cambiar contraseña
         </button>
       </section>
+
+      {/* Solo superadmin: es la cuenta con acceso a todas las barberías, la
+          que más vale la pena reforzar. No tiene sentido en modo de prueba —
+          no hay backend de Auth real contra el que inscribir un factor. */}
+      {HAY_BACKEND_REAL && perfil?.rol_id === ROL_SUPERADMIN && <SeccionAutenticacionDosPasos />}
 
       {vincularGoogle && (
         <section className="rounded-lg border border-gris-calido-200 bg-white p-5">
