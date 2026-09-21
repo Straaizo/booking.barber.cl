@@ -13,14 +13,18 @@ async function insertarReserva(reserva) {
   if (esBarberoDemo(reserva.barbero_id)) return simularReservaDemo(reserva)
   if (!HAY_BACKEND_REAL) return crearReservaProvisoria(reserva)
 
-  const { data, error } = await supabase
-    .from('reservas')
-    .insert(reserva)
-    .select()
-    .single()
-
+  // Sin `.select()`: quien reserva público nunca tuvo (ni necesita) permiso
+  // de LEER `reservas` — solo de insertar (`reservas_insert_publico`, RLS).
+  // Pedir la fila de vuelta con `.select().single()` obliga a Postgres a
+  // releerla para el RETURNING, y como no hay ninguna política de lectura
+  // que alcance a un visitante anónimo, la fila queda invisible para esa
+  // relectura y Postgres rechaza el insert entero con un genérico "new row
+  // violates row-level security policy" — aunque el insert en sí era
+  // perfectamente válido. Nada más abajo (onSuccess, onReservaCreada) usa
+  // un campo calculado por el servidor — el propio objeto enviado alcanza.
+  const { error } = await supabase.from('reservas').insert(reserva)
   if (error) throw error
-  return data
+  return reserva
 }
 
 export function useCrearReserva() {
