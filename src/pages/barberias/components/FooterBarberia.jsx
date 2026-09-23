@@ -44,7 +44,7 @@ export function FooterBarberia({ barberia, colorHeader }) {
       <p className={`versalitas mt-8 text-[10px] ${claseSutil}`}>
         Hecho con{' '}
         <HoverLink href="/" tono="cobre" className={claseTexto}>
-          booking.barber.cl
+          bookingbarber.cl
         </HoverLink>
       </p>
     </footer>

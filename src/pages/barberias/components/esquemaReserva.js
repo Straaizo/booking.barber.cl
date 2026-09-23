@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { nombreTieneLenguajeInapropiado } from '../../../utils/lenguajeInapropiado'
 
 // El input de teléfono (ver PasoDatos.jsx) ya obliga el prefijo "+56 9" como
 // una etiqueta fija, no editable — lo único que el cliente puede escribir
@@ -10,7 +11,8 @@ export const esquemaDatosCliente = z.object({
     .string()
     .trim()
     .min(2, 'Ingresa tu nombre completo')
-    .max(80, 'Nombre demasiado largo'),
+    .max(80, 'Nombre demasiado largo')
+    .refine((valor) => !nombreTieneLenguajeInapropiado(valor), 'Ingresa tu nombre real, sin garabatos ni groserías.'),
   cliente_telefono: z
     .string()
     .regex(/^9\d{8}$/, 'Ingresa tus 8 dígitos después del 9')
