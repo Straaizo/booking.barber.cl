@@ -1,0 +1,17 @@
+-- Habilita Supabase Realtime (Postgres Changes) para `reservas` — sin esto,
+-- el proyecto nunca transmite cambios de esta tabla por WebSocket, sin
+-- importar cuánto código de suscripción tenga el cliente. Necesario para que
+-- el panel de Reservas (dueño y barbero) se actualice solo cuando entra,
+-- cancela o se reprograma una reserva desde CUALQUIER lado (otra pestaña, el
+-- celular de un cliente, otro dispositivo) — sin tener que recargar la
+-- página a mano.
+--
+-- Sigue pasando por las mismas políticas RLS de siempre (`reservas_lectura`):
+-- un dueño solo recibe eventos de reservas de SU barbería, un barbero solo
+-- de las suyas — nada distinto a lo que ya podían leer con un select normal,
+-- solo que ahora también llega en vivo. Un visitante anónimo (sin sesión)
+-- sigue sin poder leer nada de esta tabla (nunca tuvo esa política — ver
+-- useCrearReserva.js y el diagnóstico del 2026-09-21 sobre RLS/RETURNING) —
+-- el asistente público de reserva no se beneficia de esto, es solo para los
+-- paneles autenticados.
+alter publication supabase_realtime add table reservas;

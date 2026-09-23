@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../../services/supabaseClient'
 import {
@@ -60,6 +61,50 @@ export function useReservasDeBarbero(barberoId) {
       HAY_BACKEND_REAL ? obtenerReservasDeBarbero(barberoId) : listarReservasDeBarberoProvisorias(barberoId),
     enabled: Boolean(barberoId),
   })
+}
+
+// Mantiene el panel al día solo — sin esto, una reserva nueva (o cancelada,
+// o reprogramada) desde OTRO dispositivo o pestaña quedaba invisible hasta
+// recargar la página a mano. Se suscribe a los cambios de `reservas` de esta
+// barbería/barbero (requiere `alter publication supabase_realtime add table
+// reservas`, ver 20260923000000_habilitar_realtime_reservas.sql — sin esa
+// migración, Supabase nunca transmite el cambio aunque el cliente esté bien
+// suscrito) y, ante cualquier cambio, invalida las queries en vez de
+// intentar aplicar el cambio a mano — mismo dato, una sola fuente de verdad.
+//
+// Pasa por las mismas políticas RLS de siempre: un dueño solo recibe eventos
+// de su propia barbería, un barbero solo de las suyas — no es una vía nueva
+// de acceso, solo una forma más rápida de enterarse de algo que igual ya
+// podían leer.
+export function useRealtimeReservas({ barberiaId, barberoId } = {}) {
+  const queryClient = useQueryClient()
+
+  useEffect(() => {
+    if (!HAY_BACKEND_REAL) return
+    if (!barberiaId && !barberoId) return
+
+    const filtro = barberiaId ? `barberia_id=eq.${barberiaId}` : `barbero_id=eq.${barberoId}`
+    const canal = supabase
+      .channel(`reservas-${barberiaId ? 'barberia-' + barberiaId : 'barbero-' + barberoId}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'reservas', filter: filtro },
+        () => {
+          if (barberiaId) queryClient.invalidateQueries({ queryKey: clave(barberiaId) })
+          if (barberoId) queryClient.invalidateQueries({ queryKey: claveBarbero(barberoId) })
+          // Sin filtro de fecha/barbero exacto: invalida cualquier día ya
+          // cargado, para que un cambio ajeno no deje una grilla de horas
+          // vieja (ej: el dueño reprogramando mientras alguien más mira el
+          // mismo día en el asistente de reserva).
+          queryClient.invalidateQueries({ queryKey: ['reservas_del_dia'] })
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(canal)
+    }
+  }, [barberiaId, barberoId, queryClient])
 }
 
 export function useCancelarReserva(barberiaId, barberoId) {

@@ -9,6 +9,7 @@ import {
   useCancelarReserva,
   useServiciosParaReprogramar,
   useReprogramarReserva,
+  useRealtimeReservas,
 } from './hooks/useReservasBandeja'
 import { formatoCLP, linkWhatsApp } from '../../utils/formatos'
 
@@ -81,6 +82,7 @@ export function PanelBarberoReservas() {
   const { data: servicios } = useServiciosParaReprogramar(perfil.barberia_id)
   const cancelarReserva = useCancelarReserva(null, perfil.barbero_id)
   const reprogramarReserva = useReprogramarReserva(null, perfil.barbero_id)
+  useRealtimeReservas({ barberoId: perfil.barbero_id })
   const [cancelandoId, setCancelandoId] = useState(null)
   const [reservaEditando, setReservaEditando] = useState(null)
 

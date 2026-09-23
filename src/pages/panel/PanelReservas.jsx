@@ -14,6 +14,7 @@ import {
   useReactivarReserva,
   useServiciosParaReprogramar,
   useReprogramarReserva,
+  useRealtimeReservas,
 } from './hooks/useReservasBandeja'
 import { formatoCLP, linkWhatsApp } from '../../utils/formatos'
 import { diaSantiagoComoFechaLocal, hoyEnSantiago, inicioDeSemanaLunes } from '../../utils/horaLocal'
@@ -135,6 +136,7 @@ export function PanelReservas() {
   const cancelarReserva = useCancelarReserva(perfil.barberia_id)
   const reactivarReserva = useReactivarReserva(perfil.barberia_id)
   const reprogramarReserva = useReprogramarReserva(perfil.barberia_id)
+  useRealtimeReservas({ barberiaId: perfil.barberia_id })
 
   const [vista, setVista] = useState('dia') // 'dia' | 'canceladas'
   const [diaSeleccionado, setDiaSeleccionado] = useState(() => hoyEnSantiago())
