@@ -670,7 +670,7 @@ export function PanelSuperadminBarberiaDetalle() {
 
   return (
     <div>
-      <HoverLink href="/admin" className="text-xs text-gris-calido-500">
+      <HoverLink href="/admin" className="text-sm font-medium text-gris-calido-600">
         ← Volver a barberías
       </HoverLink>
 
@@ -683,7 +683,7 @@ export function PanelSuperadminBarberiaDetalle() {
         </span>
       </div>
       <p className="versalitas mt-1 text-xs text-gris-calido-500">
-        booking.barber.cl/{barberia.slug}
+        bookingbarber.cl/{barberia.slug}
       </p>
 
       {barberia.estado_id === ESTADO_ACTIVO && barberia.fecha_activacion && (
