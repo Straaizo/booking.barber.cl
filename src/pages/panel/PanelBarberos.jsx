@@ -6,6 +6,7 @@ import { Button } from '../../components/common/Button'
 import { Interruptor } from '../../components/panel/Interruptor'
 import { CambiarPassword } from '../../components/panel/CambiarPassword'
 import { ModalConfirmacion } from '../../components/panel/ModalConfirmacion'
+import { ModalFormulario } from '../../components/panel/ModalFormulario'
 import { IconoPapelera } from '../../components/panel/IconoPapelera'
 import { IconoLapiz } from '../../components/panel/IconoLapiz'
 import { IconoAjustar } from '../../components/panel/IconoAjustar'
@@ -63,13 +64,13 @@ function TarjetaBarbero({
   }
 
   return (
-    <div className="rounded-lg border border-gris-calido-200 bg-white p-6 transition-colors hover:border-gris-calido-300">
+    <div className="rounded-lg border border-gris-calido-200 bg-white p-6 transition-colors hover:border-gris-calido-300 max-md:rounded-2xl max-md:p-4">
       {/* Fila 1 — identidad: quién es y si está activo, nada más. La foto y
           el nombre son lo primero que se lee de una tarjeta, así que van
           solos en su propia línea, sin competir por espacio con el campo de
           especialidad (antes los 3 vivían apretados en una sola fila). */}
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex items-center gap-4">
+      <div className="flex items-center justify-between gap-4 max-md:gap-3">
+        <div className="flex items-center gap-4 max-md:min-w-0 max-md:gap-3.5">
           {/* La foto vive DENTRO del mismo círculo del avatar. El lápiz de
               la esquina está SIEMPRE visible (no solo al pasar el mouse) —
               en el celular no hay hover, así que una pista que dependa de
@@ -83,7 +84,7 @@ function TarjetaBarbero({
             <div className="relative">
               <label
                 title="Cambiar foto"
-                className={`block h-14 w-14 cursor-pointer overflow-hidden rounded-full border border-gris-calido-200 transition-colors hover:border-cobre ${subiendo ? 'opacity-60' : ''}`}
+                className={`block h-14 w-14 cursor-pointer max-md:h-16 max-md:w-16 overflow-hidden rounded-full border border-gris-calido-200 transition-colors hover:border-cobre ${subiendo ? 'opacity-60' : ''}`}
               >
                 {barbero.foto_url ? (
                   <img
@@ -93,7 +94,7 @@ function TarjetaBarbero({
                     style={{ objectPosition: `${barbero.foto_posicion_x ?? 50}% ${barbero.foto_posicion_y ?? 50}%` }}
                   />
                 ) : (
-                  <span className="flex h-full w-full items-center justify-center text-lg text-gris-calido-400">
+                  <span className="flex h-full w-full items-center justify-center text-lg text-gris-calido-400 max-md:bg-gris-calido-100 max-md:text-2xl max-md:text-gris-calido-500">
                     {barbero.nombre.trim().charAt(0).toUpperCase()}
                   </span>
                 )}
@@ -107,13 +108,13 @@ function TarjetaBarbero({
               </label>
               <span
                 aria-hidden="true"
-                className="pointer-events-none absolute -bottom-0.5 -right-0.5 flex h-5 w-5 items-center justify-center rounded-full border-2 border-white bg-cobre-oscuro text-hueso shadow-sm"
+                className="pointer-events-none absolute -bottom-0.5 -right-0.5 flex h-5 w-5 max-md:h-6 max-md:w-6 items-center justify-center rounded-full border-2 border-white bg-cobre-oscuro text-hueso shadow-sm"
               >
-                <IconoLapiz className="h-2.5 w-2.5" />
+                <IconoLapiz className="h-2.5 w-2.5 max-md:h-3 max-md:w-3" />
               </span>
             </div>
             {barbero.foto_url && (
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-1.5 max-md:hidden">
                 <button
                   type="button"
                   onClick={() => setModalPosicionAbierto(true)}
@@ -135,13 +136,16 @@ function TarjetaBarbero({
               </div>
             )}
           </div>
-          <div className="flex flex-col gap-1">
-            <span className={`font-medium ${barbero.activo ? 'text-negro-barbero' : 'text-gris-calido-400 line-through'}`}>
+          <div className="flex flex-col gap-1 max-md:min-w-0 max-md:gap-0.5">
+            <span className={`font-medium max-md:truncate max-md:text-[17px] max-md:font-semibold ${barbero.activo ? 'text-negro-barbero' : 'text-gris-calido-400 line-through'}`}>
               {barbero.nombre}
             </span>
             {barbero.usuario && (
-              <span className="versalitas text-xs text-gris-calido-500">Usuario: {barbero.usuario}</span>
+              <span className="versalitas text-xs text-gris-calido-500 max-md:truncate max-md:text-[13px]">Usuario: {barbero.usuario}</span>
             )}
+            <span className={`text-[13px] md:hidden ${barbero.activo ? 'text-verde-barberia' : 'text-gris-calido-400'}`}>
+              {barbero.activo ? 'Activo' : 'Inactivo'}
+            </span>
           </div>
         </div>
 
@@ -160,16 +164,16 @@ function TarjetaBarbero({
       {/* Fila 2 — especialidad, con su propio ancho completo en vez de
           compartir línea con la identidad de arriba (la foto ya se maneja
           directo sobre el avatar, ver más arriba). */}
-      <div className="mt-4 border-t border-gris-calido-100 pt-4">
+      <div className="mt-4 border-t border-gris-calido-100 pt-4 max-md:pt-3">
         <label className="flex min-w-0 flex-1 flex-col gap-1">
-          <span className="versalitas text-xs text-gris-calido-500">Especialidad</span>
+          <span className="versalitas text-xs text-gris-calido-500 max-md:text-[13px]">Especialidad</span>
           <input
             type="text"
             name="especialidad"
             value={barbero.especialidad ?? ''}
             onChange={(e) => onCambiar({ especialidad: e.target.value })}
             placeholder="En qué se especializa — ej: Cortes clásicos y degradados"
-            className="min-h-11 min-w-0 border-b border-gris-calido-200 bg-transparent py-1 text-sm text-negro-barbero outline-none transition-colors focus:border-cobre"
+            className="min-h-11 min-w-0 border-b border-gris-calido-200 bg-transparent py-1 text-sm text-negro-barbero outline-none transition-colors focus:border-cobre max-md:mt-1 max-md:min-h-12 max-md:rounded-xl max-md:border max-md:bg-hueso/60 max-md:px-3.5"
           />
         </label>
       </div>
@@ -177,15 +181,38 @@ function TarjetaBarbero({
       {/* Fila 3 — acciones sobre la cuenta. El catálogo propio por barbero
           se sacó de acá: ahora se asigna un barbero a cada servicio directo
           desde el panel de Servicios, no con un interruptor por barbero. */}
-      <div className="mt-4 flex flex-wrap items-center justify-end gap-5">
+      {/* En el celular las acciones son botones táctiles de media fila (los
+          de la foto bajan acá desde abajo del avatar); en PC siguen como
+          enlaces chicos alineados a la derecha. */}
+      <div className="mt-4 flex flex-wrap items-center justify-end gap-5 max-md:gap-2">
+        {barbero.foto_url && (
+          <>
+            <button
+              type="button"
+              onClick={() => setModalPosicionAbierto(true)}
+              className="flex min-h-11 grow basis-[40%] items-center justify-center gap-2 rounded-xl border border-gris-calido-200 text-[15px] text-negro-barbero active:bg-gris-calido-100 md:hidden"
+            >
+              <IconoAjustar className="h-4 w-4 text-gris-calido-500" />
+              Ajustar foto
+            </button>
+            <button
+              type="button"
+              onClick={() => setConfirmandoQuitarFoto(true)}
+              className="flex min-h-11 grow basis-[40%] items-center justify-center gap-2 rounded-xl border border-gris-calido-200 text-[15px] text-negro-barbero active:bg-gris-calido-100 md:hidden"
+            >
+              <IconoPapelera className="h-4 w-4 text-gris-calido-500" />
+              Quitar foto
+            </button>
+          </>
+        )}
         <CambiarPassword onGuardar={onCambiarPassword} />
         <button
           type="button"
           onClick={onDarDeBaja}
           disabled={dandoDeBaja}
-          className="versalitas flex items-center gap-1.5 text-xs text-gris-calido-500 transition-colors hover:text-red-700 disabled:opacity-50"
+          className="versalitas flex items-center gap-1.5 text-xs text-gris-calido-500 transition-colors hover:text-red-700 disabled:opacity-50 max-md:min-h-11 max-md:grow max-md:basis-[40%] max-md:justify-center max-md:gap-2 max-md:rounded-xl max-md:border max-md:border-red-200 max-md:font-sans max-md:text-[15px] max-md:font-normal max-md:normal-case max-md:tracking-normal max-md:text-red-700 max-md:active:bg-red-50"
         >
-          <IconoPapelera className="h-3.5 w-3.5" />
+          <IconoPapelera className="h-3.5 w-3.5 max-md:h-4 max-md:w-4" />
           {dandoDeBaja ? 'Dando de baja…' : 'Dar de baja'}
         </button>
       </div>

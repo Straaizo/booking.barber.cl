@@ -129,6 +129,226 @@ function FilaReservaCancelada({ reserva, onPedirReactivar, reactivando }) {
   )
 }
 
+// ---------------------------------------------------------------------------
+// Celular (< md): agenda de día tipo app nativa en vez de la grilla semanal
+// del calendario, que a 390px queda como una sola columna enorme y casi vacía.
+// Usa exactamente los mismos datos y handlers que la vista de escritorio.
+// ---------------------------------------------------------------------------
+
+function formatoHora24(iso) {
+  return new Date(iso).toLocaleTimeString('es-CL', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+    timeZone: 'America/Santiago',
+  })
+}
+
+function sumarDias(fecha, dias) {
+  return new Date(fecha.getFullYear(), fecha.getMonth(), fecha.getDate() + dias)
+}
+
+function claveDia(fecha) {
+  return `${fecha.getFullYear()}-${fecha.getMonth()}-${fecha.getDate()}`
+}
+
+const DIAS_CORTOS = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb']
+
+// Tira de días desplazable: una semana atrás y un mes adelante desde hoy
+// (se estira si el día elegido cae fuera, ej. al tocar una "próxima reserva"
+// lejana). El punto bajo el número avisa qué días tienen reservas sin tener
+// que abrirlos uno por uno.
+function TiraDias({ reservas, diaSeleccionado, onSeleccionarDia }) {
+  const tiraRef = useRef(null)
+  const hoy = hoyEnSantiago()
+
+  const dias = useMemo(() => {
+    let inicio = sumarDias(hoy, -7)
+    let fin = sumarDias(hoy, 30)
+    if (diaSeleccionado < inicio) inicio = diaSeleccionado
+    if (diaSeleccionado > fin) fin = diaSeleccionado
+    const lista = []
+    for (let d = inicio; d <= fin; d = sumarDias(d, 1)) lista.push(d)
+    return lista
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [claveDia(hoy), claveDia(diaSeleccionado)])
+
+  const diasConReservas = useMemo(() => {
+    const conjunto = new Set()
+    for (const r of reservas) {
+      if (r.estado === 'confirmada') conjunto.add(claveDia(diaSantiagoComoFechaLocal(new Date(r.fecha_hora))))
+    }
+    return conjunto
+  }, [reservas])
+
+  // Centra el día elegido moviendo solo la tira (scrollIntoView movería
+  // también la página entera en iOS).
+  useEffect(() => {
+    const tira = tiraRef.current
+    const elegido = tira?.querySelector('[data-elegido="true"]')
+    if (!tira || !elegido) return
+    tira.scrollTo({
+      left: elegido.offsetLeft - tira.clientWidth / 2 + elegido.clientWidth / 2,
+      behavior: 'smooth',
+    })
+  }, [diaSeleccionado])
+
+  const esHoySeleccionado = mismoDia(diaSeleccionado, hoy)
+
+  return (
+    <div>
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-[17px] font-semibold capitalize text-negro-barbero">
+          {diaSeleccionado.toLocaleDateString('es-CL', { month: 'long', year: 'numeric' })}
+        </span>
+        <button
+          type="button"
+          onClick={() => onSeleccionarDia(hoy)}
+          disabled={esHoySeleccionado}
+          className="min-h-11 rounded-full px-4 text-[15px] font-semibold text-cobre-texto transition-colors active:bg-cobre/10 disabled:text-gris-calido-400"
+        >
+          Hoy
+        </button>
+      </div>
+      <div
+        ref={tiraRef}
+        className="-mx-4 mt-2 flex snap-x gap-2 overflow-x-auto scroll-px-4 px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      >
+        {dias.map((dia) => {
+          const elegido = mismoDia(dia, diaSeleccionado)
+          const esHoy = mismoDia(dia, hoy)
+          const conReservas = diasConReservas.has(claveDia(dia))
+          return (
+            <button
+              key={claveDia(dia)}
+              type="button"
+              data-elegido={elegido}
+              onClick={() => onSeleccionarDia(dia)}
+              aria-pressed={elegido}
+              aria-label={dia.toLocaleDateString('es-CL', { weekday: 'long', day: 'numeric', month: 'long' })}
+              className={`flex h-[72px] w-[52px] shrink-0 snap-start flex-col items-center justify-center gap-0.5 rounded-2xl border transition-colors ${
+                elegido
+                  ? 'border-cobre-oscuro bg-cobre-oscuro text-hueso'
+                  : esHoy
+                    ? 'border-cobre/60 bg-white text-cobre-texto'
+                    : 'border-gris-calido-200 bg-white text-negro-barbero'
+              }`}
+            >
+              <span className={`text-[12px] font-semibold uppercase tracking-[0.04em] ${elegido ? 'text-hueso/80' : esHoy ? '' : 'text-gris-calido-500'}`}>
+                {DIAS_CORTOS[dia.getDay()]}
+              </span>
+              <span className="numeros-tabulares text-[19px] font-semibold leading-none">{dia.getDate()}</span>
+              <span
+                aria-hidden="true"
+                className={`mt-1 h-1.5 w-1.5 rounded-full ${conReservas ? (elegido ? 'bg-hueso' : 'bg-cobre') : 'bg-transparent'}`}
+              />
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+function TarjetaReservaMovil({ reserva, onEditar, onPedirCancelar }) {
+  return (
+    <article className="rounded-2xl border border-gris-calido-200 bg-white p-4">
+      <div className="flex items-start gap-4">
+        <div className="w-16 shrink-0">
+          <span className="numeros-tabulares block text-[22px] font-semibold leading-none text-negro-barbero">
+            {formatoHora24(reserva.fecha_hora)}
+          </span>
+          {reserva.fecha_hora_fin && (
+            <span className="numeros-tabulares mt-1 block text-[13px] text-gris-calido-500">
+              {formatoHora24(reserva.fecha_hora_fin)}
+            </span>
+          )}
+        </div>
+        <div className="min-w-0 flex-1 border-l border-gris-calido-200 pl-4">
+          <div className="flex items-baseline justify-between gap-2">
+            <span className="truncate text-[17px] font-semibold text-negro-barbero">{reserva.cliente_nombre}</span>
+            <span className="numeros-tabulares shrink-0 text-[15px] font-medium text-negro-barbero">
+              {formatoCLP(reserva.servicios?.precio_clp ?? 0)}
+            </span>
+          </div>
+          <span className="mt-0.5 block truncate text-[15px] text-gris-calido-700">{reserva.servicios?.nombre}</span>
+          <span className="mt-0.5 block truncate text-[14px] text-gris-calido-500">con {reserva.barberos?.nombre}</span>
+        </div>
+      </div>
+
+      <div className="mt-4 grid grid-cols-3 gap-2">
+        <a
+          href={linkWhatsApp(reserva.cliente_telefono)}
+          target="_blank"
+          rel="noreferrer"
+          className="flex min-h-11 items-center justify-center gap-1.5 rounded-xl bg-verde-barberia/10 text-[14px] font-semibold text-verde-barberia active:bg-verde-barberia/20"
+        >
+          <IconoWhatsApp className="h-[18px] w-[18px]" />
+          WhatsApp
+        </a>
+        <button
+          type="button"
+          onClick={onEditar}
+          className="flex min-h-11 items-center justify-center gap-1.5 rounded-xl bg-gris-calido-100 text-[14px] font-semibold text-negro-barbero active:bg-gris-calido-200"
+        >
+          <IconoLapiz className="h-4 w-4" />
+          Editar
+        </button>
+        <button
+          type="button"
+          onClick={onPedirCancelar}
+          className="flex min-h-11 items-center justify-center gap-1.5 rounded-xl bg-red-50 text-[14px] font-semibold text-red-700 active:bg-red-100"
+        >
+          <IconoX className="h-4 w-4" />
+          Cancelar
+        </button>
+      </div>
+    </article>
+  )
+}
+
+function TarjetaCanceladaMovil({ reserva, onPedirReactivar, reactivando }) {
+  return (
+    <article className="rounded-2xl border border-gris-calido-200 bg-white p-4">
+      <span className="numeros-tabulares block text-[14px] font-medium capitalize text-gris-calido-500">
+        {formatoFechaHora(reserva.fecha_hora)}
+      </span>
+      <div className="mt-1 flex items-baseline justify-between gap-2">
+        <span className="truncate text-[17px] font-semibold text-gris-calido-400 line-through">{reserva.cliente_nombre}</span>
+        <span className="numeros-tabulares shrink-0 text-[15px] text-gris-calido-400">
+          {formatoCLP(reserva.servicios?.precio_clp ?? 0)}
+        </span>
+      </div>
+      <span className="mt-0.5 block truncate text-[15px] text-gris-calido-500">
+        {reserva.servicios?.nombre} · {reserva.barberos?.nombre}
+      </span>
+      <button
+        type="button"
+        onClick={onPedirReactivar}
+        disabled={reactivando}
+        className="mt-4 flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-gris-calido-100 text-[15px] font-semibold text-cobre-texto active:bg-gris-calido-200 disabled:opacity-50"
+      >
+        <IconoRefrescar className="h-4 w-4" />
+        Reactivar
+      </button>
+    </article>
+  )
+}
+
+function EstadoVacioMovil({ titulo, texto }) {
+  return (
+    <div className="flex flex-col items-center rounded-2xl border border-dashed border-gris-calido-200 bg-white/60 px-6 py-10 text-center">
+      <span className="flex h-12 w-12 items-center justify-center rounded-full bg-gris-calido-100 text-gris-calido-500">
+        <IconoCalendario className="h-6 w-6" />
+      </span>
+      <p className="mt-3 text-[16px] font-semibold text-negro-barbero">{titulo}</p>
+      <p className="mt-1 max-w-xs text-[15px] text-gris-calido-500">{texto}</p>
+    </div>
+  )
+}
+
+const ETIQUETA_SECCION_MOVIL = 'text-[13px] font-semibold uppercase tracking-[0.06em] text-gris-calido-500'
+
 export function PanelReservas() {
   const { perfil } = useAuth()
   const { data: reservas, isLoading, isError } = useReservasBandeja(perfil.barberia_id)
