@@ -4,6 +4,7 @@ import { Button } from '../../../components/common/Button'
 import { Interruptor } from '../../../components/panel/Interruptor'
 import { IconoPapelera } from '../../../components/panel/IconoPapelera'
 import { ModalFormulario } from '../../../components/panel/ModalFormulario'
+import { ModalConfirmacion } from '../../../components/panel/ModalConfirmacion'
 import { useIsMobile } from '../../../hooks/useIsMobile'
 import {
   useExcepcionesDeBarbero,
@@ -48,6 +49,7 @@ export function ExcepcionesHorario({ barberoId }) {
   const [estado, setEstado] = useState(null)
   const [errorEnvio, setErrorEnvio] = useState(null)
   const [hojaAbierta, setHojaAbierta] = useState(false)
+  const [excepcionAQuitar, setExcepcionAQuitar] = useState(null)
   const esMovil = useIsMobile()
 
   useEffect(() => {
@@ -79,6 +81,32 @@ export function ExcepcionesHorario({ barberoId }) {
 
   // En el celular: lista agrupada con las excepciones ya cargadas y una fila
   // "Agregar" que abre el formulario en una hoja inferior.
+  async function confirmarQuitar() {
+    try {
+      await eliminarExcepcion.mutateAsync(excepcionAQuitar.id)
+      setExcepcionAQuitar(null)
+    } catch {
+      setErrorEnvio('No se pudo quitar la excepción. Intenta de nuevo.')
+      setExcepcionAQuitar(null)
+    }
+  }
+
+  const modalQuitar = (
+    <ModalConfirmacion
+      abierto={Boolean(excepcionAQuitar)}
+      titulo="Quitar excepción"
+      mensaje={
+        excepcionAQuitar &&
+        `El ${formatoFechaLarga(excepcionAQuitar.fecha)} vuelve a tu horario normal de la semana.`
+      }
+      textoConfirmar="Quitar excepción"
+      textoCancelar="Volver"
+      confirmando={eliminarExcepcion.isPending}
+      onConfirmar={confirmarQuitar}
+      onCerrar={() => setExcepcionAQuitar(null)}
+    />
+  )
+
   if (esMovil) {
     return (
       <div>
@@ -98,7 +126,7 @@ export function ExcepcionesHorario({ barberoId }) {
                 </div>
                 <button
                   type="button"
-                  onClick={() => eliminarExcepcion.mutate(e.id)}
+                  onClick={() => setExcepcionAQuitar(e)}
                   aria-label={`Quitar excepción del ${formatoFechaLarga(e.fecha)}`}
                   className="flex h-14 w-14 shrink-0 items-center justify-center text-gris-calido-400 transition-colors active:text-red-700"
                 >
@@ -194,6 +222,7 @@ export function ExcepcionesHorario({ barberoId }) {
             </button>
           </form>
         </ModalFormulario>
+        {modalQuitar}
       </div>
     )
   }
@@ -222,7 +251,7 @@ export function ExcepcionesHorario({ barberoId }) {
               </span>
               <button
                 type="button"
-                onClick={() => eliminarExcepcion.mutate(e.id)}
+                onClick={() => setExcepcionAQuitar(e)}
                 className="versalitas flex items-center gap-1.5 text-xs text-gris-calido-500 transition-colors hover:text-red-700"
               >
                 <IconoPapelera className="h-3.5 w-3.5" />
@@ -316,6 +345,7 @@ export function ExcepcionesHorario({ barberoId }) {
           </p>
         )}
       </form>
+      {modalQuitar}
     </div>
   )
 }

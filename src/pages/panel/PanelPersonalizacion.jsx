@@ -8,6 +8,9 @@ import { ToastGuardado } from '../../components/common/ToastGuardado'
 import { SelectorArchivo } from '../../components/common/SelectorArchivo'
 import { Interruptor } from '../../components/panel/Interruptor'
 import { IconoCandado } from '../../components/panel/IconoCandado'
+import { ModalFormulario } from '../../components/panel/ModalFormulario'
+import { ModalConfirmacion } from '../../components/panel/ModalConfirmacion'
+import { ES_APP_INSTALADA, ES_IOS } from '../../services/pushService'
 import { usePersonalizacionAdmin, useGuardarPersonalizacion } from './hooks/usePersonalizacionAdmin'
 import { subirImagenBarberia, borrarImagenBarberia } from '../../services/storageImagenes'
 import { FUENTES_DISPONIBLES, asegurarFuenteCargada } from '../../utils/fuentes'
@@ -287,6 +290,25 @@ function BotonAgregarSeccion({ etiqueta, disponible, onClick }) {
   )
 }
 
+const CLAVE_AVISO_MOVIL_OCULTO = 'booking_barber_aviso_personalizacion_movil_oculto'
+
+function leerAvisoMovilOculto() {
+  try {
+    return localStorage.getItem(CLAVE_AVISO_MOVIL_OCULTO) === '1'
+  } catch {
+    return false
+  }
+}
+
+// Dentro de la app instalada, `/slug` es parte del mismo sitio y se abriría
+// dentro de la propia app en vez del navegador. En iPhone el esquema
+// `x-safari-https://` (iOS 17+) fuerza Safari; en Android `target="_blank"`
+// ya lo saca a una pestaña del navegador.
+function hrefPaginaPublica(slug) {
+  if (ES_IOS && ES_APP_INSTALADA) return `x-safari-https://${window.location.host}/${slug}`
+  return `/${slug}`
+}
+
 export function PanelPersonalizacion() {
   const { perfil } = useAuth()
   const esMobile = useIsMobile()
@@ -306,8 +328,22 @@ export function PanelPersonalizacion() {
   const [modoVista, setModoVista] = useState(() =>
     typeof window !== 'undefined' && window.innerWidth < 768 ? 'movil' : 'pc'
   )
-  const [alertaMovilCerrada, setAlertaMovilCerrada] = useState(false)
+  const [avisoMovilAbierto, setAvisoMovilAbierto] = useState(() => !leerAvisoMovilOculto())
+  const [noVolverAMostrar, setNoVolverAMostrar] = useState(false)
+  // Acción destructiva pendiente de confirmar: { titulo, mensaje, textoConfirmar, accion }.
+  const [confirmacion, setConfirmacion] = useState(null)
   const [grupoVisible, setGrupoVisible] = useState(GRUPOS_MOVIL[0][0])
+
+  function cerrarAvisoMovil() {
+    if (noVolverAMostrar) {
+      try {
+        localStorage.setItem(CLAVE_AVISO_MOVIL_OCULTO, '1')
+      } catch {
+        /* sin localStorage el aviso vuelve a salir la próxima vez */
+      }
+    }
+    setAvisoMovilAbierto(false)
+  }
   const iframeRef = useRef(null)
   const chipsRef = useRef(null)
 
@@ -712,7 +748,7 @@ export function PanelPersonalizacion() {
         <p className="mt-1.5 text-[15px] leading-snug text-gris-calido-500 md:hidden">
           Edita y revisa la vista previa al final.{' '}
           <a
-            href={`/${barberia.slug}`}
+            href={hrefPaginaPublica(barberia.slug)}
             target="_blank"
             rel="noreferrer"
             className="font-medium text-cobre-texto underline decoration-cobre/40 underline-offset-2"
@@ -729,23 +765,45 @@ export function PanelPersonalizacion() {
           </HoverLink>
         </p>
 
-        {esMobile && !alertaMovilCerrada && (
-          <div className="mt-4 flex items-start justify-between gap-3 rounded-md border border-cobre/40 bg-cobre/10 px-3 py-3 text-xs text-cobre-texto max-md:rounded-2xl max-md:py-2 max-md:pl-4 max-md:pr-1 max-md:text-[13px] max-md:leading-snug">
-            <p>
-              Estás viendo esto desde un dispositivo móvil. Te recomendamos usar un computador para
-              tener una vista más clara al armar tu página — hay bastante para editar y comparar con
-              la vista previa.
-            </p>
-            <button
-              type="button"
-              onClick={() => setAlertaMovilCerrada(true)}
-              aria-label="Cerrar aviso"
-              className="shrink-0 text-cobre-texto/70 hover:text-cobre-texto max-md:flex max-md:h-11 max-md:w-11 max-md:items-center max-md:justify-center max-md:text-base"
-            >
-              ✕
-            </button>
-          </div>
-        )}
+        <ModalConfirmacion
+          abierto={Boolean(confirmacion)}
+          titulo={confirmacion?.titulo}
+          mensaje={confirmacion?.mensaje}
+          textoConfirmar={confirmacion?.textoConfirmar}
+          textoCancelar="Volver"
+          onConfirmar={() => {
+            confirmacion.accion()
+            setConfirmacion(null)
+          }}
+          onCerrar={() => setConfirmacion(null)}
+        />
+
+        <ModalFormulario
+          abierto={esMobile && avisoMovilAbierto}
+          titulo="Mejor desde un computador"
+          onCerrar={cerrarAvisoMovil}
+        >
+          <p className="text-base leading-relaxed text-gris-calido-700">
+            Puedes editar tu página desde el celular, pero en un computador vas a ver la página completa junto
+            a la vista previa y es mucho más cómodo comparar cada cambio.
+          </p>
+          <label className="mt-5 flex min-h-12 items-center gap-3 text-base text-negro-barbero">
+            <input
+              type="checkbox"
+              checked={noVolverAMostrar}
+              onChange={(evento) => setNoVolverAMostrar(evento.target.checked)}
+              className="h-5 w-5 accent-cobre"
+            />
+            No volver a mostrar
+          </label>
+          <button
+            type="button"
+            onClick={cerrarAvisoMovil}
+            className="mt-4 min-h-12 w-full rounded-xl bg-cobre-oscuro text-base font-semibold text-hueso active:brightness-110"
+          >
+            Entendido
+          </button>
+        </ModalFormulario>
 
         {hayCambiosSinGuardar && (
           <p className="mt-4 flex items-center gap-2 rounded-md border border-cobre/40 bg-cobre/10 px-3 py-2 text-xs text-cobre-texto max-md:hidden">
@@ -835,10 +893,17 @@ export function PanelPersonalizacion() {
                 {form.logo_url && (
                   <button
                     type="button"
-                    onClick={() => {
-                      if (form.logo_url) borrarImagenBarberia(form.logo_url)
-                      setForm((f) => ({ ...f, logo_url: null }))
-                    }}
+                    onClick={() =>
+                      setConfirmacion({
+                        titulo: 'Quitar logo',
+                        mensaje: 'El logo se borra de inmediato y no se puede recuperar — para volver a tenerlo hay que subirlo de nuevo.',
+                        textoConfirmar: 'Quitar logo',
+                        accion: () => {
+                          if (form.logo_url) borrarImagenBarberia(form.logo_url)
+                          setForm((f) => ({ ...f, logo_url: null }))
+                        },
+                      })
+                    }
                     className="text-xs text-gris-calido-500 underline-offset-2 hover:text-red-700 hover:underline"
                   >
                     Quitar
@@ -865,10 +930,17 @@ export function PanelPersonalizacion() {
                 {form.banner_url && (
                   <button
                     type="button"
-                    onClick={() => {
-                      if (form.banner_url) borrarImagenBarberia(form.banner_url)
-                      setForm((f) => ({ ...f, banner_url: null }))
-                    }}
+                    onClick={() =>
+                      setConfirmacion({
+                        titulo: 'Quitar portada',
+                        mensaje: 'La foto de portada se borra de inmediato y no se puede recuperar — para volver a tenerla hay que subirla de nuevo.',
+                        textoConfirmar: 'Quitar portada',
+                        accion: () => {
+                          if (form.banner_url) borrarImagenBarberia(form.banner_url)
+                          setForm((f) => ({ ...f, banner_url: null }))
+                        },
+                      })
+                    }
                     className="text-xs text-gris-calido-500 underline-offset-2 hover:text-red-700 hover:underline"
                   >
                     Quitar
@@ -1274,7 +1346,14 @@ export function PanelPersonalizacion() {
                       >
                         ↓
                       </button>
-                      <button type="button" onClick={() => quitarSeccion(seccion.id)} className="hover:text-red-700 max-md:ml-auto max-md:min-h-11 max-md:px-3 max-md:text-[15px] max-md:text-red-700">
+                      <button type="button" onClick={() =>
+                          setConfirmacion({
+                            titulo: 'Eliminar sección',
+                            mensaje: 'La sección y todo su contenido salen de tu página cuando guardes los cambios.',
+                            textoConfirmar: 'Eliminar sección',
+                            accion: () => quitarSeccion(seccion.id),
+                          })
+                        } className="hover:text-red-700 max-md:ml-auto max-md:min-h-11 max-md:px-3 max-md:text-[15px] max-md:text-red-700">
                         Eliminar
                       </button>
                     </div>
@@ -1587,7 +1666,14 @@ export function PanelPersonalizacion() {
                                   >
                                     ↓
                                   </button>
-                                  <button type="button" onClick={() => quitarImagenDeGaleria(seccion.id, i)} className="hover:text-red-700 max-md:min-h-11 max-md:px-1 max-md:text-[13px]">
+                                  <button type="button" onClick={() =>
+                                      setConfirmacion({
+                                        titulo: 'Quitar foto',
+                                        mensaje: 'La foto se borra de inmediato de tu galería y no se puede recuperar.',
+                                        textoConfirmar: 'Quitar foto',
+                                        accion: () => quitarImagenDeGaleria(seccion.id, i),
+                                      })
+                                    } className="hover:text-red-700 max-md:min-h-11 max-md:px-1 max-md:text-[13px]">
                                     Quitar
                                   </button>
                                 </div>
@@ -2155,7 +2241,14 @@ export function PanelPersonalizacion() {
                                   </div>
                                   <button
                                     type="button"
-                                    onClick={() => quitarTestimonio(seccion.id, testimonio.id)}
+                                    onClick={() =>
+                                      setConfirmacion({
+                                        titulo: 'Quitar testimonio',
+                                        mensaje: 'El testimonio sale de tu página cuando guardes los cambios.',
+                                        textoConfirmar: 'Quitar testimonio',
+                                        accion: () => quitarTestimonio(seccion.id, testimonio.id),
+                                      })
+                                    }
                                     className="text-xs text-gris-calido-500 hover:text-red-700 max-md:min-h-11 max-md:min-w-11"
                                   >
                                     Quitar

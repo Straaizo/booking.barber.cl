@@ -204,7 +204,7 @@ export function CalendarioReservas({ reservas, diaSeleccionado, onSeleccionarDia
   const reservasPorDia = useMemo(() => {
     const mapa = new Map()
     for (const r of reservas) {
-      if (r.estado !== 'confirmada') continue
+      if (r.estado === 'cancelada') continue
       const clave = claveFechaSantiago(new Date(r.fecha_hora))
       if (!mapa.has(clave)) mapa.set(clave, [])
       mapa.get(clave).push(r)

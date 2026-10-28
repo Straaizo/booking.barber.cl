@@ -8,6 +8,7 @@ import {
   cancelarReservaProvisoria,
 } from '../../../mocks/datosProvisoriosSuperadmin'
 import { conBarberoIds } from '../../../utils/servicios'
+import { diaSantiagoComoFechaLocal, hoyEnSantiago } from '../../../utils/horaLocal'
 
 const COLUMNAS =
   'id, cliente_nombre, cliente_telefono, fecha_hora, fecha_hora_fin, estado, servicio_id, barbero_id, servicios (nombre, precio_clp), barberos (nombre, intervalo_reserva_minutos)'
@@ -60,6 +61,51 @@ export function useReservasDeBarbero(barberoId) {
     queryFn: () =>
       HAY_BACKEND_REAL ? obtenerReservasDeBarbero(barberoId) : listarReservasDeBarberoProvisorias(barberoId),
     enabled: Boolean(barberoId),
+  })
+}
+
+// Inicio del mes anterior al actual (en hora de Chile) — todo lo anterior a
+// esto ya no está en `reservas`: el cron `archivar_reservas_antiguas` lo
+// movió a `reservas_historico` (ver 20261028000002_historico_reservas.sql).
+export function inicioMesArchivado() {
+  const hoy = hoyEnSantiago()
+  return new Date(hoy.getFullYear(), hoy.getMonth() - 1, 1)
+}
+
+// Reservas archivadas de un mes puntual, para el historial del barbero. Se
+// pide un día de margen a cada lado y se recorta con la fecha de Chile,
+// para no depender del cambio de horario de verano en los bordes del mes.
+// Mismo formato que las reservas normales (`servicios.nombre/precio_clp`)
+// para que las tarjetas no tengan que distinguirlas.
+export function useReservasArchivadas(barberoId, mes, habilitado) {
+  return useQuery({
+    queryKey: ['reservas_archivadas', barberoId, mes.getFullYear(), mes.getMonth()],
+    queryFn: async () => {
+      if (!HAY_BACKEND_REAL) return []
+      const desde = new Date(mes.getFullYear(), mes.getMonth(), 0)
+      const hasta = new Date(mes.getFullYear(), mes.getMonth() + 1, 2)
+      const { data, error } = await supabase
+        .from('reservas_historico')
+        .select(
+          'id, cliente_nombre, cliente_telefono, fecha_hora, fecha_hora_fin, estado, precio_cobrado_clp, servicio_nombre_snapshot'
+        )
+        .eq('barbero_id', barberoId)
+        .gte('fecha_hora', desde.toISOString())
+        .lt('fecha_hora', hasta.toISOString())
+        .order('fecha_hora', { ascending: false })
+      if (error) throw error
+      return data
+        .filter((r) => {
+          const dia = diaSantiagoComoFechaLocal(new Date(r.fecha_hora))
+          return dia.getFullYear() === mes.getFullYear() && dia.getMonth() === mes.getMonth()
+        })
+        .map((r) => ({
+          ...r,
+          archivada: true,
+          servicios: { nombre: r.servicio_nombre_snapshot, precio_clp: r.precio_cobrado_clp },
+        }))
+    },
+    enabled: Boolean(barberoId) && habilitado,
   })
 }
 
@@ -133,6 +179,25 @@ export function useReactivarReserva(barberiaId, barberoId) {
     mutationFn: async (id) => {
       if (!HAY_BACKEND_REAL) throw new Error('No disponible en modo de prueba.')
       const { error } = await supabase.from('reservas').update({ estado: 'confirmada' }).eq('id', id)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      if (barberiaId) queryClient.invalidateQueries({ queryKey: clave(barberiaId) })
+      if (barberoId) queryClient.invalidateQueries({ queryKey: claveBarbero(barberoId) })
+    },
+  })
+}
+
+// El cliente llegó y fue atendido — la reserva sale de "Próximas" y pasa al
+// historial. El trigger `trg_reservas_u50_validar_completar` (ver
+// 20261028000001_reservas_completadas.sql) solo lo deja pasar desde una
+// reserva confirmada y a partir del día de la cita.
+export function useCompletarReserva(barberiaId, barberoId) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (id) => {
+      if (!HAY_BACKEND_REAL) throw new Error('No disponible en modo de prueba.')
+      const { error } = await supabase.from('reservas').update({ estado: 'completada' }).eq('id', id)
       if (error) throw error
     },
     onSuccess: () => {

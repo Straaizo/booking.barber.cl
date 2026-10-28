@@ -26,6 +26,7 @@ const PanelBarberoReservas = pagina(() => import('../pages/panel/PanelBarberoRes
 const PanelBarberoHorarios = pagina(() => import('../pages/panel/PanelBarberoHorarios'), 'PanelBarberoHorarios')
 const PanelBarberoServicios = pagina(() => import('../pages/panel/PanelBarberoServicios'), 'PanelBarberoServicios')
 const PanelAdminLayout = pagina(() => import('../pages/panel/PanelAdminLayout'), 'PanelAdminLayout')
+const PanelResumen = pagina(() => import('../pages/panel/PanelResumen'), 'PanelResumen')
 const PanelReservas = pagina(() => import('../pages/panel/PanelReservas'), 'PanelReservas')
 const PanelBarberos = pagina(() => import('../pages/panel/PanelBarberos'), 'PanelBarberos')
 const PanelServicios = pagina(() => import('../pages/panel/PanelServicios'), 'PanelServicios')
@@ -123,7 +124,8 @@ const router = createBrowserRouter([
         path: '/panel',
         element: <PanelAdminLayout />,
         children: [
-          { index: true, element: <Navigate to="/panel/reservas" replace /> },
+          { index: true, element: <Navigate to="/panel/resumen" replace /> },
+          { path: 'resumen', element: <PanelResumen /> },
           { path: 'reservas', element: <PanelReservas /> },
           { path: 'barberos', element: <PanelBarberos /> },
           { path: 'servicios', element: <PanelServicios /> },

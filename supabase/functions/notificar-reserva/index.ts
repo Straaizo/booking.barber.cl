@@ -85,7 +85,11 @@ Deno.serve(async (req) => {
       try {
         await webpush.sendNotification(
           { endpoint: suscripcion.endpoint, keys: { p256dh: suscripcion.p256dh, auth: suscripcion.auth } },
-          payload
+          payload,
+          // `high`: el servicio de push (Apple/Google) la entrega al instante
+          // aunque el teléfono esté en reposo, en vez de agruparla en
+          // silencio para ahorrar batería.
+          { urgency: 'high', TTL: 60 * 60 }
         )
       } catch (error) {
         // 404/410: el navegador dio de baja la suscripción (desinstaló la

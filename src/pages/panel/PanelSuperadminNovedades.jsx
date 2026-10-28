@@ -8,6 +8,7 @@ import {
   useEliminarNovedad,
 } from './hooks/useNovedadesSuperadmin'
 import { FilaNovedad } from './components/FilaNovedad'
+import { ModalConfirmacion } from '../../components/panel/ModalConfirmacion'
 
 function hoyISO() {
   const ahora = new Date()
@@ -27,6 +28,17 @@ export function PanelSuperadminNovedades() {
   const [nueva, setNueva] = useState(NUEVA_VACIA)
   const [errorEnvio, setErrorEnvio] = useState(null)
   const [formularioAbierto, setFormularioAbierto] = useState(false)
+  const [novedadAEliminar, setNovedadAEliminar] = useState(null)
+
+  async function confirmarEliminar() {
+    try {
+      await eliminar.mutateAsync(novedadAEliminar.id)
+    } catch {
+      setErrorEnvio('No se pudo eliminar la novedad. Intenta de nuevo.')
+    } finally {
+      setNovedadAEliminar(null)
+    }
+  }
 
   async function agregarNovedad(evento) {
     evento.preventDefault()
@@ -83,7 +95,7 @@ export function PanelSuperadminNovedades() {
                 key={novedad.id}
                 novedad={novedad}
                 onGuardar={(cambios) => actualizar.mutateAsync({ id: novedad.id, cambios })}
-                onEliminar={() => eliminar.mutateAsync(novedad.id)}
+                onEliminar={() => setNovedadAEliminar(novedad)}
               />
             ))}
           </div>
@@ -162,6 +174,17 @@ export function PanelSuperadminNovedades() {
           </p>
         )}
       </div>
+
+      <ModalConfirmacion
+        abierto={Boolean(novedadAEliminar)}
+        titulo="Eliminar novedad"
+        mensaje={novedadAEliminar && `"${novedadAEliminar.titulo}" deja de mostrarse en la página de inicio. No se puede deshacer.`}
+        textoConfirmar="Eliminar"
+        textoCancelar="Volver"
+        confirmando={eliminar.isPending}
+        onConfirmar={confirmarEliminar}
+        onCerrar={() => setNovedadAEliminar(null)}
+      />
     </div>
   )
 }

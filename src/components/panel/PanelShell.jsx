@@ -1,7 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
+import { useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '../../hooks/useAuth'
+import { useIsMobile } from '../../hooks/useIsMobile'
+import { usePullToRefresh } from '../../hooks/usePullToRefresh'
+import { IconoRefrescar } from './IconoRefrescar'
 import { rutaPorRol, ROL_ADMIN, ROL_BARBERO } from '../../utils/roles'
 import { HoverLink } from '../common/HoverLink'
 import { IconoCuenta } from '../common/IconoCuenta'
@@ -84,6 +88,34 @@ export function PanelShell({ secciones, children, ancho = 'normal', rutaCuenta }
   const navigate = useNavigate()
   const { pathname } = useLocation()
   const [menuAbierto, setMenuAbierto] = useState(false)
+  const queryClient = useQueryClient()
+  const esMovil = useIsMobile()
+
+  // Vuelve a pedir los datos de la pantalla actual (sin recargar la app
+  // entera). Se mantiene visible al menos un instante para que se note.
+  const actualizar = useCallback(
+    () =>
+      Promise.all([
+        queryClient.refetchQueries({ type: 'active' }),
+        new Promise((resolver) => setTimeout(resolver, 600)),
+      ]),
+    [queryClient]
+  )
+  const { distancia, actualizando, progreso } = usePullToRefresh(actualizar, esMovil)
+  const [actualizandoBoton, setActualizandoBoton] = useState(false)
+
+  async function alTocarActualizar() {
+    if (actualizandoBoton) return
+    setActualizandoBoton(true)
+    try {
+      await actualizar()
+    } finally {
+      setActualizandoBoton(false)
+    }
+  }
+  const girando = actualizando || actualizandoBoton
+  const seccionesMovil = secciones.filter((s) => !s.soloEscritorio)
+  const seccionesMenu = secciones.filter((s) => s.soloEscritorio)
 
   useEffect(() => {
     setMenuAbierto(false)
@@ -187,6 +219,15 @@ export function PanelShell({ secciones, children, ancho = 'normal', rutaCuenta }
             </p>
             <p className="mt-1 truncate text-xs text-gris-calido-400">{fechaDeHoy()}</p>
           </div>
+          <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={alTocarActualizar}
+            aria-label="Actualizar"
+            className="flex h-10 w-10 items-center justify-center rounded-full text-gris-calido-400 active:bg-white/10"
+          >
+            <IconoRefrescar className={`h-5 w-5 ${girando ? 'animate-spin' : ''}`} />
+          </button>
           <button
             type="button"
             onClick={() => setMenuAbierto(true)}
@@ -195,8 +236,29 @@ export function PanelShell({ secciones, children, ancho = 'normal', rutaCuenta }
           >
             {inicial(perfil?.nombre)}
           </button>
+          </div>
         </div>
       </header>
+
+      {/* Indicador del gesto "deslizar para actualizar". */}
+      <div
+        className="pointer-events-none fixed inset-x-0 top-[calc(env(safe-area-inset-top)+3.5rem)] z-20 flex justify-center md:hidden"
+        style={{
+          transform: `translateY(${actualizando ? 16 : distancia * 0.6}px)`,
+          opacity: actualizando ? 1 : progreso,
+          transition: distancia ? 'none' : 'transform 200ms ease, opacity 200ms ease',
+        }}
+        aria-hidden="true"
+      >
+        <span
+          className={`flex h-10 w-10 items-center justify-center rounded-full bg-white text-cobre-texto shadow-md ${
+            actualizando ? 'animate-spin' : ''
+          }`}
+          style={actualizando ? undefined : { transform: `rotate(${progreso * 270}deg)` }}
+        >
+          <IconoRefrescar className="h-5 w-5" />
+        </span>
+      </div>
 
       <main
         className={`mx-auto px-4 pb-[calc(env(safe-area-inset-bottom)+6rem)] pt-5 md:px-8 md:py-12 ${ANCHOS[ancho]}`}
@@ -209,8 +271,8 @@ export function PanelShell({ secciones, children, ancho = 'normal', rutaCuenta }
         className="fixed inset-x-0 bottom-0 z-30 border-t border-gris-calido-200 bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden"
         aria-label="Secciones del panel"
       >
-        <div className="grid" style={{ gridTemplateColumns: `repeat(${secciones.length}, minmax(0, 1fr))` }}>
-          {secciones.map((seccion) => (
+        <div className="grid" style={{ gridTemplateColumns: `repeat(${seccionesMovil.length}, minmax(0, 1fr))` }}>
+          {seccionesMovil.map((seccion) => (
             <PestanaMovil key={seccion.to} {...seccion} />
           ))}
         </div>
@@ -257,6 +319,16 @@ export function PanelShell({ secciones, children, ancho = 'normal', rutaCuenta }
               )}
 
               <div className="mt-5 flex flex-col overflow-hidden rounded-2xl border border-gris-calido-200">
+                {seccionesMenu.map(({ to, etiqueta, etiquetaCorta, Icono }) => (
+                  <NavLink
+                    key={to}
+                    to={to}
+                    className="flex min-h-14 items-center gap-3 border-b border-gris-calido-200 px-4 text-base text-negro-barbero active:bg-gris-calido-100"
+                  >
+                    <Icono className="h-6 w-6 text-gris-calido-500" />
+                    {etiquetaCorta ?? etiqueta}
+                  </NavLink>
+                ))}
                 {rutaCuenta && (
                   <NavLink
                     to={rutaCuenta}

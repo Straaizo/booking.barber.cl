@@ -19,6 +19,13 @@ self.addEventListener('push', (evento) => {
       icon: '/icon-192.png',
       badge: '/icon-192.png',
       tag: datos.tag,
+      renotify: Boolean(datos.tag),
+      // Android/PC: vibra y queda en pantalla hasta que la toquen. iOS ignora
+      // estas opciones y usa el sonido/vibración que el usuario tenga en
+      // Ajustes → Notificaciones → Booking Barber.
+      vibrate: [200, 100, 200, 100, 300],
+      requireInteraction: true,
+      silent: false,
       data: { url: datos.url || '/login' },
     })
   )

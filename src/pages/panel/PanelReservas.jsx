@@ -77,6 +77,9 @@ function FilaReservaActiva({ reserva, onEditar, onPedirCancelar }) {
         <span className="versalitas block text-xs text-gris-calido-500">{reserva.barberos?.nombre}</span>
       </div>
 
+      {reserva.estado === 'completada' ? (
+        <span className="versalitas mt-1 text-xs text-verde-barberia">✓ Atendida</span>
+      ) : (
       <div className="mt-1 flex items-center justify-between">
         <button
           type="button"
@@ -95,6 +98,7 @@ function FilaReservaActiva({ reserva, onEditar, onPedirCancelar }) {
           Cancelar
         </button>
       </div>
+      )}
     </div>
   )
 }
@@ -174,7 +178,7 @@ function TiraDias({ reservas, diaSeleccionado, onSeleccionarDia }) {
   const diasConReservas = useMemo(() => {
     const conjunto = new Set()
     for (const r of reservas) {
-      if (r.estado === 'confirmada') conjunto.add(claveDia(diaSantiagoComoFechaLocal(new Date(r.fecha_hora))))
+      if (r.estado !== 'cancelada') conjunto.add(claveDia(diaSantiagoComoFechaLocal(new Date(r.fecha_hora))))
     }
     return conjunto
   }, [reservas])
@@ -274,6 +278,11 @@ function TarjetaReservaMovil({ reserva, onEditar, onPedirCancelar }) {
         </div>
       </div>
 
+      {reserva.estado === 'completada' ? (
+        <p className="mt-4 flex min-h-11 items-center justify-center gap-2 rounded-xl bg-verde-barberia/10 text-[15px] font-semibold text-verde-barberia">
+          ✓ Atendida
+        </p>
+      ) : (
       <div className="mt-4 grid grid-cols-3 gap-2">
         <a
           href={linkWhatsApp(reserva.cliente_telefono)}
@@ -301,6 +310,7 @@ function TarjetaReservaMovil({ reserva, onEditar, onPedirCancelar }) {
           Cancelar
         </button>
       </div>
+      )}
     </article>
   )
 }
@@ -368,7 +378,7 @@ export function PanelReservas() {
     if (!reservas) return []
     return reservas
       .filter(
-        (r) => r.estado === 'confirmada' && mismoDia(diaSantiagoComoFechaLocal(new Date(r.fecha_hora)), diaSeleccionado)
+        (r) => r.estado !== 'cancelada' && mismoDia(diaSantiagoComoFechaLocal(new Date(r.fecha_hora)), diaSeleccionado)
       )
       .sort((a, b) => new Date(a.fecha_hora) - new Date(b.fecha_hora))
   }, [reservas, diaSeleccionado])
@@ -389,7 +399,7 @@ export function PanelReservas() {
     const inicio = inicioDeSemanaLunes(diaSeleccionado)
     const fin = new Date(inicio.getFullYear(), inicio.getMonth(), inicio.getDate() + 7)
     return reservas.filter((r) => {
-      if (r.estado !== 'confirmada') return false
+      if (r.estado === 'cancelada') return false
       const dia = diaSantiagoComoFechaLocal(new Date(r.fecha_hora))
       return dia >= inicio && dia < fin
     }).length
@@ -746,7 +756,7 @@ export function PanelReservas() {
                 setDiaSeleccionado(fecha)
                 setVista('dia')
               }}
-              onAbrirReserva={(reserva) => setReservaEditando(reserva)}
+              onAbrirReserva={(reserva) => reserva.estado === 'confirmada' && setReservaEditando(reserva)}
             />
           </div>
         </div>
