@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react'
-import { createBrowserRouter, Navigate, Outlet, RouterProvider, useParams } from 'react-router-dom'
+import { createBrowserRouter, Navigate, Outlet, RouterProvider, ScrollRestoration, useParams } from 'react-router-dom'
 import { Home } from '../pages/Home/Home'
 import { RutaProtegida } from './RutaProtegida'
 import { Loader } from '../components/common/Loader'
@@ -67,9 +67,14 @@ function RedirigirBarberiaSinPrefijo() {
 const router = createBrowserRouter([
   {
     element: (
-      <Suspense fallback={<CargandoPagina />}>
-        <Outlet />
-      </Suspense>
+      <>
+        {/* Cada pantalla nueva abre arriba (antes heredaba el scroll de la
+            anterior); al volver atrás, recupera donde se había quedado. */}
+        <ScrollRestoration />
+        <Suspense fallback={<CargandoPagina />}>
+          <Outlet />
+        </Suspense>
+      </>
     ),
     children: [
       // Dentro de la app instalada (PWA) la landing de marketing no existe:

@@ -46,6 +46,10 @@ export function useModoApp() {
     const raiz = document.documentElement
     raiz.style.overscrollBehaviorY = 'none'
     document.body.style.overscrollBehaviorY = 'none'
+    // El scroll suave global (index.css, pensado para los anclas de la página
+    // pública) haría que cada cambio de sección "viaje" animado hasta arriba;
+    // en el panel el salto tiene que ser instantáneo, como en una app.
+    raiz.style.scrollBehavior = 'auto'
 
     registrarServiceWorker()
     return () => {
@@ -53,6 +57,7 @@ export function useModoApp() {
       if (viewportOriginal) viewport.setAttribute('content', viewportOriginal)
       raiz.style.overscrollBehaviorY = ''
       document.body.style.overscrollBehaviorY = ''
+      raiz.style.scrollBehavior = ''
     }
   }, [])
 }

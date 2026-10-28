@@ -155,7 +155,7 @@ export function PanelShell({ secciones, children, ancho = 'normal', rutaCuenta }
   )
 
   return (
-    <div className="panel-app min-h-screen bg-hueso">
+    <div className="panel-app min-h-dvh bg-hueso">
       {/* ---------- PC ---------- */}
       <header className="hidden items-center justify-between border-b border-gris-calido-200 bg-negro-barbero px-8 py-4 text-hueso md:flex">
         <div className="flex items-center gap-4">
@@ -263,7 +263,7 @@ export function PanelShell({ secciones, children, ancho = 'normal', rutaCuenta }
       </div>
 
       <main
-        className={`mx-auto px-4 pb-[calc(env(safe-area-inset-bottom)+6rem)] pt-5 md:px-8 md:py-12 ${ANCHOS[ancho]}`}
+        className={`mx-auto px-4 pb-[calc(env(safe-area-inset-bottom)+4.5rem)] pt-5 md:px-8 md:py-12 ${ANCHOS[ancho]}`}
       >
         <AvisoAppMovil />
         {children}

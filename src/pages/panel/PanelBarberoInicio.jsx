@@ -143,6 +143,8 @@ export function PanelBarberoInicio() {
   const porcentajePropio = meta ? Math.round(((propio?.ingresos_agendados ?? 0) / meta) * 100) : null
 
   const { deHoy, proxima, sinConfirmar } = useMemo(() => {
+    const hoy = hoyEnSantiago()
+    const mes = new Date(hoy.getFullYear(), hoy.getMonth(), 1)
     const confirmadas = (reservas ?? []).filter((r) => r.estado === 'confirmada')
     const ahora = new Date()
     const delDia = confirmadas
@@ -153,9 +155,14 @@ export function PanelBarberoInicio() {
       proxima: confirmadas
         .filter((r) => new Date(r.fecha_hora_fin ?? r.fecha_hora) > ahora)
         .sort((a, b) => new Date(a.fecha_hora) - new Date(b.fecha_hora))[0],
-      sinConfirmar: confirmadas.filter((r) => diaSantiagoComoFechaLocal(new Date(r.fecha_hora)) < hoy).length,
+      // Solo las de este mes: las de meses anteriores ya quedaron en el
+      // historial y no tiene sentido seguir recordándolas acá.
+      sinConfirmar: confirmadas.filter((r) => {
+        const dia = diaSantiagoComoFechaLocal(new Date(r.fecha_hora))
+        return dia < hoy && dia >= mes
+      }).length,
     }
-  }, [reservas, hoy])
+  }, [reservas])
 
   const efectivas = propio ? propio.reservas - propio.canceladas : 0
   const efectivasAnterior = propioAnterior ? propioAnterior.reservas - propioAnterior.canceladas : 0
