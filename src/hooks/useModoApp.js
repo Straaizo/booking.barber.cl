@@ -41,10 +41,18 @@ export function useModoApp() {
     const viewportOriginal = viewport?.getAttribute('content')
     viewport?.setAttribute('content', `${viewportOriginal}, viewport-fit=cover`)
 
+    // Sin el "rebote" de iOS al tirar hacia abajo: la página queda quieta y
+    // el gesto de actualizar solo muestra su ícono (ver usePullToRefresh).
+    const raiz = document.documentElement
+    raiz.style.overscrollBehaviorY = 'none'
+    document.body.style.overscrollBehaviorY = 'none'
+
     registrarServiceWorker()
     return () => {
       link.remove()
       if (viewportOriginal) viewport.setAttribute('content', viewportOriginal)
+      raiz.style.overscrollBehaviorY = ''
+      document.body.style.overscrollBehaviorY = ''
     }
   }, [])
 }

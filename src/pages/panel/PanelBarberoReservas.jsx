@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
 import { Loader } from '../../components/common/Loader'
 import { HoverLink } from '../../components/common/HoverLink'
@@ -20,7 +21,6 @@ import {
   inicioMesArchivado,
 } from './hooks/useReservasBandeja'
 import { formatoCLP, linkWhatsApp } from '../../utils/formatos'
-import { useMetasMes, useResumenMes } from './hooks/useResumen'
 
 // Estado que se muestra en el historial. Una reserva confirmada de un día ya
 // pasado que nadie marcó como atendida queda "Sin confirmar" — sigue
@@ -237,64 +237,6 @@ function TarjetaReservaMovil({ reserva, enHistorial, puedeConfirmar, onConfirmar
   )
 }
 
-// Avance de la meta del mes que le definió el dueño — solo en porcentaje,
-// sin montos. El "ritmo" compara ese avance con la parte del mes que ya
-// pasó: a mitad de mes, ir en 50% o más es ir al día. No aparece si no
-// tiene meta.
-function TarjetaMeta({ barberoId, mes }) {
-  const { data: resumen } = useResumenMes(mes)
-  const { data: metas } = useMetasMes(mes)
-  const meta = metas?.find((m) => m.barbero_id === barberoId)?.meta_ingresos_clp
-  const fila = resumen?.find((f) => f.barbero_id === barberoId)
-  if (!meta || !fila) return null
-
-  const porcentaje = Math.round((fila.ingresos_agendados / meta) * 100)
-  const hoy = hoyEnSantiago()
-  const diasDelMes = new Date(mes.getFullYear(), mes.getMonth() + 1, 0).getDate()
-  const esperado = Math.round((hoy.getDate() / diasDelMes) * 100)
-  const diferencia = porcentaje - esperado
-
-  let ritmo
-  if (porcentaje >= 100) ritmo = { texto: '🎉 ¡Meta cumplida!', clase: 'text-hueso' }
-  else if (diferencia >= 0) ritmo = { texto: diferencia >= 10 ? 'Vas adelantado ✓' : 'Vas al día ✓', clase: 'text-[#9fd3b1]' }
-  else ritmo = { texto: `Vas ${Math.abs(diferencia)}% atrasado`, clase: 'text-cobre-claro' }
-
-  return (
-    <section className="mt-5 rounded-2xl bg-negro-barbero p-4 text-hueso md:max-w-xl">
-      <p className="text-[13px] font-semibold uppercase tracking-[0.06em] text-gris-calido-400">
-        Tu meta de {nombreMes(mes).split(' ')[0].toLowerCase()}
-      </p>
-      <div className="mt-1 flex items-baseline justify-between gap-2">
-        <p className="text-[15px] text-gris-calido-200">
-          Vas en <strong className="numeros-tabulares text-[26px] font-semibold text-hueso">{porcentaje}%</strong>
-        </p>
-        <p className={`text-[15px] font-semibold ${ritmo.clase}`}>{ritmo.texto}</p>
-      </div>
-      {/* Barra de avance + marca de dónde debería ir a esta altura del mes. */}
-      <div className="relative mt-3">
-        <div className="h-2.5 overflow-hidden rounded-full bg-white/15">
-          <div
-            className={`h-full rounded-full transition-[width] duration-700 ${porcentaje >= 100 ? 'bg-verde-barberia' : 'bg-cobre'}`}
-            style={{ width: `${Math.min(100, porcentaje)}%` }}
-          />
-        </div>
-        {porcentaje < 100 && (
-          <span
-            className="absolute -top-1 h-[18px] w-0.5 rounded-full bg-hueso"
-            style={{ left: `${esperado}%` }}
-            aria-hidden="true"
-          />
-        )}
-      </div>
-      {porcentaje < 100 && (
-        <p className="mt-2 text-[13px] text-gris-calido-400">
-          La marca blanca es donde deberías ir hoy ({esperado}%).
-        </p>
-      )}
-    </section>
-  )
-}
-
 function EstadoVacio({ titulo, texto }) {
   return (
     <div className="flex flex-col items-center rounded-2xl border border-dashed border-gris-calido-200 bg-white/60 px-6 py-12 text-center">
@@ -316,7 +258,9 @@ export function PanelBarberoReservas() {
   const reprogramarReserva = useReprogramarReserva(null, perfil.barbero_id)
   useRealtimeReservas({ barberoId: perfil.barbero_id })
 
-  const [vista, setVista] = useState('proximas') // 'proximas' | 'historial'
+  // El Inicio puede mandar directo al historial (aviso de "sin confirmar").
+  const { state } = useLocation()
+  const [vista, setVista] = useState(state?.vista === 'historial' ? 'historial' : 'proximas') // 'proximas' | 'historial'
   const [mesHistorial, setMesHistorial] = useState(() => {
     const hoy = hoyEnSantiago()
     return new Date(hoy.getFullYear(), hoy.getMonth(), 1)
@@ -434,8 +378,6 @@ export function PanelBarberoReservas() {
           </button>
         ))}
       </div>
-
-      {!enHistorial && <TarjetaMeta barberoId={perfil.barbero_id} mes={mesActual} />}
 
       {enHistorial && (
         <div className="mt-4 rounded-2xl border border-gris-calido-200 bg-white p-2 md:max-w-xl">

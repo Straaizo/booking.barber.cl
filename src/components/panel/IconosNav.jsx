@@ -26,6 +26,15 @@ export function IconoCalendario({ className }) {
   )
 }
 
+export function IconoInicio({ className }) {
+  return (
+    <Svg className={className}>
+      <path d="M3.5 11 12 4l8.5 7" {...trazo} />
+      <path d="M5.5 9.5V20h4.5v-5.5h4V20h4.5V9.5" {...trazo} />
+    </Svg>
+  )
+}
+
 export function IconoGrafico({ className }) {
   return (
     <Svg className={className}>
