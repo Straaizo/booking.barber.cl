@@ -17,7 +17,7 @@ const LARGO_MINIMO_PASSWORD = 8
 const CLASE_SECCION =
   'rounded-lg border border-gris-calido-200 bg-white p-5 max-md:flex max-md:flex-col max-md:rounded-none max-md:border-0 max-md:bg-transparent max-md:p-0'
 const CLASE_TITULO_SECCION =
-  'versalitas text-xs text-cobre max-md:mb-2 max-md:px-1 max-md:font-sans max-md:text-[13px] max-md:tracking-[0.06em] max-md:text-gris-calido-500'
+  'versalitas text-xs text-cobre max-md:mb-2 max-md:px-1 max-md:font-sans! max-md:text-[13px] max-md:tracking-[0.06em] max-md:text-gris-calido-500'
 const CLASE_NOTA_SECCION =
   'mt-1 text-sm text-gris-calido-500 max-md:order-last max-md:mt-2 max-md:px-1 max-md:text-[13px] max-md:leading-snug'
 const CLASE_FILA_ACCION =

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useAuth } from '../../hooks/useAuth'
 import { Loader } from '../../components/common/Loader'
 import { HoverLink } from '../../components/common/HoverLink'
@@ -7,6 +7,8 @@ import { CalendarioReservas } from '../../components/panel/CalendarioReservas'
 import { IconoLapiz } from '../../components/panel/IconoLapiz'
 import { IconoX } from '../../components/panel/IconoX'
 import { IconoRefrescar } from '../../components/panel/IconoRefrescar'
+import { IconoCalendario } from '../../components/panel/IconosNav'
+import { IconoWhatsApp } from '../../components/common/IconoWhatsApp'
 import { ModalReprogramarReserva } from './components/ModalReprogramarReserva'
 import {
   useReservasBandeja,
@@ -162,16 +164,12 @@ function TiraDias({ reservas, diaSeleccionado, onSeleccionarDia }) {
   const tiraRef = useRef(null)
   const hoy = hoyEnSantiago()
 
-  const dias = useMemo(() => {
-    let inicio = sumarDias(hoy, -7)
-    let fin = sumarDias(hoy, 30)
-    if (diaSeleccionado < inicio) inicio = diaSeleccionado
-    if (diaSeleccionado > fin) fin = diaSeleccionado
-    const lista = []
-    for (let d = inicio; d <= fin; d = sumarDias(d, 1)) lista.push(d)
-    return lista
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [claveDia(hoy), claveDia(diaSeleccionado)])
+  let inicio = sumarDias(hoy, -7)
+  let fin = sumarDias(hoy, 30)
+  if (diaSeleccionado < inicio) inicio = diaSeleccionado
+  if (diaSeleccionado > fin) fin = diaSeleccionado
+  const dias = []
+  for (let d = inicio; d <= fin; d = sumarDias(d, 1)) dias.push(d)
 
   const diasConReservas = useMemo(() => {
     const conjunto = new Set()
@@ -199,7 +197,7 @@ function TiraDias({ reservas, diaSeleccionado, onSeleccionarDia }) {
     <div>
       <div className="flex items-center justify-between gap-3">
         <span className="text-[17px] font-semibold capitalize text-negro-barbero">
-          {diaSeleccionado.toLocaleDateString('es-CL', { month: 'long', year: 'numeric' })}
+          {diaSeleccionado.toLocaleDateString('es-CL', { month: 'long' })} {diaSeleccionado.getFullYear()}
         </span>
         <button
           type="button"
@@ -310,7 +308,7 @@ function TarjetaReservaMovil({ reserva, onEditar, onPedirCancelar }) {
 function TarjetaCanceladaMovil({ reserva, onPedirReactivar, reactivando }) {
   return (
     <article className="rounded-2xl border border-gris-calido-200 bg-white p-4">
-      <span className="numeros-tabulares block text-[14px] font-medium capitalize text-gris-calido-500">
+      <span className="numeros-tabulares block text-[14px] font-medium text-gris-calido-500 first-letter:uppercase">
         {formatoFechaHora(reserva.fecha_hora)}
       </span>
       <div className="mt-1 flex items-baseline justify-between gap-2">
@@ -441,15 +439,37 @@ export function PanelReservas() {
 
   return (
     <div>
-      <h1 className="font-display text-2xl font-light tracking-tight text-negro-barbero md:text-3xl">
+      <h1 className="font-display text-[28px]/[1.15] font-light tracking-tight text-negro-barbero md:text-3xl">
         Reservas
       </h1>
-      <p className="mt-2 max-w-lg text-sm text-gris-calido-700">
+      <p className="mt-1 text-[15px] text-gris-calido-500 md:hidden">Tu agenda del día y las canceladas.</p>
+      <p className="mt-2 hidden max-w-lg text-sm text-gris-calido-700 md:block">
         Todas las reservas de tu barbería. Elige un día en el calendario para ver sus horas, o mira las
         canceladas para reactivar alguna si fue un error.
       </p>
 
-      <div className="mt-6 flex gap-2">
+      {/* Celular: control segmentado a todo el ancho, como las apps nativas. */}
+      <div className="mt-5 grid grid-cols-2 gap-1 rounded-xl bg-gris-calido-100 p-1 md:hidden" role="tablist">
+        {[
+          ['dia', 'Agenda'],
+          ['canceladas', `Canceladas${reservasCanceladas.length > 0 ? ` (${reservasCanceladas.length})` : ''}`],
+        ].map(([valor, texto]) => (
+          <button
+            key={valor}
+            type="button"
+            role="tab"
+            aria-selected={vista === valor}
+            onClick={() => setVista(valor)}
+            className={`min-h-10 rounded-lg text-[15px] font-semibold transition-colors ${
+              vista === valor ? 'bg-white text-negro-barbero shadow-sm' : 'text-gris-calido-500'
+            }`}
+          >
+            {texto}
+          </button>
+        ))}
+      </div>
+
+      <div className="mt-6 hidden gap-2 md:flex">
         <button
           type="button"
           onClick={() => setVista('dia')}
@@ -483,7 +503,125 @@ export function PanelReservas() {
       )}
 
       {reservas && (
-        <div className="mt-8 grid gap-8 lg:grid-cols-[420px_minmax(0,1fr)] lg:items-stretch">
+        <div className="mt-5 md:hidden">
+          {vista === 'dia' && (
+            <>
+              <TiraDias reservas={reservas} diaSeleccionado={diaSeleccionado} onSeleccionarDia={setDiaSeleccionado} />
+
+              <h2 className="mt-6 text-[22px] font-semibold capitalize tracking-tight text-negro-barbero">
+                {esHoy ? 'Hoy' : diaSeleccionado.toLocaleDateString('es-CL', { weekday: 'long', day: 'numeric', month: 'long' })}
+              </h2>
+
+              <div className="mt-3 grid grid-cols-3 divide-x divide-gris-calido-200 rounded-2xl border border-gris-calido-200 bg-white py-3">
+                {[
+                  ['Reservas', reservasDelDia.length],
+                  ['Ingresos', formatoCLP(reservasDelDia.reduce((total, r) => total + (r.servicios?.precio_clp ?? 0), 0))],
+                  ['Semana', reservasSemana],
+                ].map(([etiqueta, valor]) => (
+                  <div key={etiqueta} className="min-w-0 px-2 text-center">
+                    <span className="block text-[12px] font-semibold uppercase tracking-[0.06em] text-gris-calido-500">
+                      {etiqueta}
+                    </span>
+                    <span className="numeros-tabulares mt-0.5 block truncate text-[18px] font-semibold text-negro-barbero">
+                      {valor}
+                    </span>
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-4 flex flex-col gap-3">
+                {reservasDelDia.length === 0 ? (
+                  <EstadoVacioMovil
+                    titulo="Día libre"
+                    texto="No hay reservas confirmadas este día. Desliza la tira de arriba para ver otros días."
+                  />
+                ) : (
+                  reservasDelDia.map((reserva) => (
+                    <TarjetaReservaMovil
+                      key={reserva.id}
+                      reserva={reserva}
+                      onEditar={() => setReservaEditando(reserva)}
+                      onPedirCancelar={() => setReservaCancelando(reserva)}
+                    />
+                  ))
+                )}
+              </div>
+
+              {proximasReservas.length > 0 && (
+                <div className="mt-8">
+                  <p role="heading" aria-level={3} className={ETIQUETA_SECCION_MOVIL}>
+                    Próximas reservas
+                  </p>
+                  <div className="mt-2 divide-y divide-gris-calido-100 overflow-hidden rounded-2xl border border-gris-calido-200 bg-white">
+                    {proximasReservas.map((reserva) => (
+                      <button
+                        key={reserva.id}
+                        type="button"
+                        onClick={() => setDiaSeleccionado(diaSantiagoComoFechaLocal(new Date(reserva.fecha_hora)))}
+                        className="flex min-h-14 w-full items-center gap-3 px-4 py-2.5 text-left active:bg-gris-calido-100"
+                      >
+                        <span className="w-[72px] shrink-0">
+                          <span className="block text-[13px] font-medium capitalize text-gris-calido-500">
+                            {new Date(reserva.fecha_hora).toLocaleDateString('es-CL', {
+                              weekday: 'short',
+                              day: 'numeric',
+                              timeZone: 'America/Santiago',
+                            })}
+                          </span>
+                          <span className="numeros-tabulares block text-[16px] font-semibold text-negro-barbero">
+                            {formatoHora24(reserva.fecha_hora)}
+                          </span>
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-[15px] font-medium text-negro-barbero">
+                            {reserva.cliente_nombre}
+                          </span>
+                          <span className="block truncate text-[13px] text-gris-calido-500">{reserva.barberos?.nombre}</span>
+                        </span>
+                        <span aria-hidden="true" className="shrink-0 text-xl text-gris-calido-400">
+                          ›
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+
+          {vista === 'canceladas' && (
+            <>
+              <p role="heading" aria-level={2} className={ETIQUETA_SECCION_MOVIL}>
+                {reservasCanceladas.length} reserva{reservasCanceladas.length === 1 ? '' : 's'} cancelada
+                {reservasCanceladas.length === 1 ? '' : 's'}
+              </p>
+              <div className="mt-3 flex flex-col gap-3">
+                {reservasCanceladas.length === 0 ? (
+                  <EstadoVacioMovil
+                    titulo="Sin canceladas"
+                    texto="Si cancelas una reserva por error, aparecerá aquí para que puedas reactivarla."
+                  />
+                ) : (
+                  reservasCanceladas.map((reserva) => (
+                    <TarjetaCanceladaMovil
+                      key={reserva.id}
+                      reserva={reserva}
+                      onPedirReactivar={() => {
+                        setErrorReactivar(null)
+                        setReservaReactivando(reserva)
+                      }}
+                      reactivando={reservaReactivando?.id === reserva.id && procesando}
+                    />
+                  ))
+                )}
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {reservas && (
+        <div className="mt-8 hidden gap-8 md:grid lg:grid-cols-[420px_minmax(0,1fr)] lg:items-stretch">
           {/* Columna izquierda: la lista — angosta, como el formulario de
               Personalización — según la vista, el día elegido o todas las
               canceladas. En mobile va primero el calendario (se elige el día

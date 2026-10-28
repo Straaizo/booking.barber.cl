@@ -11,7 +11,7 @@ export function SelectorArchivo({ etiqueta, cargando, accept = 'image/*', multip
   const id = useId()
   return (
     <label
-      className={`versalitas inline-flex w-fit cursor-pointer items-center gap-2 rounded-md border border-gris-calido-200 px-3 py-2 text-xs text-gris-calido-700 transition-colors hover:border-cobre hover:text-cobre-texto ${className}`}
+      className={`versalitas inline-flex w-fit cursor-pointer items-center gap-2 min-h-11 rounded-md border border-gris-calido-200 px-3 py-2 text-[14px] text-gris-calido-700 md:min-h-0 md:text-xs transition-colors hover:border-cobre hover:text-cobre-texto ${className}`}
     >
       {cargando ? 'Subiendo…' : etiqueta}
       <input id={id} type="file" accept={accept} multiple={multiple} onChange={onChange} className="hidden" />

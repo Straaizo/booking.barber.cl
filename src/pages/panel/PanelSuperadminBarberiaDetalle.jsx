@@ -43,7 +43,24 @@ function textoDiasHasta(dias) {
 }
 
 const CLASE_INPUT =
-  'min-h-11 min-w-0 border-b border-gris-calido-200 bg-transparent py-1 text-negro-barbero outline-none transition-colors focus:border-cobre'
+  'min-h-11 min-w-0 border-b border-gris-calido-200 bg-transparent py-1 text-negro-barbero outline-none transition-colors focus:border-cobre max-md:min-h-12 max-md:rounded-xl max-md:border max-md:bg-white max-md:px-3.5'
+
+// En el celular todo va con prefijo `max-md:` para que el escritorio quede
+// idéntico. `versalitas` no se puede sobreescribir por breakpoint (es CSS
+// propio, fuera de las capas de Tailwind), por eso acá va desarmada.
+const ETIQUETA_SECCION =
+  'text-xs font-semibold uppercase tracking-[0.07em] text-cobre max-md:text-[13px] max-md:tracking-[0.06em] max-md:text-gris-calido-500'
+const ETIQUETA_CAMPO =
+  'text-xs font-semibold uppercase tracking-[0.07em] text-gris-calido-500 max-md:text-[13px] max-md:tracking-[0.06em]'
+const TEXTO_USUARIO =
+  'text-xs font-semibold uppercase tracking-[0.07em] max-md:text-[14px] max-md:font-normal max-md:normal-case max-md:tracking-normal'
+const BOTON_PRIMARIO = 'w-fit max-md:min-h-12 max-md:w-full max-md:rounded-xl max-md:text-base'
+const CLASE_SELECT =
+  'min-h-11 border-b border-gris-calido-200 bg-transparent py-2 text-negro-barbero outline-none transition-colors focus:border-cobre max-md:min-h-12 max-md:w-full max-md:rounded-xl max-md:border max-md:bg-hueso/60 max-md:px-3.5'
+const TARJETA_CUENTA =
+  'flex flex-wrap items-center justify-between gap-4 rounded-lg border border-gris-calido-200 bg-white p-5 max-md:flex-nowrap max-md:gap-3 max-md:rounded-2xl max-md:py-3 max-md:pl-4 max-md:pr-1.5'
+const BOTON_LAPIZ =
+  'text-gris-calido-500 transition-colors hover:text-cobre-texto max-md:flex max-md:h-11 max-md:w-11 max-md:shrink-0 max-md:items-center max-md:justify-center'
 
 // Mismo mínimo que valida la Edge Function `gestionar-usuario` (fuente de
 // verdad real) — repetido en cada formulario de esta pantalla solo para
@@ -115,7 +132,7 @@ function ModalEditarCuenta({
       {onGuardarNombre && (
         <form onSubmit={guardarNombre} className="flex flex-col gap-3 border-b border-gris-calido-100 pb-4">
           <label className="flex flex-col gap-1">
-            <span className="versalitas text-xs text-gris-calido-500">Nombre</span>
+            <span className={ETIQUETA_CAMPO}>Nombre</span>
             <input
               type="text"
               name="nombre"
@@ -132,7 +149,7 @@ function ModalEditarCuenta({
             as="button"
             type="submit"
             disabled={estadoNombre === 'guardando' || nombreEditado.trim() === nombre}
-            className="w-fit"
+            className={BOTON_PRIMARIO}
           >
             {estadoNombre === 'guardando' ? 'Guardando…' : 'Guardar nombre'}
           </Button>
@@ -144,12 +161,12 @@ function ModalEditarCuenta({
           )}
         </form>
       )}
-      <p className={onGuardarNombre ? 'mt-4 versalitas text-xs text-gris-calido-500' : 'versalitas text-xs text-gris-calido-500'}>
+      <p className={`${TEXTO_USUARIO} text-gris-calido-500 ${onGuardarNombre ? 'mt-4' : ''}`}>
         Usuario: {usuario}
       </p>
       <form onSubmit={guardar} className="mt-4 flex flex-col gap-3">
         <label className="flex flex-col gap-1">
-          <span className="versalitas text-xs text-gris-calido-500">Nueva contraseña</span>
+          <span className={ETIQUETA_CAMPO}>Nueva contraseña</span>
           <input
             type="text"
             name="password"
@@ -160,7 +177,7 @@ function ModalEditarCuenta({
             className={CLASE_INPUT}
           />
         </label>
-        <Button as="button" type="submit" disabled={estado === 'guardando'} className="w-fit">
+        <Button as="button" type="submit" disabled={estado === 'guardando'} className={BOTON_PRIMARIO}>
           {estado === 'guardando' ? 'Guardando…' : 'Guardar contraseña'}
         </Button>
         {estado === 'guardado' && <p className="text-sm text-verde-barberia">Contraseña actualizada.</p>}
@@ -181,13 +198,13 @@ function ModalEditarCuenta({
             mismo (mismo motivo que "no hagas confirm() nativo del navegador":
             se ve y se siente como el resto de la app). */}
         {confirmandoEliminar ? (
-          <div className="flex flex-wrap items-center gap-3">
-            <span className="text-xs text-gris-calido-700">¿Eliminar esta cuenta?</span>
+          <div className="flex flex-wrap items-center gap-3 max-md:gap-x-5 max-md:gap-y-1">
+            <span className="text-xs text-gris-calido-700 max-md:basis-full max-md:text-[15px]">¿Eliminar esta cuenta?</span>
             <button
               type="button"
               onClick={onEliminar}
               disabled={eliminando}
-              className="versalitas text-xs font-semibold text-red-700 transition-colors hover:text-red-800 disabled:opacity-50"
+              className="versalitas text-xs font-semibold text-red-700 transition-colors hover:text-red-800 disabled:opacity-50 max-md:min-h-11 max-md:text-[13px]"
             >
               {eliminando ? 'Eliminando…' : 'Sí, eliminar'}
             </button>
@@ -195,7 +212,7 @@ function ModalEditarCuenta({
               type="button"
               onClick={() => setConfirmandoEliminar(false)}
               disabled={eliminando}
-              className="versalitas text-xs text-gris-calido-500 transition-colors hover:text-negro-barbero disabled:opacity-50"
+              className="versalitas text-xs text-gris-calido-500 transition-colors hover:text-negro-barbero disabled:opacity-50 max-md:min-h-11 max-md:text-[13px]"
             >
               Cancelar
             </button>
@@ -204,7 +221,7 @@ function ModalEditarCuenta({
           <button
             type="button"
             onClick={() => setConfirmandoEliminar(true)}
-            className="versalitas flex items-center gap-1.5 text-xs text-gris-calido-500 transition-colors hover:text-red-700"
+            className="versalitas flex items-center gap-1.5 text-xs text-gris-calido-500 transition-colors hover:text-red-700 max-md:min-h-11 max-md:text-[13px]"
           >
             <IconoPapelera className="h-3.5 w-3.5" />
             Eliminar cuenta
@@ -263,9 +280,9 @@ function SeccionCuentaDueno({ barberiaId }) {
 
   if (!cuenta) {
     return (
-      <div className="mt-3 flex flex-wrap items-center justify-between gap-4 rounded-lg border border-dashed border-cobre/40 bg-cobre/5 p-5">
-        <p className="text-sm text-gris-calido-700">Esta barbería todavía no tiene cuenta de dueño.</p>
-        <Button as="button" type="button" onClick={() => setModalCrearAbierto(true)} className="w-fit">
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-4 rounded-lg border border-dashed border-cobre/40 bg-cobre/5 p-5 max-md:rounded-2xl max-md:p-4">
+        <p className="text-sm text-gris-calido-700 max-md:text-[15px]">Esta barbería todavía no tiene cuenta de dueño.</p>
+        <Button as="button" type="button" onClick={() => setModalCrearAbierto(true)} className={BOTON_PRIMARIO}>
           + Crear cuenta
         </Button>
 
@@ -276,7 +293,7 @@ function SeccionCuentaDueno({ barberiaId }) {
         >
           <form onSubmit={crearCuenta} className="flex flex-col gap-3">
             <label className="flex flex-col gap-1">
-              <span className="versalitas text-xs text-gris-calido-500">Nombre del dueño</span>
+              <span className={ETIQUETA_CAMPO}>Nombre del dueño</span>
               <input
                 type="text"
                 name="nombre"
@@ -288,7 +305,7 @@ function SeccionCuentaDueno({ barberiaId }) {
               />
             </label>
             <label className="flex flex-col gap-1">
-              <span className="versalitas text-xs text-gris-calido-500">Contraseña</span>
+              <span className={ETIQUETA_CAMPO}>Contraseña</span>
               <input
                 type="text"
                 name="password"
@@ -298,7 +315,7 @@ function SeccionCuentaDueno({ barberiaId }) {
                 className={CLASE_INPUT}
               />
             </label>
-            <Button as="button" type="submit" disabled={crear.isPending} className="w-fit">
+            <Button as="button" type="submit" disabled={crear.isPending} className={BOTON_PRIMARIO}>
               {crear.isPending ? 'Creando…' : 'Crear cuenta'}
             </Button>
             {error && (
@@ -313,16 +330,16 @@ function SeccionCuentaDueno({ barberiaId }) {
   }
 
   return (
-    <div className="mt-3 flex flex-wrap items-center justify-between gap-4 rounded-lg border border-gris-calido-200 bg-white p-5">
-      <div className="flex flex-col gap-1">
-        <span className="font-medium text-negro-barbero">{cuenta.nombre}</span>
-        <span className="versalitas text-xs text-gris-calido-500">Usuario: {cuenta.usuario}</span>
+    <div className={`mt-3 ${TARJETA_CUENTA}`}>
+      <div className="flex flex-col gap-1 max-md:min-w-0 max-md:gap-0.5">
+        <span className="font-medium text-negro-barbero max-md:truncate max-md:text-[17px]">{cuenta.nombre}</span>
+        <span className={`${TEXTO_USUARIO} truncate text-gris-calido-500`}>Usuario: {cuenta.usuario}</span>
       </div>
       <button
         type="button"
         onClick={() => setModalEditarAbierto(true)}
         aria-label="Editar cuenta del dueño"
-        className="text-gris-calido-500 transition-colors hover:text-cobre-texto"
+        className={BOTON_LAPIZ}
       >
         <IconoLapiz className="h-5 w-5" />
       </button>
@@ -398,8 +415,8 @@ function FilaBarberoUsuario({ barbero, barberiaId }) {
   }
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-4 rounded-lg border border-gris-calido-200 bg-white p-5">
-      <div className="flex flex-col gap-1">
+    <div className={TARJETA_CUENTA}>
+      <div className="flex flex-col gap-1 max-md:min-w-0 max-md:gap-0.5">
         {editandoNombre ? (
           <form onSubmit={guardarNombreInline} className="flex items-center gap-2">
             <input
@@ -408,18 +425,18 @@ function FilaBarberoUsuario({ barbero, barberiaId }) {
               value={nombreEditado}
               onChange={(e) => setNombreEditado(e.target.value)}
               onBlur={guardarNombreInline}
-              className="min-h-9 border-b border-gris-calido-200 bg-transparent px-1 py-1 font-medium text-negro-barbero outline-none focus:border-cobre"
+              className="min-h-9 border-b border-gris-calido-200 bg-transparent px-1 py-1 font-medium text-negro-barbero outline-none focus:border-cobre max-md:min-h-11 max-md:w-full"
             />
           </form>
         ) : (
           <div className="flex items-center gap-2">
-            <span className="font-medium text-negro-barbero">{barbero.nombre}</span>
+            <span className="font-medium text-negro-barbero max-md:truncate max-md:text-[17px]">{barbero.nombre}</span>
             {!barbero.usuario && (
               <button
                 type="button"
                 onClick={() => setEditandoNombre(true)}
                 aria-label={`Editar nombre de ${barbero.nombre}`}
-                className="text-gris-calido-400 transition-colors hover:text-cobre-texto"
+                className="text-gris-calido-400 transition-colors hover:text-cobre-texto max-md:-m-3 max-md:p-3"
               >
                 <IconoLapiz className="h-3.5 w-3.5" />
               </button>
@@ -427,9 +444,9 @@ function FilaBarberoUsuario({ barbero, barberiaId }) {
           </div>
         )}
         {barbero.usuario ? (
-          <span className="versalitas text-xs text-gris-calido-500">Usuario: {barbero.usuario}</span>
+          <span className={`${TEXTO_USUARIO} truncate text-gris-calido-500`}>Usuario: {barbero.usuario}</span>
         ) : (
-          <span className="versalitas text-xs text-gris-calido-400">Sin cuenta creada</span>
+          <span className={`${TEXTO_USUARIO} text-gris-calido-400`}>Sin cuenta creada</span>
         )}
       </div>
 
@@ -439,7 +456,7 @@ function FilaBarberoUsuario({ barbero, barberiaId }) {
             type="button"
             onClick={() => setModalEditarAbierto(true)}
             aria-label={`Editar cuenta de ${barbero.nombre}`}
-            className="text-gris-calido-500 transition-colors hover:text-cobre-texto"
+            className={BOTON_LAPIZ}
           >
             <IconoLapiz className="h-5 w-5" />
           </button>
@@ -461,7 +478,7 @@ function FilaBarberoUsuario({ barbero, barberiaId }) {
           <button
             type="button"
             onClick={() => setModalCrearAbierto(true)}
-            className="versalitas text-xs text-cobre-texto transition-colors hover:text-cobre"
+            className="versalitas shrink-0 text-xs text-cobre-texto transition-colors hover:text-cobre max-md:min-h-11 max-md:px-2.5 max-md:text-[13px]"
           >
             + Crear cuenta
           </button>
@@ -473,7 +490,7 @@ function FilaBarberoUsuario({ barbero, barberiaId }) {
           >
             <form onSubmit={crear} className="flex flex-col gap-3">
               <label className="flex flex-col gap-1">
-                <span className="versalitas text-xs text-gris-calido-500">Contraseña</span>
+                <span className={ETIQUETA_CAMPO}>Contraseña</span>
                 <input
                   type="text"
                   name="password"
@@ -484,7 +501,7 @@ function FilaBarberoUsuario({ barbero, barberiaId }) {
                   className={CLASE_INPUT}
                 />
               </label>
-              <Button as="button" type="submit" disabled={crearCuenta.isPending} className="w-fit">
+              <Button as="button" type="submit" disabled={crearCuenta.isPending} className={BOTON_PRIMARIO}>
                 {crearCuenta.isPending ? 'Creando…' : 'Crear cuenta'}
               </Button>
               {error && (
@@ -532,7 +549,7 @@ function BotonNuevoBarbero({ barberiaId, limiteAlcanzado, maxBarberos, planNombr
 
   if (limiteAlcanzado) {
     return (
-      <p className="mt-3 text-sm text-gris-calido-700">
+      <p className="mt-3 text-sm text-gris-calido-700 max-md:text-[15px]">
         Esta barbería alcanzó el límite de <strong>{maxBarberos} barberos</strong> de su plan{' '}
         <strong>{planNombre}</strong>.
       </p>
@@ -544,7 +561,7 @@ function BotonNuevoBarbero({ barberiaId, limiteAlcanzado, maxBarberos, planNombr
       <button
         type="button"
         onClick={() => setAbierto(true)}
-        className="versalitas mt-3 text-xs text-cobre-texto transition-colors hover:text-cobre"
+        className="mt-3 text-xs font-semibold uppercase tracking-[0.07em] text-cobre-texto transition-colors hover:text-cobre max-md:flex max-md:min-h-12 max-md:w-full max-md:items-center max-md:justify-center max-md:rounded-xl max-md:border max-md:border-dashed max-md:border-cobre/40 max-md:text-[15px] max-md:normal-case max-md:tracking-normal"
       >
         + Nuevo barbero
       </button>
@@ -552,7 +569,7 @@ function BotonNuevoBarbero({ barberiaId, limiteAlcanzado, maxBarberos, planNombr
       <ModalFormulario abierto={abierto} onCerrar={() => setAbierto(false)} titulo="Nuevo barbero">
         <form onSubmit={crear} className="flex flex-col gap-3">
           <label className="flex flex-col gap-1">
-            <span className="versalitas text-xs text-gris-calido-500">Nombre del barbero</span>
+            <span className={ETIQUETA_CAMPO}>Nombre del barbero</span>
             <input
               type="text"
               name="nombre"
@@ -564,7 +581,7 @@ function BotonNuevoBarbero({ barberiaId, limiteAlcanzado, maxBarberos, planNombr
             />
           </label>
           <label className="flex flex-col gap-1">
-            <span className="versalitas text-xs text-gris-calido-500">Contraseña</span>
+            <span className={ETIQUETA_CAMPO}>Contraseña</span>
             <input
               type="text"
               name="password"
@@ -574,7 +591,7 @@ function BotonNuevoBarbero({ barberiaId, limiteAlcanzado, maxBarberos, planNombr
               className={CLASE_INPUT}
             />
           </label>
-          <Button as="button" type="submit" disabled={crearBarbero.isPending} className="w-fit">
+          <Button as="button" type="submit" disabled={crearBarbero.isPending} className={BOTON_PRIMARIO}>
             {crearBarbero.isPending ? 'Agregando…' : 'Agregar barbero'}
           </Button>
           {error && (
@@ -670,24 +687,29 @@ export function PanelSuperadminBarberiaDetalle() {
 
   return (
     <div>
-      <HoverLink href="/admin" className="text-sm font-medium text-gris-calido-600">
+      <HoverLink
+        href="/admin"
+        className="text-sm font-medium text-gris-calido-600 max-md:-my-2 max-md:py-2.5 max-md:text-[15px]"
+      >
         ← Volver a barberías
       </HoverLink>
 
-      <div className="mt-4 flex flex-wrap items-baseline justify-between gap-3">
-        <h1 className="font-display text-2xl font-light tracking-tight text-negro-barbero md:text-3xl">
+      <div className="mt-4 flex flex-wrap items-baseline justify-between gap-3 max-md:flex-col max-md:items-start max-md:gap-2">
+        <h1 className="font-display text-[28px] font-light leading-tight tracking-tight text-negro-barbero md:text-3xl md:leading-9">
           {barberia.nombre}
         </h1>
-        <span className={`versalitas text-xs ${TONO_ESTADO[barberia.estado_id]}`}>
+        <span
+          className={`versalitas text-xs ${TONO_ESTADO[barberia.estado_id]} max-md:order-first max-md:rounded-full max-md:border max-md:border-current/30 max-md:px-2.5 max-md:py-1 max-md:text-[11px]`}
+        >
           {NOMBRE_ESTADO[barberia.estado_id]}
         </span>
       </div>
-      <p className="versalitas mt-1 text-xs text-gris-calido-500">
+      <p className="mt-1 text-xs font-semibold uppercase tracking-[0.07em] text-gris-calido-500 max-md:text-[15px] max-md:font-normal max-md:normal-case max-md:tracking-normal">
         bookingbarber.cl/{barberia.slug}
       </p>
 
       {barberia.estado_id === ESTADO_ACTIVO && barberia.fecha_activacion && (
-        <p className="mt-3 text-sm text-gris-calido-700">
+        <p className="mt-3 text-sm text-gris-calido-700 max-md:text-[15px]">
           Próximo pago{' '}
           <strong className="text-negro-barbero">
             {textoDiasHasta(diasHastaProximoPago(barberia.fecha_activacion))}
@@ -696,15 +718,15 @@ export function PanelSuperadminBarberiaDetalle() {
         </p>
       )}
 
-      <div className="mt-10 grid gap-10 md:grid-cols-2">
-        <section>
-          <span className="versalitas text-xs text-cobre">— Plan contratado</span>
-          <div className="mt-3 flex items-center gap-4">
+      <div className="mt-10 grid gap-10 md:grid-cols-2 max-md:mt-6 max-md:gap-4">
+        <section className="max-md:rounded-2xl max-md:border max-md:border-gris-calido-200 max-md:bg-white max-md:p-4">
+          <span className={ETIQUETA_SECCION}>— Plan contratado</span>
+          <div className="mt-3 flex items-center gap-4 max-md:flex-wrap max-md:gap-2">
             <select
               name="plan_id"
               value={barberia.plan_id ?? ''}
               onChange={(e) => cambiarPlanDe(Number(e.target.value))}
-              className="min-h-11 border-b border-gris-calido-200 bg-transparent py-2 text-negro-barbero outline-none transition-colors focus:border-cobre"
+              className={CLASE_SELECT}
             >
               {planes?.map((plan) => (
                 <option key={plan.id} value={plan.id}>
@@ -713,10 +735,10 @@ export function PanelSuperadminBarberiaDetalle() {
               ))}
             </select>
             {cambiarPlan.isPending && (
-              <span className="versalitas text-xs text-gris-calido-500">Guardando…</span>
+              <span className={ETIQUETA_CAMPO}>Guardando…</span>
             )}
           </div>
-          <p className="mt-2 text-xs text-gris-calido-500">
+          <p className="mt-2 text-xs text-gris-calido-500 max-md:text-[14px]">
             Máximo {barberia.planes?.max_barberos} barberos con este plan.
           </p>
           {errorPlan && (
@@ -726,14 +748,14 @@ export function PanelSuperadminBarberiaDetalle() {
           )}
         </section>
 
-        <section>
-          <span className="versalitas text-xs text-cobre">— Cambiar estado</span>
+        <section className="max-md:rounded-2xl max-md:border max-md:border-gris-calido-200 max-md:bg-white max-md:p-4">
+          <span className={ETIQUETA_SECCION}>— Cambiar estado</span>
           <form onSubmit={confirmarCambioEstado} className="mt-3 flex flex-col gap-4">
             <select
               name="estado_destino"
               value={estadoDestino}
               onChange={(e) => setEstadoDestino(e.target.value)}
-              className="min-h-11 border-b border-gris-calido-200 bg-transparent py-2 text-negro-barbero outline-none transition-colors focus:border-cobre"
+              className={CLASE_SELECT}
             >
               <option value="">Selecciona el nuevo estado</option>
               {Object.entries(NOMBRE_ESTADO)
@@ -746,18 +768,18 @@ export function PanelSuperadminBarberiaDetalle() {
             </select>
             {!activandoAhora && (
               <label className="flex flex-col gap-2">
-                <span className="versalitas text-xs text-gris-calido-500">Motivo (obligatorio)</span>
+                <span className={ETIQUETA_CAMPO}>Motivo (obligatorio)</span>
                 <textarea
                   name="motivo"
                   value={motivo}
                   onChange={(e) => setMotivo(e.target.value)}
                   rows={2}
                   placeholder="Ej: atraso de pago de 2 meses"
-                  className="border-b border-gris-calido-200 bg-transparent py-2 text-sm text-negro-barbero outline-none transition-colors focus:border-cobre"
+                  className="border-b border-gris-calido-200 bg-transparent py-2 text-sm text-negro-barbero outline-none transition-colors focus:border-cobre max-md:rounded-xl max-md:border max-md:bg-hueso/60 max-md:px-3.5 max-md:py-3"
                 />
               </label>
             )}
-            <Button as="button" type="submit" disabled={cambiarEstado.isPending} className="w-fit">
+            <Button as="button" type="submit" disabled={cambiarEstado.isPending} className={BOTON_PRIMARIO}>
               {cambiarEstado.isPending ? 'Guardando…' : 'Confirmar cambio'}
             </Button>
             {errorEnvio && (
@@ -769,20 +791,20 @@ export function PanelSuperadminBarberiaDetalle() {
         </section>
       </div>
 
-      <div className="mt-10 border-t border-gris-calido-200 pt-6">
-        <span className="versalitas text-xs text-cobre">— Usuarios</span>
-        <p className="mt-2 max-w-lg text-sm text-gris-calido-700">
+      <div className="mt-10 border-t border-gris-calido-200 pt-6 max-md:mt-8 max-md:border-t-0 max-md:pt-0">
+        <span className={ETIQUETA_SECCION}>— Usuarios</span>
+        <p className="mt-2 max-w-lg text-sm text-gris-calido-700 max-md:text-[15px]">
           La cuenta del dueño entra al panel administrativo de esta barbería; cada barbero entra solo al
           suyo.
         </p>
 
         <div className="mt-5">
-          <span className="versalitas text-xs text-gris-calido-500">Dueño</span>
+          <span className={ETIQUETA_CAMPO}>Dueño</span>
           <SeccionCuentaDueno barberiaId={id} />
         </div>
 
         <div className="mt-6">
-          <span className="versalitas text-xs text-gris-calido-500">Barberos</span>
+          <span className={ETIQUETA_CAMPO}>Barberos</span>
 
           {cargandoBarberos && (
             <div className="py-8">
@@ -791,11 +813,11 @@ export function PanelSuperadminBarberiaDetalle() {
           )}
 
           {barberos && barberos.length === 0 && (
-            <p className="mt-3 text-sm text-gris-calido-700">Esta barbería todavía no tiene barberos cargados.</p>
+            <p className="mt-3 text-sm text-gris-calido-700 max-md:text-[15px]">Esta barbería todavía no tiene barberos cargados.</p>
           )}
 
           {barberos && barberos.length > 0 && (
-            <div className="mt-3 flex flex-col gap-3">
+            <div className="mt-3 flex flex-col gap-3 max-md:gap-2">
               {barberos.map((barbero) => (
                 <FilaBarberoUsuario key={barbero.id} barbero={barbero} barberiaId={id} />
               ))}
@@ -815,8 +837,8 @@ export function PanelSuperadminBarberiaDetalle() {
         </div>
       </div>
 
-      <div className="mt-10 border-t border-gris-calido-200 pt-6">
-        <span className="versalitas text-xs text-cobre">— Historial de estados</span>
+      <div className="mt-10 border-t border-gris-calido-200 pt-6 max-md:mt-8 max-md:border-t-0 max-md:pt-0">
+        <span className={ETIQUETA_SECCION}>— Historial de estados</span>
 
         {cargandoHistorial && (
           <div className="py-8">
@@ -825,24 +847,26 @@ export function PanelSuperadminBarberiaDetalle() {
         )}
 
         {historial && historial.length === 0 && (
-          <p className="py-6 text-sm text-gris-calido-700">Sin cambios de estado registrados.</p>
+          <p className="py-6 text-sm text-gris-calido-700 max-md:mt-3 max-md:rounded-2xl max-md:border max-md:border-gris-calido-200 max-md:bg-white max-md:p-4 max-md:text-[15px] max-md:text-gris-calido-500">
+            Sin cambios de estado registrados.
+          </p>
         )}
 
         {historial && historial.length > 0 && (
-          <div className="mt-4">
+          <div className="mt-4 max-md:mt-3 max-md:rounded-2xl max-md:border max-md:border-gris-calido-200 max-md:bg-white max-md:px-4">
             {historial.map((evento) => (
-              <div key={evento.id} className="border-b border-gris-calido-200 py-4">
+              <div key={evento.id} className="border-b border-gris-calido-200 py-4 max-md:last:border-b-0">
                 <div className="flex flex-wrap items-baseline justify-between gap-2">
-                  <span className="text-sm text-negro-barbero">
+                  <span className="text-sm text-negro-barbero max-md:text-[15px]">
                     {NOMBRE_ESTADO[evento.estado_anterior_id] ?? '—'} →{' '}
                     <strong>{NOMBRE_ESTADO[evento.estado_nuevo_id]}</strong>
                   </span>
-                  <span className="numeros-tabulares text-xs text-gris-calido-500">
+                  <span className="numeros-tabulares text-xs text-gris-calido-500 max-md:text-[13px]">
                     {formatoFecha(evento.created_at)}
                   </span>
                 </div>
-                <p className="mt-1 text-sm text-gris-calido-700">{evento.motivo}</p>
-                <p className="versalitas mt-1 text-xs text-gris-calido-400">
+                <p className="mt-1 text-sm text-gris-calido-700 max-md:text-[15px]">{evento.motivo}</p>
+                <p className="mt-1 text-xs font-semibold uppercase tracking-[0.07em] text-gris-calido-400 max-md:text-[13px] max-md:font-normal max-md:normal-case max-md:tracking-normal">
                   por {evento.usuarios?.nombre ?? 'usuario eliminado'}
                 </p>
               </div>

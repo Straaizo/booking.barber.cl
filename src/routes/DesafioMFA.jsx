@@ -51,11 +51,11 @@ export function DesafioMFA({ factorId, onVerificado }) {
           </span>
         </div>
 
-        <span className="versalitas mt-6 block text-xs text-cobre-texto">— Verificación de seguridad</span>
-        <h1 className="font-display mt-2 text-2xl font-light tracking-tight text-negro-barbero">
+        <span className="mt-6 block text-xs font-semibold uppercase tracking-[0.07em] text-cobre-texto max-md:text-[13px] max-md:tracking-[0.06em]">— Verificación de seguridad</span>
+        <h1 className="font-display mt-2 text-2xl font-light tracking-tight text-negro-barbero max-md:text-[28px] max-md:leading-tight">
           Verificación en dos pasos
         </h1>
-        <p className="mx-auto mt-2 max-w-xs text-sm text-gris-calido-500">
+        <p className="mx-auto mt-2 max-w-xs text-sm text-gris-calido-500 max-md:text-[15px]">
           Ingresa el código de 6 dígitos de tu app de autenticación.
         </p>
 
@@ -66,17 +66,17 @@ export function DesafioMFA({ factorId, onVerificado }) {
             deshabilitado={verificando}
           />
           {error && (
-            <p role="alert" className="text-sm text-red-700">
+            <p role="alert" className="text-sm text-red-700 max-md:text-[15px]">
               {error}
             </p>
           )}
-          {verificando && <p className="versalitas text-xs text-gris-calido-400">Verificando…</p>}
+          {verificando && <p className="versalitas text-xs text-gris-calido-400 max-md:text-[13px]">Verificando…</p>}
         </div>
 
         <button
           type="button"
           onClick={cerrarSesion}
-          className="versalitas mt-8 text-xs text-gris-calido-500 hover:text-negro-barbero"
+          className="versalitas mt-8 text-xs text-gris-calido-500 hover:text-negro-barbero max-md:min-h-11 max-md:px-4 max-md:text-[13px]"
         >
           Cerrar sesión
         </button>

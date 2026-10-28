@@ -210,7 +210,7 @@ function TarjetaBarbero({
           type="button"
           onClick={onDarDeBaja}
           disabled={dandoDeBaja}
-          className="versalitas flex items-center gap-1.5 text-xs text-gris-calido-500 transition-colors hover:text-red-700 disabled:opacity-50 max-md:min-h-11 max-md:grow max-md:basis-[40%] max-md:justify-center max-md:gap-2 max-md:rounded-xl max-md:border max-md:border-red-200 max-md:font-sans max-md:text-[15px] max-md:font-normal max-md:normal-case max-md:tracking-normal max-md:text-red-700 max-md:active:bg-red-50"
+          className="flex items-center gap-1.5 text-xs text-gris-calido-500 transition-colors hover:text-red-700 disabled:opacity-50 md:font-semibold md:uppercase md:tracking-[0.07em] max-md:min-h-11 max-md:grow max-md:basis-[40%] max-md:justify-center max-md:gap-2 max-md:rounded-xl max-md:border max-md:border-red-200 max-md:text-[15px] max-md:text-red-700 max-md:active:bg-red-50"
         >
           <IconoPapelera className="h-3.5 w-3.5 max-md:h-4 max-md:w-4" />
           {dandoDeBaja ? 'Dando de baja…' : 'Dar de baja'}
@@ -254,6 +254,9 @@ export function PanelBarberos() {
   const [barberoDandoDeBaja, setBarberoDandoDeBaja] = useState(null)
   const [usuarioCreado, setUsuarioCreado] = useState(null)
   const [errorActivo, setErrorActivo] = useState(null)
+  // Solo celular: el alta de barbero vive en una hoja inferior en vez de un
+  // formulario siempre visible al final de la página.
+  const [modalNuevoAbierto, setModalNuevoAbierto] = useState(false)
 
   // Reactivar a un barbero con el interruptor puede chocar con el límite de
   // barberos del plan (no solo crear uno nuevo) — antes esta mutación era
@@ -310,30 +313,85 @@ export function PanelBarberos() {
       const nuevo = await crearBarbero.mutateAsync({ nombre: nombreNuevo.trim(), password: passwordNueva.trim() })
       setNombreNuevo('')
       setPasswordNueva('')
+      setModalNuevoAbierto(false)
       if (nuevo.usuario) setUsuarioCreado({ nombre: nuevo.nombre, usuario: nuevo.usuario })
     } catch {
       setErrorEnvio('No pudimos agregar el barbero. Intenta de nuevo.')
     }
   }
 
+  function renderFormularioNuevo(enModal) {
+    return (
+      <form
+        onSubmit={agregarBarbero}
+        className={enModal ? 'flex flex-col gap-5' : 'flex flex-col gap-4 sm:flex-row sm:items-end'}
+      >
+        <label className="flex min-w-0 flex-1 flex-col gap-1">
+          <span className="versalitas text-xs text-gris-calido-500 max-md:text-[13px]">Nombre del nuevo barbero</span>
+          <input
+            type="text"
+            name="nombre_nuevo"
+            value={nombreNuevo}
+            onChange={(evento) => setNombreNuevo(evento.target.value)}
+            placeholder="Nombre y apellido"
+            className="min-h-11 border-b border-gris-calido-200 bg-transparent py-1 text-negro-barbero outline-none transition-colors focus:border-cobre max-md:min-h-12"
+          />
+        </label>
+        <label className={`flex min-w-0 flex-1 flex-col gap-1 ${enModal ? '' : 'sm:max-w-[12rem]'}`}>
+          <span className="versalitas text-xs text-gris-calido-500 max-md:text-[13px]">Contraseña</span>
+          <input
+            type="text"
+            name="password_nueva"
+            value={passwordNueva}
+            onChange={(evento) => setPasswordNueva(evento.target.value)}
+            placeholder="Con la que va a entrar"
+            className="min-h-11 border-b border-gris-calido-200 bg-transparent py-1 text-negro-barbero outline-none transition-colors focus:border-cobre max-md:min-h-12"
+          />
+          {enModal && (
+            <span className="mt-1 text-[13px] text-gris-calido-500">
+              Mínimo {LARGO_MINIMO_PASSWORD} caracteres. Con esto y su usuario entra a su panel.
+            </span>
+          )}
+        </label>
+        <Button
+          as="button"
+          type="submit"
+          disabled={crearBarbero.isPending}
+          className={enModal ? 'mt-1 min-h-12 w-full rounded-xl py-3 text-base' : 'sm:w-auto'}
+        >
+          {crearBarbero.isPending ? 'Agregando…' : 'Agregar barbero'}
+        </Button>
+        {enModal && errorEnvio && (
+          <p role="alert" className="text-[15px] text-red-700">
+            {errorEnvio}
+          </p>
+        )}
+      </form>
+    )
+  }
+
   return (
     <div>
-      <div className="flex flex-wrap items-baseline justify-between gap-3">
-        <h1 className="font-display text-2xl font-light tracking-tight text-negro-barbero md:text-3xl">
+      <div className="flex flex-wrap items-baseline justify-between gap-3 max-md:items-center">
+        <h1 className="font-display text-2xl font-light tracking-tight text-negro-barbero md:text-3xl max-md:text-[28px] max-md:leading-tight">
           Barberos
         </h1>
         {maxBarberos !== null && (
-          <span className="inline-flex items-center gap-2 rounded-full border border-gris-calido-200 bg-hueso px-3 py-1.5">
-            <span className="numeros-tabulares text-sm font-semibold text-negro-barbero">
+          <span className="inline-flex items-center gap-2 rounded-full border border-gris-calido-200 bg-hueso px-3 py-1.5 max-md:gap-1.5 max-md:bg-white">
+            <span className="numeros-tabulares text-sm font-semibold text-negro-barbero max-md:text-[15px]">
               {totalBarberos}/{maxBarberos}
             </span>
-            <span className="versalitas text-xs text-gris-calido-500">
+            <span className="versalitas text-xs text-gris-calido-500 max-md:hidden">
               barberos · plan {barberia?.planes?.nombre}
             </span>
+            <span className="text-[13px] text-gris-calido-500 md:hidden">· plan {barberia?.planes?.nombre}</span>
           </span>
         )}
       </div>
-      <p className="mt-2 max-w-lg text-sm text-gris-calido-700">
+      <p className="mt-1.5 text-[15px] leading-snug text-gris-calido-500 md:hidden">
+        Foto y especialidad se muestran en tu página pública.
+      </p>
+      <p className="mt-2 max-w-lg text-sm text-gris-calido-700 max-md:hidden">
         La foto y la especialidad de cada barbero aparecen en tu página pública, en la sección
         "Nuestro equipo". El usuario y la contraseña son con los que cada barbero entra a su propio
         panel.
@@ -344,7 +402,7 @@ export function PanelBarberos() {
         </p>
       )}
 
-      <div className="mt-8">
+      <div className="mt-8 max-md:mt-6">
         {isLoading && (
           <div className="py-12">
             <Loader label="Cargando barberos" />
@@ -364,7 +422,7 @@ export function PanelBarberos() {
         )}
 
         {barberos && barberos.length > 0 && (
-          <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-4 max-md:gap-3">
             {barberos.map((barbero) => (
               <TarjetaBarbero
                 key={barbero.id}
@@ -382,7 +440,26 @@ export function PanelBarberos() {
         )}
       </div>
 
-      <div className="mt-8">
+      {/* Celular: botón principal que abre la hoja inferior con el alta. */}
+      <div className="mt-6 md:hidden">
+        {limiteAlcanzado ? (
+          <p className="rounded-2xl border border-dashed border-cobre/40 bg-cobre/5 p-4 text-[15px] text-gris-calido-700">
+            Alcanzaste el límite de <strong>{maxBarberos} barberos</strong> de tu plan{' '}
+            <strong>{barberia?.planes?.nombre}</strong>. Para agregar más, actualiza tu plan.
+          </p>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setModalNuevoAbierto(true)}
+            className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-cobre-oscuro text-base font-semibold text-hueso active:brightness-110"
+          >
+            <span aria-hidden="true" className="text-xl leading-none">+</span>
+            Nuevo barbero
+          </button>
+        )}
+      </div>
+
+      <div className="mt-8 hidden md:block">
         <span className="versalitas text-xs text-cobre">— Nuevo barbero</span>
         <div className="mt-3 rounded-lg border border-dashed border-cobre/40 bg-cobre/5 p-5">
           {limiteAlcanzado ? (
@@ -391,33 +468,7 @@ export function PanelBarberos() {
               <strong>{barberia?.planes?.nombre}</strong>. Para agregar más, actualiza tu plan.
             </p>
           ) : (
-            <form onSubmit={agregarBarbero} className="flex flex-col gap-4 sm:flex-row sm:items-end">
-              <label className="flex min-w-0 flex-1 flex-col gap-1">
-                <span className="versalitas text-xs text-gris-calido-500">Nombre del nuevo barbero</span>
-                <input
-                  type="text"
-                  name="nombre_nuevo"
-                  value={nombreNuevo}
-                  onChange={(evento) => setNombreNuevo(evento.target.value)}
-                  placeholder="Nombre y apellido"
-                  className="min-h-11 border-b border-gris-calido-200 bg-transparent py-1 text-negro-barbero outline-none transition-colors focus:border-cobre"
-                />
-              </label>
-              <label className="flex min-w-0 flex-1 flex-col gap-1 sm:max-w-[12rem]">
-                <span className="versalitas text-xs text-gris-calido-500">Contraseña</span>
-                <input
-                  type="text"
-                  name="password_nueva"
-                  value={passwordNueva}
-                  onChange={(evento) => setPasswordNueva(evento.target.value)}
-                  placeholder="Con la que va a entrar"
-                  className="min-h-11 border-b border-gris-calido-200 bg-transparent py-1 text-negro-barbero outline-none transition-colors focus:border-cobre"
-                />
-              </label>
-              <Button as="button" type="submit" disabled={crearBarbero.isPending} className="sm:w-auto">
-                {crearBarbero.isPending ? 'Agregando…' : 'Agregar barbero'}
-              </Button>
-            </form>
+            renderFormularioNuevo(false)
           )}
           {errorEnvio && (
             <p role="alert" className="mt-3 text-sm text-red-700">
@@ -433,9 +484,9 @@ export function PanelBarberos() {
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0 }}
-            className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-verde-barberia/40 bg-verde-barberia/5 p-4"
+            className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-verde-barberia/40 bg-verde-barberia/5 p-4 max-md:rounded-2xl"
           >
-            <p className="text-sm text-negro-barbero">
+            <p className="text-sm text-negro-barbero max-md:text-[15px]">
               {usuarioCreado.nombre} ya puede entrar a su panel con el usuario{' '}
               <strong className="numeros-tabulares font-semibold">{usuarioCreado.usuario}</strong> y la
               contraseña que le pusiste.
@@ -443,13 +494,17 @@ export function PanelBarberos() {
             <button
               type="button"
               onClick={() => setUsuarioCreado(null)}
-              className="versalitas shrink-0 text-xs text-gris-calido-500 transition-colors hover:text-negro-barbero"
+              className="versalitas shrink-0 text-xs text-gris-calido-500 transition-colors hover:text-negro-barbero max-md:min-h-11 max-md:w-full max-md:rounded-xl max-md:border max-md:border-gris-calido-200 max-md:bg-white max-md:text-[13px]"
             >
               Cerrar
             </button>
           </motion.div>
         )}
       </AnimatePresence>
+
+      <ModalFormulario abierto={modalNuevoAbierto} titulo="Nuevo barbero" onCerrar={() => setModalNuevoAbierto(false)}>
+        {renderFormularioNuevo(true)}
+      </ModalFormulario>
 
       <ModalConfirmacion
         abierto={Boolean(barberoDandoDeBaja)}

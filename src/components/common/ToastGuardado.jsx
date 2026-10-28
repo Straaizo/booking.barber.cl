@@ -6,7 +6,7 @@ import { EASE_ENTRADA, EASE_SALIDA, DURACION_MICRO } from '../animations/easing'
 // "guardado" (o a un error), sin que haya que ir a buscarla en la pantalla.
 export function ToastGuardado({ estado }) {
   return (
-    <div className="pointer-events-none fixed inset-x-0 bottom-6 z-50 flex justify-center px-4 md:justify-end md:pr-10">
+    <div className="pointer-events-none fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+5rem)] z-50 flex justify-center px-4 md:bottom-6 md:justify-end md:pr-10">
       <AnimatePresence>
         {estado && (
           <motion.div

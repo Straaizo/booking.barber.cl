@@ -56,7 +56,7 @@ export function SeccionNotificaciones() {
   return (
     // En el celular: grupo tipo Ajustes de iOS (ver PanelCuenta).
     <section className="rounded-lg border border-gris-calido-200 bg-white p-5 max-md:flex max-md:flex-col max-md:rounded-none max-md:border-0 max-md:bg-transparent max-md:p-0">
-      <h2 className="versalitas text-xs text-cobre max-md:mb-2 max-md:px-1 max-md:font-sans max-md:text-[13px] max-md:tracking-[0.06em] max-md:text-gris-calido-500">
+      <h2 className="versalitas text-xs text-cobre max-md:mb-2 max-md:px-1 max-md:font-sans! max-md:text-[13px] max-md:tracking-[0.06em] max-md:text-gris-calido-500">
         Notificaciones
       </h2>
       <p

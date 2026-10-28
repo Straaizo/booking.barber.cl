@@ -6,8 +6,13 @@ import { useServiciosAdmin, useCrearServicio, useActualizarServicioAdmin } from 
 import { useBarberosAdmin } from './hooks/useBarberosAdmin'
 import { FilaServicioAdmin } from './components/FilaServicioAdmin'
 import { ModalAsignarBarberos } from './components/ModalAsignarBarberos'
+import { ModalFormulario } from '../../components/panel/ModalFormulario'
+import { useIsMobile } from '../../hooks/useIsMobile'
 
 const SERVICIO_VACIO = { nombre: '', duracion_minutos: '30', precio_clp: '', barbero_ids: [] }
+const ETIQUETA_MOVIL = 'text-[13px] font-semibold uppercase tracking-[0.06em] text-gris-calido-500'
+const CAMPO_MOVIL =
+  'numeros-tabulares min-h-12 w-full appearance-none rounded-xl [&::-webkit-inner-spin-button]:appearance-none border border-gris-calido-200 bg-white px-3.5 text-base text-negro-barbero outline-none transition-colors focus:border-cobre'
 
 export function PanelServicios() {
   const { perfil } = useAuth()
@@ -19,6 +24,8 @@ export function PanelServicios() {
   const [nuevo, setNuevo] = useState(SERVICIO_VACIO)
   const [errorEnvio, setErrorEnvio] = useState(null)
   const [modalBarberosAbierto, setModalBarberosAbierto] = useState(false)
+  const [hojaNuevoAbierta, setHojaNuevoAbierta] = useState(false)
+  const esMovil = useIsMobile()
 
   async function agregarServicio(evento) {
     evento.preventDefault()
@@ -39,9 +46,145 @@ export function PanelServicios() {
         barbero_ids: nuevo.barbero_ids,
       })
       setNuevo(SERVICIO_VACIO)
+      setHojaNuevoAbierta(false)
     } catch {
       setErrorEnvio('No pudimos crear el servicio. Intenta de nuevo.')
     }
+  }
+
+  const textoBarberosNuevo =
+    nuevo.barbero_ids.length === 0
+      ? 'Todos'
+      : (barberos ?? [])
+          .filter((barbero) => nuevo.barbero_ids.includes(barbero.id))
+          .map((barbero) => barbero.nombre)
+          .join(', ')
+
+  // En el celular: lista compacta de servicios (cada uno se despliega para
+  // editarlo) y "Nuevo servicio" como botón principal que abre una hoja inferior.
+  if (esMovil) {
+    return (
+      <div>
+        <h1 className="font-display text-[28px] font-light leading-tight tracking-tight text-negro-barbero">
+          Servicios
+        </h1>
+        <p className="mt-1 text-[15px] text-gris-calido-500">Toca uno para editarlo. Se guarda solo.</p>
+
+        <button
+          type="button"
+          onClick={() => setHojaNuevoAbierta(true)}
+          className="mt-5 min-h-12 w-full rounded-xl bg-cobre-oscuro text-base font-semibold text-hueso transition-[filter] active:brightness-110"
+        >
+          + Nuevo servicio
+        </button>
+
+        <div className="mt-6">
+          {isLoading && (
+            <div className="py-12">
+              <Loader label="Cargando servicios" />
+            </div>
+          )}
+          {isError && (
+            <p role="alert" className="py-4 text-[15px] text-red-700">
+              No pudimos cargar los servicios. Recarga la página o intenta más tarde.
+            </p>
+          )}
+          {servicios && servicios.length === 0 && (
+            <p className="py-4 text-[15px] text-gris-calido-700">Aún no tienes servicios. Crea el primero.</p>
+          )}
+          {servicios && servicios.length > 0 && (
+            <div className="divide-y divide-gris-calido-100 overflow-hidden rounded-2xl border border-gris-calido-200 bg-white">
+              {servicios.map((servicio) => (
+                <FilaServicioAdmin
+                  key={servicio.id}
+                  servicio={servicio}
+                  barberiaId={perfil.barberia_id}
+                  barberos={barberos}
+                  onGuardar={(cambios) => actualizarServicio.mutateAsync({ id: servicio.id, cambios })}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+
+        <ModalFormulario abierto={hojaNuevoAbierta} titulo="Nuevo servicio" onCerrar={() => setHojaNuevoAbierta(false)}>
+          <form onSubmit={agregarServicio} className="flex flex-col gap-4">
+            <label className="flex flex-col gap-1.5">
+              <span className={ETIQUETA_MOVIL}>Nombre</span>
+              <input
+                type="text"
+                name="nombre"
+                value={nuevo.nombre}
+                onChange={(e) => setNuevo((n) => ({ ...n, nombre: e.target.value }))}
+                placeholder="Ej: Corte + Barba"
+                className={CAMPO_MOVIL}
+              />
+            </label>
+            <div className="grid grid-cols-2 gap-3">
+              <label className="flex min-w-0 flex-col gap-1.5">
+                <span className={ETIQUETA_MOVIL}>Duración (min)</span>
+                <input
+                  type="number"
+                  min="0"
+                  inputMode="numeric"
+                  name="duracion_minutos"
+                  value={nuevo.duracion_minutos}
+                  onChange={(e) => setNuevo((n) => ({ ...n, duracion_minutos: e.target.value }))}
+                  className={CAMPO_MOVIL}
+                />
+              </label>
+              <label className="flex min-w-0 flex-col gap-1.5">
+                <span className={ETIQUETA_MOVIL}>Precio</span>
+                <input
+                  type="number"
+                  min="0"
+                  inputMode="numeric"
+                  name="precio_clp"
+                  value={nuevo.precio_clp}
+                  onChange={(e) => setNuevo((n) => ({ ...n, precio_clp: e.target.value }))}
+                  placeholder="12000"
+                  className={CAMPO_MOVIL}
+                />
+              </label>
+            </div>
+            <button
+              type="button"
+              onClick={() => setModalBarberosAbierto(true)}
+              className="flex min-h-14 items-center justify-between gap-3 rounded-xl border border-gris-calido-200 px-4 text-left"
+            >
+              <span className="shrink-0 text-base text-negro-barbero">Barberos</span>
+              <span className="flex min-w-0 items-center gap-1 text-[15px] text-gris-calido-500">
+                <span className="truncate">{textoBarberosNuevo}</span>
+                <span aria-hidden="true" className="text-lg leading-none text-gris-calido-400">
+                  ›
+                </span>
+              </span>
+            </button>
+            {errorEnvio && (
+              <p role="alert" className="text-[15px] text-red-700">
+                {errorEnvio}
+              </p>
+            )}
+            <button
+              type="submit"
+              disabled={crearServicio.isPending}
+              className="mt-2 min-h-12 w-full rounded-xl bg-cobre-oscuro text-base font-semibold text-hueso transition-[filter] active:brightness-110 disabled:opacity-60"
+            >
+              {crearServicio.isPending ? 'Creando…' : 'Crear servicio'}
+            </button>
+          </form>
+        </ModalFormulario>
+
+        <ModalAsignarBarberos
+          abierto={modalBarberosAbierto}
+          servicioNombre={nuevo.nombre.trim() || 'nuevo servicio'}
+          barberos={barberos}
+          barberoIds={nuevo.barbero_ids}
+          onGuardar={(barbero_ids) => setNuevo((n) => ({ ...n, barbero_ids }))}
+          onCerrar={() => setModalBarberosAbierto(false)}
+        />
+      </div>
+    )
   }
 
   return (

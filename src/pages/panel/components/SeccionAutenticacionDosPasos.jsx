@@ -105,7 +105,7 @@ export function SeccionAutenticacionDosPasos() {
     // En el celular: grupo tipo Ajustes de iOS (ver PanelCuenta) — la
     // explicación larga pasa a ser la nota de abajo del grupo.
     <section className="rounded-lg border border-gris-calido-200 bg-white p-5 max-md:flex max-md:flex-col max-md:rounded-none max-md:border-0 max-md:bg-transparent max-md:p-0">
-      <h2 className="versalitas text-xs text-cobre max-md:mb-2 max-md:px-1 max-md:font-sans max-md:text-[13px] max-md:tracking-[0.06em] max-md:text-gris-calido-500">
+      <h2 className="versalitas text-xs text-cobre max-md:mb-2 max-md:px-1 max-md:font-sans! max-md:text-[13px] max-md:tracking-[0.06em] max-md:text-gris-calido-500">
         Verificación en dos pasos
       </h2>
       <p className="mt-1 text-sm text-gris-calido-500 max-md:order-last max-md:mt-2 max-md:px-1 max-md:text-[13px] max-md:leading-snug">

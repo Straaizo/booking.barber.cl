@@ -83,7 +83,7 @@ export function ModalPosicionFoto({ abierto, fotoUrl, posicionInicial, onGuardar
   return (
     <ModalFormulario abierto={abierto} titulo="Ajustar foto" onCerrar={onCerrar}>
       <form onSubmit={guardar} className="flex flex-col gap-5">
-        <p className="text-sm text-gris-calido-600">Arrastrá la foto para centrarla donde quieras.</p>
+        <p className="text-sm text-gris-calido-600 max-md:text-[15px]">Arrastra la foto para centrarla donde quieras.</p>
 
         <div
           className="relative mx-auto cursor-grab overflow-hidden rounded-full border border-gris-calido-200 bg-gris-calido-100 active:cursor-grabbing"
@@ -123,7 +123,7 @@ export function ModalPosicionFoto({ abierto, fotoUrl, posicionInicial, onGuardar
 
         <button
           type="submit"
-          className="rounded-md bg-cobre-oscuro px-4 py-2.5 text-sm font-semibold text-hueso transition-[filter] hover:brightness-110"
+          className="rounded-md bg-cobre-oscuro px-4 py-2.5 text-sm font-semibold text-hueso transition-[filter] hover:brightness-110 max-md:min-h-12 max-md:rounded-xl max-md:text-base"
         >
           Guardar
         </button>

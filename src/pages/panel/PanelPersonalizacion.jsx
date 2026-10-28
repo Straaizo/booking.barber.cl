@@ -245,11 +245,21 @@ function resumenSeccion(seccion, cantidadBarberos, cantidadServicios) {
 function TituloGrupo({ numero, children }) {
   return (
     <div className="flex items-center gap-3 border-b border-cobre/25 pb-2">
-      <span className="numeros-tabulares text-xs text-cobre">{numero}</span>
-      <h2 className="versalitas text-xs text-gris-calido-700">{children}</h2>
+      <span className="numeros-tabulares text-xs text-cobre max-md:text-[13px]">{numero}</span>
+      <h2 className="versalitas text-xs text-gris-calido-700 max-md:text-[15px] max-md:text-negro-barbero">{children}</h2>
     </div>
   )
 }
+
+// Solo celular: chips pegajosos arriba para saltar entre los grupos del
+// formulario (es una página larga) sin tener que scrollear a ciegas.
+const GRUPOS_MOVIL = [
+  ['grupo-identidad', 'Identidad'],
+  ['grupo-textos', 'Textos'],
+  ['grupo-secciones', 'Secciones'],
+  ['grupo-reserva', 'Reserva'],
+  ['grupo-vista-previa', 'Vista previa'],
+]
 
 // Mismo botón de "+ Agregar sección" de siempre, salvo que si el tipo no
 // está disponible en el plan actual queda un candado en vez de un onClick —
@@ -260,7 +270,7 @@ function BotonAgregarSeccion({ etiqueta, disponible, onClick }) {
     return (
       <span
         title="Disponible desde el plan Estudio"
-        className="versalitas flex cursor-not-allowed items-center gap-1.5 rounded-md border border-dashed border-gris-calido-200 px-3 py-2 text-xs text-gris-calido-400"
+        className="versalitas flex cursor-not-allowed items-center gap-1.5 rounded-md border border-dashed border-gris-calido-200 px-3 py-2 text-xs text-gris-calido-400 max-md:min-h-11 max-md:text-[13px]"
       >
         <IconoCandado className="h-3 w-3" />+ {etiqueta}
       </span>
@@ -270,7 +280,7 @@ function BotonAgregarSeccion({ etiqueta, disponible, onClick }) {
     <button
       type="button"
       onClick={onClick}
-      className="versalitas rounded-md border border-gris-calido-200 px-3 py-2 text-xs text-gris-calido-700 hover:border-cobre hover:text-cobre-texto"
+      className="versalitas rounded-md border border-gris-calido-200 px-3 py-2 text-xs text-gris-calido-700 hover:border-cobre hover:text-cobre-texto max-md:min-h-11 max-md:text-[13px]"
     >
       + {etiqueta}
     </button>
@@ -297,7 +307,9 @@ export function PanelPersonalizacion() {
     typeof window !== 'undefined' && window.innerWidth < 768 ? 'movil' : 'pc'
   )
   const [alertaMovilCerrada, setAlertaMovilCerrada] = useState(false)
+  const [grupoVisible, setGrupoVisible] = useState(GRUPOS_MOVIL[0][0])
   const iframeRef = useRef(null)
+  const chipsRef = useRef(null)
 
   // En un celular real no tiene sentido ofrecer el modo "PC": el iframe en
   // ese modo fuerza un ancho mínimo de 768px para seguir siendo un layout de
@@ -307,6 +319,35 @@ export function PanelPersonalizacion() {
   useEffect(() => {
     if (esMobile) setModoVista('movil')
   }, [esMobile])
+
+  // Marca en los chips el grupo que está a la vista mientras se scrollea.
+  const formListo = Boolean(form)
+  useEffect(() => {
+    if (!esMobile || !formListo) return
+    const observador = new IntersectionObserver(
+      (entradas) => {
+        const visible = entradas.find((entrada) => entrada.isIntersecting)
+        if (visible) setGrupoVisible(visible.target.id)
+      },
+      { rootMargin: '-140px 0px -55% 0px' }
+    )
+    GRUPOS_MOVIL.forEach(([id]) => {
+      const elemento = document.getElementById(id)
+      if (elemento) observador.observe(elemento)
+    })
+    return () => observador.disconnect()
+  }, [esMobile, formListo])
+
+  useEffect(() => {
+    const fila = chipsRef.current
+    const chip = fila?.querySelector(`[data-grupo="${grupoVisible}"]`)
+    if (!fila || !chip) return
+    fila.scrollTo({ left: chip.offsetLeft - (fila.clientWidth - chip.offsetWidth) / 2, behavior: 'smooth' })
+  }, [grupoVisible])
+
+  function irAGrupo(id) {
+    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
 
   useEffect(() => {
     if (barberia) {
@@ -659,11 +700,27 @@ export function PanelPersonalizacion() {
           de las pestañas) — y todo tiene que alinearse al mismo borde
           izquierdo real de la página, título incluido, en vez de que el
           título quede más metido hacia el centro que el formulario de abajo. */}
-      <div className="relative left-1/2 right-1/2 -mx-[50vw] w-screen px-6 md:px-10">
-        <h1 className="font-display text-2xl font-light tracking-tight text-negro-barbero md:text-3xl">
-          Personalización
+      <div
+        className={`relative left-1/2 right-1/2 -mx-[50vw] w-screen px-6 md:px-10 max-md:static max-md:mx-0 max-md:w-auto max-md:px-0 ${
+          hayCambiosSinGuardar ? 'max-md:pb-20' : ''
+        }`}
+      >
+        <h1 className="font-display text-2xl font-light tracking-tight text-negro-barbero md:text-3xl max-md:text-[28px] max-md:leading-tight">
+          <span className="md:hidden">Mi página</span>
+          <span className="max-md:hidden">Personalización</span>
         </h1>
-        <p className="mt-2 max-w-lg text-sm text-gris-calido-700">
+        <p className="mt-1.5 text-[15px] leading-snug text-gris-calido-500 md:hidden">
+          Edita y revisa la vista previa al final.{' '}
+          <a
+            href={`/${barberia.slug}`}
+            target="_blank"
+            rel="noreferrer"
+            className="font-medium text-cobre-texto underline decoration-cobre/40 underline-offset-2"
+          >
+            Ver página pública
+          </a>
+        </p>
+        <p className="mt-2 max-w-lg text-sm text-gris-calido-700 max-md:hidden">
           Así se ve tu página pública. Cambia lo que quieras a la izquierda — la vista previa de al
           lado se actualiza al instante, con el mismo botón para ver cómo queda en PC o en el
           celular de un cliente, y recién queda pública cuando guardas.{' '}
@@ -673,7 +730,7 @@ export function PanelPersonalizacion() {
         </p>
 
         {esMobile && !alertaMovilCerrada && (
-          <div className="mt-4 flex items-start justify-between gap-3 rounded-md border border-cobre/40 bg-cobre/10 px-3 py-3 text-xs text-cobre-texto">
+          <div className="mt-4 flex items-start justify-between gap-3 rounded-md border border-cobre/40 bg-cobre/10 px-3 py-3 text-xs text-cobre-texto max-md:rounded-2xl max-md:py-2 max-md:pl-4 max-md:pr-1 max-md:text-[13px] max-md:leading-snug">
             <p>
               Estás viendo esto desde un dispositivo móvil. Te recomendamos usar un computador para
               tener una vista más clara al armar tu página — hay bastante para editar y comparar con
@@ -683,7 +740,7 @@ export function PanelPersonalizacion() {
               type="button"
               onClick={() => setAlertaMovilCerrada(true)}
               aria-label="Cerrar aviso"
-              className="shrink-0 text-cobre-texto/70 hover:text-cobre-texto"
+              className="shrink-0 text-cobre-texto/70 hover:text-cobre-texto max-md:flex max-md:h-11 max-md:w-11 max-md:items-center max-md:justify-center max-md:text-base"
             >
               ✕
             </button>
@@ -691,7 +748,7 @@ export function PanelPersonalizacion() {
         )}
 
         {hayCambiosSinGuardar && (
-          <p className="mt-4 flex items-center gap-2 rounded-md border border-cobre/40 bg-cobre/10 px-3 py-2 text-xs text-cobre-texto">
+          <p className="mt-4 flex items-center gap-2 rounded-md border border-cobre/40 bg-cobre/10 px-3 py-2 text-xs text-cobre-texto max-md:hidden">
             <span aria-hidden="true">●</span> Tienes cambios sin guardar — la página pública todavía
             muestra la versión anterior.
           </p>
@@ -699,29 +756,55 @@ export function PanelPersonalizacion() {
 
         {/* En pantallas chicas (debajo de `lg`) el grid cae a una sola
             columna — formulario y luego vista previa, como antes. */}
-        <form onSubmit={guardarCambios} className="mt-8">
+        <nav
+          aria-label="Grupos de la personalización"
+          className="sticky top-[calc(env(safe-area-inset-top)+3.5rem)] z-20 -mx-4 mt-4 border-b border-gris-calido-200 bg-hueso/95 backdrop-blur md:hidden"
+        >
+          <div ref={chipsRef} className="relative flex gap-2 overflow-x-auto px-4 py-2.5 [scrollbar-width:none]">
+            {GRUPOS_MOVIL.map(([id, etiqueta]) => (
+              <button
+                key={id}
+                type="button"
+                data-grupo={id}
+                onClick={() => irAGrupo(id)}
+                className={`min-h-10 shrink-0 rounded-full border px-4 text-[15px] transition-colors ${
+                  grupoVisible === id
+                    ? 'border-negro-barbero bg-negro-barbero text-hueso'
+                    : 'border-gris-calido-200 bg-white text-gris-calido-700'
+                }`}
+              >
+                {etiqueta}
+              </button>
+            ))}
+          </div>
+        </nav>
+
+        <form onSubmit={guardarCambios} className="mt-8 max-md:mt-5">
         <div className="grid gap-x-12 gap-y-10 lg:grid-cols-[480px_minmax(0,1fr)] lg:items-start">
           {/* Columna izquierda: formulario */}
-          <div className="flex max-w-lg flex-col gap-12 lg:max-w-none">
-          <section className="flex flex-col gap-6">
+          <div className="flex max-w-lg flex-col gap-12 lg:max-w-none max-md:min-w-0 max-md:gap-6">
+          <section id="grupo-identidad" className="flex flex-col gap-6 max-md:scroll-mt-32 max-md:rounded-2xl max-md:border max-md:border-gris-calido-200 max-md:bg-white max-md:p-4">
             <TituloGrupo numero="01">Identidad</TituloGrupo>
 
             <div className="flex flex-col gap-2">
-              <span className="versalitas text-xs text-gris-calido-500">Plantillas completas</span>
-              <p className="text-xs text-gris-calido-500">
+              <span className="versalitas text-xs text-gris-calido-500 max-md:text-[13px]">Plantillas completas</span>
+              <p className="text-[13px] leading-snug text-gris-calido-500 md:hidden">
+                Aplica paleta, tipografía y estilo juntos. Después puedes ajustar cada cosa.
+              </p>
+              <p className="text-xs text-gris-calido-500 max-md:hidden">
                 Un punto de partida real, no solo de color: aplica paleta, tipografía, estilo de
                 tarjetas y cómo se ven tus secciones, todo junto. Sin agregar ni sacar ninguna — solo
                 les cambia el estilo a las que ya tienes. Después sigues pudiendo ajustar cualquier
                 cosa por separado, campo por campo.
               </p>
-              <div className="flex flex-wrap gap-3">
+              <div className="flex flex-wrap gap-3 max-md:-mx-4 max-md:flex-nowrap max-md:overflow-x-auto max-md:px-4 max-md:pb-1 max-md:[scrollbar-width:none]">
                 {PLANTILLAS_COMPLETAS.map((plantilla) => (
                   <button
                     key={plantilla.nombre}
                     type="button"
                     onClick={() => aplicarPlantillaCompleta(plantilla)}
                     title={plantilla.descripcion}
-                    className="flex w-32 flex-col gap-2 rounded-md border border-gris-calido-200 p-3 text-left transition-colors hover:border-cobre"
+                    className="flex w-32 flex-col gap-2 rounded-md border border-gris-calido-200 p-3 text-left transition-colors hover:border-cobre max-md:w-36 max-md:shrink-0 max-md:rounded-xl max-md:active:border-cobre"
                   >
                     <span
                       className="h-10 w-full rounded"
@@ -729,8 +812,8 @@ export function PanelPersonalizacion() {
                         background: `linear-gradient(135deg, ${plantilla.color_primario || '#a85c32'} 50%, ${plantilla.color_header || '#1c1b19'} 50%)`,
                       }}
                     />
-                    <span className="text-xs font-medium text-negro-barbero">{plantilla.nombre}</span>
-                    <span className="text-[10px] leading-snug text-gris-calido-500">
+                    <span className="text-xs font-medium text-negro-barbero max-md:text-[15px]">{plantilla.nombre}</span>
+                    <span className="text-[10px] leading-snug text-gris-calido-500 max-md:text-xs">
                       {plantilla.descripcion}
                     </span>
                   </button>
@@ -739,7 +822,7 @@ export function PanelPersonalizacion() {
             </div>
 
             <div className="flex flex-col gap-2">
-              <span className="versalitas text-xs text-gris-calido-500">Logo</span>
+              <span className="versalitas text-xs text-gris-calido-500 max-md:text-[13px]">Logo</span>
               <div className="flex items-center gap-4">
                 {form.logo_url ? (
                   <img src={form.logo_url} alt="Logo" className="h-14 w-14 rounded-full object-cover" />
@@ -765,8 +848,8 @@ export function PanelPersonalizacion() {
             </div>
 
             <div className="flex flex-col gap-2">
-              <span className="versalitas text-xs text-gris-calido-500">Foto de portada</span>
-              <p className="text-xs text-gris-calido-500">
+              <span className="versalitas text-xs text-gris-calido-500 max-md:text-[13px]">Foto de portada</span>
+              <p className="text-xs text-gris-calido-500 max-md:text-[13px] max-md:leading-snug">
                 Se muestra de fondo en el encabezado, detrás del nombre — si no subes una, el
                 encabezado queda con el color de abajo, como hasta ahora.
               </p>
@@ -795,8 +878,8 @@ export function PanelPersonalizacion() {
             </div>
 
             <div className="flex flex-col gap-2">
-              <span className="versalitas text-xs text-gris-calido-500">Paletas sugeridas</span>
-              <p className="text-xs text-gris-calido-500">
+              <span className="versalitas text-xs text-gris-calido-500 max-md:text-[13px]">Paletas sugeridas</span>
+              <p className="text-xs text-gris-calido-500 max-md:text-[13px] max-md:leading-snug">
                 Un clic aplica color de marca + color del header + modo oscuro/claro juntos, ya
                 combinados — sigues pudiendo tocar cada uno por separado después.
               </p>
@@ -822,19 +905,19 @@ export function PanelPersonalizacion() {
                         background: `linear-gradient(135deg, ${paleta.muestraPrimario} 50%, ${paleta.muestraHeader} 50%)`,
                       }}
                     />
-                    <span className="text-[10px] text-gris-calido-500">{paleta.nombre}</span>
+                    <span className="text-[10px] text-gris-calido-500 max-md:text-xs">{paleta.nombre}</span>
                   </button>
                 ))}
               </div>
             </div>
 
             <div className="flex flex-col gap-2">
-              <span className="versalitas text-xs text-gris-calido-500">Estilo de tarjetas</span>
-              <p className="text-xs text-gris-calido-500">
+              <span className="versalitas text-xs text-gris-calido-500 max-md:text-[13px]">Estilo de tarjetas</span>
+              <p className="text-xs text-gris-calido-500 max-md:text-[13px] max-md:leading-snug">
                 Cómo se ven las tarjetas y tablas de toda tu página — testimonios, equipo, horario,
                 servicios y el formulario de reserva cambian todos juntos.
               </p>
-              <div className="flex gap-2">
+              <div className="flex gap-2 max-md:flex-wrap">
                 {[
                   ['bordes', 'Bordes', 'Borde fino, el look de siempre'],
                   ['flotante', 'Flotante', 'Sin borde, más sombra — se despegan de la página. Se ajusta solo en modo oscuro.'],
@@ -845,7 +928,7 @@ export function PanelPersonalizacion() {
                     type="button"
                     onClick={() => setForm((f) => ({ ...f, estilo_tarjetas: valor }))}
                     title={descripcion}
-                    className={`versalitas rounded-md border px-3 py-2 text-xs transition-colors ${
+                    className={`versalitas rounded-md border px-3 py-2 text-xs transition-colors max-md:min-h-11 max-md:rounded-lg max-md:px-3.5 max-md:text-[13px] ${
                       (form.estilo_tarjetas ?? 'bordes') === valor
                         ? 'border-cobre text-cobre-texto'
                         : 'border-gris-calido-200 text-gris-calido-500'
@@ -859,7 +942,7 @@ export function PanelPersonalizacion() {
 
             <div className="grid grid-cols-2 gap-6">
               <label className="flex flex-col gap-2">
-                <span className="versalitas text-xs text-gris-calido-500">Color de marca</span>
+                <span className="versalitas text-xs text-gris-calido-500 max-md:text-[13px]">Color de marca</span>
                 <div className="flex items-center gap-2">
                   <input
                     type="color"
@@ -873,7 +956,7 @@ export function PanelPersonalizacion() {
                       type="button"
                       onClick={() => setForm((f) => ({ ...f, color_primario: '' }))}
                       aria-label="Quitar color de marca"
-                      className="text-xs text-gris-calido-500 hover:text-red-700"
+                      className="text-xs text-gris-calido-500 hover:text-red-700 max-md:min-h-11 max-md:min-w-11"
                     >
                       ✕
                     </button>
@@ -882,7 +965,7 @@ export function PanelPersonalizacion() {
               </label>
 
               <label className="flex flex-col gap-2">
-                <span className="versalitas text-xs text-gris-calido-500">Color del header</span>
+                <span className="versalitas text-xs text-gris-calido-500 max-md:text-[13px]">Color del header</span>
                 <div className="flex items-center gap-2">
                   <input
                     type="color"
@@ -896,18 +979,18 @@ export function PanelPersonalizacion() {
                       type="button"
                       onClick={() => setForm((f) => ({ ...f, color_header: '' }))}
                       aria-label="Quitar color del header"
-                      className="text-xs text-gris-calido-500 hover:text-red-700"
+                      className="text-xs text-gris-calido-500 hover:text-red-700 max-md:min-h-11 max-md:min-w-11"
                     >
                       ✕
                     </button>
                   )}
                 </div>
-                <span className="text-xs text-gris-calido-500">El texto se ajusta solo para seguir siendo legible.</span>
+                <span className="text-xs text-gris-calido-500 max-md:text-[13px] max-md:leading-snug">El texto se ajusta solo para seguir siendo legible.</span>
               </label>
             </div>
 
             <label className="flex flex-col gap-2">
-              <span className="versalitas text-xs text-gris-calido-500">Tipografía del nombre de tu barbería</span>
+              <span className="versalitas text-xs text-gris-calido-500 max-md:text-[13px]">Tipografía del nombre de tu barbería</span>
               <select
                 name="fuente_display"
                 value={form.fuente_display}
@@ -933,7 +1016,7 @@ export function PanelPersonalizacion() {
                   etiqueta="Modo oscuro de la página pública"
                   onCambiar={(valor) => setForm((f) => ({ ...f, tema: valor ? 'oscuro' : 'claro' }))}
                 />
-                <span className="versalitas text-xs text-gris-calido-500">Modo oscuro</span>
+                <span className="versalitas text-xs text-gris-calido-500 max-md:text-[13px]">Modo oscuro</span>
               </div>
               {form.tema === 'oscuro' && (
                 <ul className="flex flex-col gap-1 border-l-2 border-cobre/30 pl-4 text-xs text-gris-calido-500">
@@ -945,11 +1028,11 @@ export function PanelPersonalizacion() {
             </div>
           </section>
 
-          <section className="flex flex-col gap-6">
+          <section id="grupo-textos" className="flex flex-col gap-6 max-md:scroll-mt-32 max-md:rounded-2xl max-md:border max-md:border-gris-calido-200 max-md:bg-white max-md:p-4">
             <TituloGrupo numero="02">Textos y contacto</TituloGrupo>
 
             <label className="flex flex-col gap-2">
-              <span className="versalitas text-xs text-gris-calido-500">Eslogan</span>
+              <span className="versalitas text-xs text-gris-calido-500 max-md:text-[13px]">Eslogan</span>
               <div className="flex items-center gap-3">
                 <input
                   type="text"
@@ -978,25 +1061,25 @@ export function PanelPersonalizacion() {
                   </button>
                 )}
               </div>
-              <span className="text-xs text-gris-calido-500">
+              <span className="text-xs text-gris-calido-500 max-md:text-[13px] max-md:leading-snug">
                 Sin elegir un color, se ajusta solo para contrastar con el header.
               </span>
             </label>
 
             <label className="flex flex-col gap-2">
-              <span className="versalitas text-xs text-gris-calido-500">Descripción</span>
+              <span className="versalitas text-xs text-gris-calido-500 max-md:text-[13px]">Descripción</span>
               <textarea
                 name="descripcion"
                 value={form.descripcion}
                 onChange={(e) => setForm((f) => ({ ...f, descripcion: e.target.value }))}
                 rows={3}
-                placeholder="Contale a tus clientes qué hace especial a tu barbería."
+                placeholder="Cuéntale a tus clientes qué hace especial a tu barbería."
                 className="border-b border-gris-calido-200 bg-transparent py-2 text-sm text-negro-barbero outline-none transition-colors focus:border-cobre"
               />
             </label>
 
             <label className="flex flex-col gap-2">
-              <span className="versalitas text-xs text-gris-calido-500">Dirección</span>
+              <span className="versalitas text-xs text-gris-calido-500 max-md:text-[13px]">Dirección</span>
               <input
                 type="text"
                 name="direccion"
@@ -1008,7 +1091,7 @@ export function PanelPersonalizacion() {
             </label>
 
             <label className="flex flex-col gap-2">
-              <span className="versalitas text-xs text-gris-calido-500">Teléfono de WhatsApp</span>
+              <span className="versalitas text-xs text-gris-calido-500 max-md:text-[13px]">Teléfono de WhatsApp</span>
               <input
                 type="tel"
                 name="telefono_whatsapp"
@@ -1020,12 +1103,12 @@ export function PanelPersonalizacion() {
             </label>
 
             <div className="flex flex-col gap-2">
-              <span className="versalitas text-xs text-gris-calido-500">Cómo mostrar el WhatsApp</span>
-              <div className="flex gap-2">
+              <span className="versalitas text-xs text-gris-calido-500 max-md:text-[13px]">Cómo mostrar el WhatsApp</span>
+              <div className="flex gap-2 max-md:flex-wrap">
                 <button
                   type="button"
                   onClick={() => setForm((f) => ({ ...f, estilo_whatsapp: 'enlace' }))}
-                  className={`versalitas rounded-md border px-3 py-2 text-xs transition-colors ${
+                  className={`versalitas rounded-md border px-3 py-2 text-xs transition-colors max-md:min-h-11 max-md:rounded-lg max-md:px-3.5 max-md:text-[13px] ${
                     form.estilo_whatsapp === 'enlace'
                       ? 'border-cobre text-cobre-texto'
                       : 'border-gris-calido-200 text-gris-calido-500'
@@ -1036,7 +1119,7 @@ export function PanelPersonalizacion() {
                 <button
                   type="button"
                   onClick={() => setForm((f) => ({ ...f, estilo_whatsapp: 'burbuja' }))}
-                  className={`versalitas rounded-md border px-3 py-2 text-xs transition-colors ${
+                  className={`versalitas rounded-md border px-3 py-2 text-xs transition-colors max-md:min-h-11 max-md:rounded-lg max-md:px-3.5 max-md:text-[13px] ${
                     form.estilo_whatsapp === 'burbuja'
                       ? 'border-cobre text-cobre-texto'
                       : 'border-gris-calido-200 text-gris-calido-500'
@@ -1045,7 +1128,7 @@ export function PanelPersonalizacion() {
                   Burbuja flotante
                 </button>
               </div>
-              <span className="text-xs text-gris-calido-500">
+              <span className="text-xs text-gris-calido-500 max-md:text-[13px] max-md:leading-snug">
                 {form.estilo_whatsapp === 'burbuja'
                   ? 'Un botón circular fijo en la esquina, visible en toda la página.'
                   : 'El texto "Escribir por WhatsApp" junto a la dirección, en el encabezado.'}
@@ -1055,7 +1138,7 @@ export function PanelPersonalizacion() {
             {form.estilo_whatsapp === 'burbuja' && (
               <div className="flex flex-col gap-4 rounded-lg border border-gris-calido-200 p-4">
                 <label className="flex flex-col gap-2">
-                  <span className="versalitas text-xs text-gris-calido-500">Color de la burbuja</span>
+                  <span className="versalitas text-xs text-gris-calido-500 max-md:text-[13px]">Color de la burbuja</span>
                   <div className="flex items-center gap-2">
                     <input
                       type="color"
@@ -1069,20 +1152,20 @@ export function PanelPersonalizacion() {
                         type="button"
                         onClick={() => setForm((f) => ({ ...f, whatsapp_color: '' }))}
                         aria-label="Quitar color de la burbuja de WhatsApp"
-                        className="text-xs text-gris-calido-500 hover:text-red-700"
+                        className="text-xs text-gris-calido-500 hover:text-red-700 max-md:min-h-11 max-md:min-w-11"
                       >
                         ✕
                       </button>
                     )}
                   </div>
-                  <span className="text-xs text-gris-calido-500">
+                  <span className="text-xs text-gris-calido-500 max-md:text-[13px] max-md:leading-snug">
                     Sin elegir, usa el color de marca (arriba, en Identidad).
                   </span>
                 </label>
 
                 <div className="flex flex-col gap-2">
-                  <span className="versalitas text-xs text-gris-calido-500">Tamaño</span>
-                  <div className="flex gap-2">
+                  <span className="versalitas text-xs text-gris-calido-500 max-md:text-[13px]">Tamaño</span>
+                  <div className="flex gap-2 max-md:flex-wrap">
                     {[
                       ['chica', 'Chica'],
                       ['mediana', 'Mediana'],
@@ -1092,7 +1175,7 @@ export function PanelPersonalizacion() {
                         key={valor}
                         type="button"
                         onClick={() => setForm((f) => ({ ...f, whatsapp_tamano: valor }))}
-                        className={`versalitas rounded-md border px-3 py-2 text-xs transition-colors ${
+                        className={`versalitas rounded-md border px-3 py-2 text-xs transition-colors max-md:min-h-11 max-md:rounded-lg max-md:px-3.5 max-md:text-[13px] ${
                           form.whatsapp_tamano === valor
                             ? 'border-cobre text-cobre-texto'
                             : 'border-gris-calido-200 text-gris-calido-500'
@@ -1107,7 +1190,7 @@ export function PanelPersonalizacion() {
             )}
           </section>
 
-          <section className="flex flex-col gap-4">
+          <section id="grupo-secciones" className="flex flex-col gap-4 max-md:min-w-0 max-md:scroll-mt-32 max-md:rounded-2xl max-md:border max-md:border-gris-calido-200 max-md:bg-white max-md:p-4">
             <TituloGrupo numero="03">Secciones de la página</TituloGrupo>
 
             {!puedeSecciones ? (
@@ -1117,13 +1200,16 @@ export function PanelPersonalizacion() {
                   disponibles desde el plan <strong>Equipo</strong>. Si ya tenías secciones armadas de
                   antes, siguen guardadas — vuelven a aparecer apenas subas de plan.
                 </p>
-                <p className="mt-2 text-xs text-gris-calido-500">
+                <p className="mt-2 text-xs text-gris-calido-500 max-md:text-[13px] max-md:leading-snug">
                   Habla con el administrador de la plataforma para mejorar tu plan.
                 </p>
               </div>
             ) : (
               <>
-                <p className="-mt-2 text-xs text-gris-calido-500">
+                <p className="-mt-1 text-[13px] leading-snug text-gris-calido-500 md:hidden">
+                  Toca una sección para editarla. El orden de la lista es el orden en tu página.
+                </p>
+                <p className="-mt-2 text-xs text-gris-calido-500 max-md:hidden">
                   Click en una sección para abrirla y editarla — el orden de la lista es el orden real en
                   tu página, entre el encabezado y el formulario de reserva. Incluye galerías, bloques de
                   imagen y texto, tu equipo de barberos, tu horario de atención, y tus servicios y
@@ -1147,35 +1233,35 @@ export function PanelPersonalizacion() {
                     !disponible ? 'border-gris-calido-200 bg-gris-calido-100/40' : abierta ? 'border-cobre' : 'border-gris-calido-200'
                   }`}
                 >
-                  <div className="flex items-center justify-between gap-2 p-3">
+                  <div className="flex items-center justify-between gap-2 p-3 max-md:flex-wrap max-md:gap-0 max-md:p-0">
                     <button
                       type="button"
                       onClick={() => disponible && setSeccionAbiertaId(abierta ? null : seccion.id)}
                       disabled={!disponible}
                       title={!disponible ? 'Disponible desde el plan Estudio' : undefined}
-                      className={`flex flex-1 items-center gap-3 text-left ${!disponible ? 'cursor-not-allowed opacity-60' : ''}`}
+                      className={`flex flex-1 items-center gap-3 text-left max-md:min-h-14 max-md:min-w-0 max-md:basis-full max-md:flex-wrap max-md:gap-x-2.5 max-md:gap-y-0.5 max-md:px-3.5 max-md:py-2.5 ${!disponible ? 'cursor-not-allowed opacity-60' : ''}`}
                     >
                       {disponible ? (
                         <span className="text-xs text-gris-calido-400">{abierta ? '▾' : '▸'}</span>
                       ) : (
                         <IconoCandado className="h-3.5 w-3.5 shrink-0 text-gris-calido-400" />
                       )}
-                      <span className="versalitas shrink-0 text-xs text-gris-calido-500">
+                      <span className="versalitas shrink-0 text-xs text-gris-calido-500 max-md:text-[13px]">
                         {ETIQUETA_TIPO_SECCION[seccion.tipo]}
                       </span>
-                      <span className="truncate text-sm text-negro-barbero">
+                      <span className="truncate text-sm text-negro-barbero max-md:basis-full max-md:pl-5 max-md:text-[15px]">
                         {disponible
                           ? resumenSeccion(seccion, equipoOrdenado.length, barberia.servicios?.length ?? 0)
                           : 'Disponible desde el plan Estudio'}
                       </span>
                     </button>
-                    <div className="flex shrink-0 gap-2 text-xs text-gris-calido-500">
+                    <div className="flex shrink-0 gap-2 text-xs text-gris-calido-500 max-md:basis-full max-md:gap-1 max-md:border-t max-md:border-gris-calido-100 max-md:px-1.5 max-md:text-base">
                       <button
                         type="button"
                         onClick={() => moverSeccion(indice, -1)}
                         disabled={indice === 0}
                         aria-label="Subir esta sección"
-                        className="disabled:opacity-30"
+                        className="disabled:opacity-30 max-md:min-h-11 max-md:min-w-11"
                       >
                         ↑
                       </button>
@@ -1184,18 +1270,18 @@ export function PanelPersonalizacion() {
                         onClick={() => moverSeccion(indice, 1)}
                         disabled={indice === form.secciones.length - 1}
                         aria-label="Bajar esta sección"
-                        className="disabled:opacity-30"
+                        className="disabled:opacity-30 max-md:min-h-11 max-md:min-w-11"
                       >
                         ↓
                       </button>
-                      <button type="button" onClick={() => quitarSeccion(seccion.id)} className="hover:text-red-700">
+                      <button type="button" onClick={() => quitarSeccion(seccion.id)} className="hover:text-red-700 max-md:ml-auto max-md:min-h-11 max-md:px-3 max-md:text-[15px] max-md:text-red-700">
                         Eliminar
                       </button>
                     </div>
                   </div>
 
                   {abierta && (
-                    <div className="border-t border-gris-calido-200 bg-hueso/60 p-4">
+                    <div className="border-t border-gris-calido-200 bg-hueso/60 p-4 max-md:px-3.5">
                       {seccion.tipo === 'galeria' && (
                         <div className="flex flex-col gap-4">
                           <input
@@ -1208,8 +1294,8 @@ export function PanelPersonalizacion() {
                           />
 
                           <div className="flex flex-col gap-1">
-                            <span className="versalitas text-xs text-gris-calido-500">Estilo</span>
-                            <div className="flex gap-2">
+                            <span className="versalitas text-xs text-gris-calido-500 max-md:text-[13px]">Estilo</span>
+                            <div className="flex gap-2 max-md:flex-wrap">
                               {[
                                 ['grilla', 'Grilla'],
                                 ['carrusel', 'Carrusel'],
@@ -1218,7 +1304,7 @@ export function PanelPersonalizacion() {
                                   key={valor}
                                   type="button"
                                   onClick={() => actualizarSeccion(seccion.id, { estilo: valor })}
-                                  className={`versalitas rounded-md border px-3 py-2 text-xs transition-colors ${
+                                  className={`versalitas rounded-md border px-3 py-2 text-xs transition-colors max-md:min-h-11 max-md:rounded-lg max-md:px-3.5 max-md:text-[13px] ${
                                     (seccion.estilo ?? 'grilla') === valor
                                       ? 'border-cobre text-cobre-texto'
                                       : 'border-gris-calido-200 text-gris-calido-500'
@@ -1233,8 +1319,8 @@ export function PanelPersonalizacion() {
                           {(seccion.estilo ?? 'grilla') === 'carrusel' && (
                             <>
                               <div className="flex flex-col gap-1">
-                                <span className="versalitas text-xs text-gris-calido-500">Posición</span>
-                                <div className="flex gap-2">
+                                <span className="versalitas text-xs text-gris-calido-500 max-md:text-[13px]">Posición</span>
+                                <div className="flex gap-2 max-md:flex-wrap">
                                   {[
                                     ['izquierda', 'Izquierda'],
                                     ['centro', 'Centro'],
@@ -1244,7 +1330,7 @@ export function PanelPersonalizacion() {
                                       key={valor}
                                       type="button"
                                       onClick={() => actualizarSeccion(seccion.id, { posicion: valor })}
-                                      className={`versalitas rounded-md border px-3 py-2 text-xs transition-colors ${
+                                      className={`versalitas rounded-md border px-3 py-2 text-xs transition-colors max-md:min-h-11 max-md:rounded-lg max-md:px-3.5 max-md:text-[13px] ${
                                         (seccion.posicion ?? 'centro') === valor
                                           ? 'border-cobre text-cobre-texto'
                                           : 'border-gris-calido-200 text-gris-calido-500'
@@ -1254,15 +1340,15 @@ export function PanelPersonalizacion() {
                                     </button>
                                   ))}
                                 </div>
-                                <span className="text-xs text-gris-calido-500">
+                                <span className="text-xs text-gris-calido-500 max-md:text-[13px] max-md:leading-snug">
                                   "Centro" no muestra texto al lado. En "Izquierda"/"Derecha" el carrusel
                                   queda en una columna y el texto de abajo aparece en la columna opuesta.
                                 </span>
                               </div>
 
                               <div className="flex flex-col gap-1">
-                                <span className="versalitas text-xs text-gris-calido-500">Tamaño de la foto</span>
-                                <div className="flex gap-2">
+                                <span className="versalitas text-xs text-gris-calido-500 max-md:text-[13px]">Tamaño de la foto</span>
+                                <div className="flex gap-2 max-md:flex-wrap">
                                   {[
                                     ['chica', 'Chica'],
                                     ['mediana', 'Mediana'],
@@ -1272,7 +1358,7 @@ export function PanelPersonalizacion() {
                                       key={valor}
                                       type="button"
                                       onClick={() => actualizarSeccion(seccion.id, { imagen_tamano: valor })}
-                                      className={`versalitas rounded-md border px-3 py-2 text-xs transition-colors ${
+                                      className={`versalitas rounded-md border px-3 py-2 text-xs transition-colors max-md:min-h-11 max-md:rounded-lg max-md:px-3.5 max-md:text-[13px] ${
                                         (seccion.imagen_tamano ?? 'mediana') === valor
                                           ? 'border-cobre text-cobre-texto'
                                           : 'border-gris-calido-200 text-gris-calido-500'
@@ -1301,7 +1387,7 @@ export function PanelPersonalizacion() {
                                         etiqueta="Cursiva"
                                         onCambiar={(valor) => actualizarSeccion(seccion.id, { texto_cursiva: valor })}
                                       />
-                                      <span className="versalitas text-xs text-gris-calido-500">Cursiva</span>
+                                      <span className="versalitas text-xs text-gris-calido-500 max-md:text-[13px]">Cursiva</span>
                                     </div>
                                     <div className="flex items-center gap-3">
                                       <Interruptor
@@ -1311,13 +1397,13 @@ export function PanelPersonalizacion() {
                                           actualizarSeccion(seccion.id, { texto_subrayado: valor })
                                         }
                                       />
-                                      <span className="versalitas text-xs text-gris-calido-500">Subrayado</span>
+                                      <span className="versalitas text-xs text-gris-calido-500 max-md:text-[13px]">Subrayado</span>
                                     </div>
                                   </div>
 
                                   <div className="flex flex-col gap-1">
-                                    <span className="versalitas text-xs text-gris-calido-500">Tamaño</span>
-                                    <div className="flex gap-2">
+                                    <span className="versalitas text-xs text-gris-calido-500 max-md:text-[13px]">Tamaño</span>
+                                    <div className="flex gap-2 max-md:flex-wrap">
                                       {[
                                         ['chica', 'Chica'],
                                         ['mediana', 'Mediana'],
@@ -1328,7 +1414,7 @@ export function PanelPersonalizacion() {
                                           key={valor}
                                           type="button"
                                           onClick={() => actualizarSeccion(seccion.id, { texto_tamano: valor })}
-                                          className={`versalitas rounded-md border px-3 py-2 text-xs transition-colors ${
+                                          className={`versalitas rounded-md border px-3 py-2 text-xs transition-colors max-md:min-h-11 max-md:rounded-lg max-md:px-3.5 max-md:text-[13px] ${
                                             (seccion.texto_tamano ?? 'mediana') === valor
                                               ? 'border-cobre text-cobre-texto'
                                               : 'border-gris-calido-200 text-gris-calido-500'
@@ -1341,7 +1427,7 @@ export function PanelPersonalizacion() {
                                   </div>
 
                                   <label className="flex flex-col gap-1">
-                                    <span className="versalitas text-xs text-gris-calido-500">Tipografía</span>
+                                    <span className="versalitas text-xs text-gris-calido-500 max-md:text-[13px]">Tipografía</span>
                                     <select
                                       name="galeria_texto_fuente"
                                       value={seccion.texto_fuente ?? ''}
@@ -1362,7 +1448,7 @@ export function PanelPersonalizacion() {
                                   </label>
 
                                   <div className="flex flex-col gap-2 border-t border-gris-calido-200 pt-3">
-                                    <span className="versalitas text-xs text-gris-calido-500">
+                                    <span className="versalitas text-xs text-gris-calido-500 max-md:text-[13px]">
                                       Frase destacada (opcional)
                                     </span>
                                     <div className="flex items-center gap-3">
@@ -1395,7 +1481,7 @@ export function PanelPersonalizacion() {
                                             actualizarSeccion(seccion.id, { texto_resaltado_color: null })
                                           }
                                           aria-label="Quitar color de la frase destacada"
-                                          className="text-xs text-gris-calido-500 hover:text-red-700"
+                                          className="text-xs text-gris-calido-500 hover:text-red-700 max-md:min-h-11 max-md:min-w-11"
                                         >
                                           ✕
                                         </button>
@@ -1403,8 +1489,8 @@ export function PanelPersonalizacion() {
                                     </div>
 
                                     <div className="flex flex-col gap-1">
-                                      <span className="versalitas text-xs text-gris-calido-500">Tamaño</span>
-                                      <div className="flex gap-2">
+                                      <span className="versalitas text-xs text-gris-calido-500 max-md:text-[13px]">Tamaño</span>
+                                      <div className="flex gap-2 max-md:flex-wrap">
                                         {[
                                           ['chica', 'Chica'],
                                           ['mediana', 'Mediana'],
@@ -1417,7 +1503,7 @@ export function PanelPersonalizacion() {
                                             onClick={() =>
                                               actualizarSeccion(seccion.id, { texto_resaltado_tamano: valor })
                                             }
-                                            className={`versalitas rounded-md border px-3 py-2 text-xs transition-colors ${
+                                            className={`versalitas rounded-md border px-3 py-2 text-xs transition-colors max-md:min-h-11 max-md:rounded-lg max-md:px-3.5 max-md:text-[13px] ${
                                               (seccion.texto_resaltado_tamano ?? 'grande') === valor
                                                 ? 'border-cobre text-cobre-texto'
                                                 : 'border-gris-calido-200 text-gris-calido-500'
@@ -1430,7 +1516,7 @@ export function PanelPersonalizacion() {
                                     </div>
 
                                     <label className="flex flex-col gap-1">
-                                      <span className="versalitas text-xs text-gris-calido-500">Tipografía</span>
+                                      <span className="versalitas text-xs text-gris-calido-500 max-md:text-[13px]">Tipografía</span>
                                       <select
                                         name="galeria_texto_resaltado_fuente"
                                         value={seccion.texto_resaltado_fuente ?? ''}
@@ -1450,7 +1536,7 @@ export function PanelPersonalizacion() {
                                       </select>
                                     </label>
 
-                                    <span className="text-xs text-gris-calido-500">
+                                    <span className="text-xs text-gris-calido-500 max-md:text-[13px] max-md:leading-snug">
                                       Se muestra al final del texto de arriba, siempre subrayada — tamaño,
                                       tipografía y color son propios, no dependen del texto normal.
                                     </span>
@@ -1462,7 +1548,7 @@ export function PanelPersonalizacion() {
 
                           <div className="flex flex-wrap gap-3">
                             {(seccion.imagenes ?? []).map((foto, i) => (
-                              <div key={i} className="flex w-40 flex-col gap-2 rounded border border-gris-calido-200 bg-white p-2">
+                              <div key={i} className="flex w-40 flex-col gap-2 rounded border border-gris-calido-200 bg-white p-2 max-md:w-[calc(50%-0.375rem)] max-md:rounded-lg">
                                 <img src={foto.url} alt={`Foto ${i + 1}`} className="h-24 w-full rounded object-cover" />
                                 <input
                                   type="text"
@@ -1488,7 +1574,7 @@ export function PanelPersonalizacion() {
                                     onClick={() => moverImagenEnGaleria(seccion.id, i, -1)}
                                     disabled={i === 0}
                                     aria-label={`Mover foto ${i + 1} antes`}
-                                    className="disabled:opacity-30"
+                                    className="disabled:opacity-30 max-md:min-h-11 max-md:min-w-11 max-md:text-base"
                                   >
                                     ↑
                                   </button>
@@ -1497,11 +1583,11 @@ export function PanelPersonalizacion() {
                                     onClick={() => moverImagenEnGaleria(seccion.id, i, 1)}
                                     disabled={i === seccion.imagenes.length - 1}
                                     aria-label={`Mover foto ${i + 1} después`}
-                                    className="disabled:opacity-30"
+                                    className="disabled:opacity-30 max-md:min-h-11 max-md:min-w-11 max-md:text-base"
                                   >
                                     ↓
                                   </button>
-                                  <button type="button" onClick={() => quitarImagenDeGaleria(seccion.id, i)} className="hover:text-red-700">
+                                  <button type="button" onClick={() => quitarImagenDeGaleria(seccion.id, i)} className="hover:text-red-700 max-md:min-h-11 max-md:px-1 max-md:text-[13px]">
                                     Quitar
                                   </button>
                                 </div>
@@ -1538,7 +1624,7 @@ export function PanelPersonalizacion() {
                                   )}
                                 </div>
                                 {enElTope && (
-                                  <p className="text-xs text-gris-calido-500">
+                                  <p className="text-xs text-gris-calido-500 max-md:text-[13px] max-md:leading-snug">
                                     Llegaste al máximo de fotos de tu plan ({tope}). El plan Estudio no tiene tope.
                                   </p>
                                 )}
@@ -1584,8 +1670,8 @@ export function PanelPersonalizacion() {
                             className="border-b border-gris-calido-200 bg-transparent py-2 text-sm text-negro-barbero outline-none transition-colors focus:border-cobre"
                           />
                           <div className="flex flex-col gap-1">
-                            <span className="versalitas text-xs text-gris-calido-500">Imagen a la</span>
-                            <div className="flex gap-2">
+                            <span className="versalitas text-xs text-gris-calido-500 max-md:text-[13px]">Imagen a la</span>
+                            <div className="flex gap-2 max-md:flex-wrap">
                               {[
                                 ['izquierda', 'Izquierda'],
                                 ['derecha', 'Derecha'],
@@ -1594,7 +1680,7 @@ export function PanelPersonalizacion() {
                                   key={valor}
                                   type="button"
                                   onClick={() => actualizarSeccion(seccion.id, { posicion_imagen: valor })}
-                                  className={`versalitas rounded-md border px-3 py-2 text-xs transition-colors ${
+                                  className={`versalitas rounded-md border px-3 py-2 text-xs transition-colors max-md:min-h-11 max-md:rounded-lg max-md:px-3.5 max-md:text-[13px] ${
                                     (seccion.posicion_imagen ?? 'izquierda') === valor
                                       ? 'border-cobre text-cobre-texto'
                                       : 'border-gris-calido-200 text-gris-calido-500'
@@ -1604,7 +1690,7 @@ export function PanelPersonalizacion() {
                                 </button>
                               ))}
                             </div>
-                            <span className="text-xs text-gris-calido-500">
+                            <span className="text-xs text-gris-calido-500 max-md:text-[13px] max-md:leading-snug">
                               Solo afecta el orden en pantallas grandes — en el celular la imagen siempre
                               queda arriba.
                             </span>
@@ -1624,8 +1710,8 @@ export function PanelPersonalizacion() {
                           />
 
                           <div className="flex flex-col gap-1">
-                            <span className="versalitas text-xs text-gris-calido-500">Estilo</span>
-                            <div className="flex gap-2">
+                            <span className="versalitas text-xs text-gris-calido-500 max-md:text-[13px]">Estilo</span>
+                            <div className="flex gap-2 max-md:flex-wrap">
                               {[
                                 ['grilla', 'Grilla'],
                                 ['carrusel', 'Carrusel'],
@@ -1634,7 +1720,7 @@ export function PanelPersonalizacion() {
                                   key={valor}
                                   type="button"
                                   onClick={() => actualizarSeccion(seccion.id, { estilo: valor })}
-                                  className={`versalitas rounded-md border px-3 py-2 text-xs transition-colors ${
+                                  className={`versalitas rounded-md border px-3 py-2 text-xs transition-colors max-md:min-h-11 max-md:rounded-lg max-md:px-3.5 max-md:text-[13px] ${
                                     (seccion.estilo ?? 'grilla') === valor
                                       ? 'border-cobre text-cobre-texto'
                                       : 'border-gris-calido-200 text-gris-calido-500'
@@ -1646,7 +1732,7 @@ export function PanelPersonalizacion() {
                             </div>
                           </div>
 
-                          <p className="text-xs text-gris-calido-500">
+                          <p className="text-xs text-gris-calido-500 max-md:text-[13px] max-md:leading-snug">
                             Este es el orden en que aparecen. Para agregar, quitar o editar la foto y la
                             especialidad de un barbero, ve a la pestaña "Barberos".
                           </p>
@@ -1680,7 +1766,7 @@ export function PanelPersonalizacion() {
                                       onClick={() => moverBarberoEnEquipo(i, -1)}
                                       disabled={i === 0}
                                       aria-label={`Mover a ${barbero.nombre} antes en el equipo`}
-                                      className="disabled:opacity-30"
+                                      className="disabled:opacity-30 max-md:min-h-11 max-md:min-w-11 max-md:text-base"
                                     >
                                       ↑
                                     </button>
@@ -1689,7 +1775,7 @@ export function PanelPersonalizacion() {
                                       onClick={() => moverBarberoEnEquipo(i, 1)}
                                       disabled={i === equipoOrdenado.length - 1}
                                       aria-label={`Mover a ${barbero.nombre} después en el equipo`}
-                                      className="disabled:opacity-30"
+                                      className="disabled:opacity-30 max-md:min-h-11 max-md:min-w-11 max-md:text-base"
                                     >
                                       ↓
                                     </button>
@@ -1711,14 +1797,14 @@ export function PanelPersonalizacion() {
                             placeholder="Título de la sección — ej: Horario de atención"
                             className="min-h-11 border-b border-gris-calido-200 bg-transparent py-2 text-sm text-negro-barbero outline-none transition-colors focus:border-cobre"
                           />
-                          <p className="text-xs text-gris-calido-500">
+                          <p className="text-xs text-gris-calido-500 max-md:text-[13px] max-md:leading-snug">
                             El horario en sí se calcula solo, a partir de los horarios reales de tus
                             barberos activos — no se edita a mano acá.
                           </p>
 
                           <div className="flex flex-col gap-1">
-                            <span className="versalitas text-xs text-gris-calido-500">Posición</span>
-                            <div className="flex gap-2">
+                            <span className="versalitas text-xs text-gris-calido-500 max-md:text-[13px]">Posición</span>
+                            <div className="flex gap-2 max-md:flex-wrap">
                               {[
                                 ['izquierda', 'Izquierda'],
                                 ['centro', 'Centro'],
@@ -1728,7 +1814,7 @@ export function PanelPersonalizacion() {
                                   key={valor}
                                   type="button"
                                   onClick={() => actualizarSeccion(seccion.id, { posicion: valor })}
-                                  className={`versalitas rounded-md border px-3 py-2 text-xs transition-colors ${
+                                  className={`versalitas rounded-md border px-3 py-2 text-xs transition-colors max-md:min-h-11 max-md:rounded-lg max-md:px-3.5 max-md:text-[13px] ${
                                     (seccion.posicion ?? 'centro') === valor
                                       ? 'border-cobre text-cobre-texto'
                                       : 'border-gris-calido-200 text-gris-calido-500'
@@ -1738,7 +1824,7 @@ export function PanelPersonalizacion() {
                                 </button>
                               ))}
                             </div>
-                            <span className="text-xs text-gris-calido-500">
+                            <span className="text-xs text-gris-calido-500 max-md:text-[13px] max-md:leading-snug">
                               "Centro" muestra solo la tabla, sin foto. En "Izquierda"/"Derecha" puedes
                               agregar una foto del local al lado, para darle más credibilidad.
                             </span>
@@ -1762,10 +1848,10 @@ export function PanelPersonalizacion() {
                               </div>
 
                               <div className="flex flex-col gap-1">
-                                <span className="versalitas text-xs text-gris-calido-500">
+                                <span className="versalitas text-xs text-gris-calido-500 max-md:text-[13px]">
                                   Tamaño de la foto
                                 </span>
-                                <div className="flex gap-2">
+                                <div className="flex gap-2 max-md:flex-wrap">
                                   {[
                                     ['chica', 'Chica'],
                                     ['mediana', 'Mediana'],
@@ -1775,7 +1861,7 @@ export function PanelPersonalizacion() {
                                       key={valor}
                                       type="button"
                                       onClick={() => actualizarSeccion(seccion.id, { imagen_tamano: valor })}
-                                      className={`versalitas rounded-md border px-3 py-2 text-xs transition-colors ${
+                                      className={`versalitas rounded-md border px-3 py-2 text-xs transition-colors max-md:min-h-11 max-md:rounded-lg max-md:px-3.5 max-md:text-[13px] ${
                                         (seccion.imagen_tamano ?? 'mediana') === valor
                                           ? 'border-cobre text-cobre-texto'
                                           : 'border-gris-calido-200 text-gris-calido-500'
@@ -1801,14 +1887,14 @@ export function PanelPersonalizacion() {
                             placeholder="Título de la sección — ej: Servicios y precios"
                             className="min-h-11 border-b border-gris-calido-200 bg-transparent py-2 text-sm text-negro-barbero outline-none transition-colors focus:border-cobre"
                           />
-                          <p className="text-xs text-gris-calido-500">
+                          <p className="text-xs text-gris-calido-500 max-md:text-[13px] max-md:leading-snug">
                             Se calcula sola a partir de tus servicios reales — no se edita a mano acá,
                             solo se puede ocultar quitando la sección.
                           </p>
 
                           <div className="flex flex-col gap-1">
-                            <span className="versalitas text-xs text-gris-calido-500">Posición</span>
-                            <div className="flex gap-2">
+                            <span className="versalitas text-xs text-gris-calido-500 max-md:text-[13px]">Posición</span>
+                            <div className="flex gap-2 max-md:flex-wrap">
                               {[
                                 ['izquierda', 'Izquierda'],
                                 ['centro', 'Centro'],
@@ -1818,7 +1904,7 @@ export function PanelPersonalizacion() {
                                   key={valor}
                                   type="button"
                                   onClick={() => actualizarSeccion(seccion.id, { posicion: valor })}
-                                  className={`versalitas rounded-md border px-3 py-2 text-xs transition-colors ${
+                                  className={`versalitas rounded-md border px-3 py-2 text-xs transition-colors max-md:min-h-11 max-md:rounded-lg max-md:px-3.5 max-md:text-[13px] ${
                                     (seccion.posicion ?? 'centro') === valor
                                       ? 'border-cobre text-cobre-texto'
                                       : 'border-gris-calido-200 text-gris-calido-500'
@@ -1828,7 +1914,7 @@ export function PanelPersonalizacion() {
                                 </button>
                               ))}
                             </div>
-                            <span className="text-xs text-gris-calido-500">
+                            <span className="text-xs text-gris-calido-500 max-md:text-[13px] max-md:leading-snug">
                               "Centro" muestra solo la tabla, sin foto. En "Izquierda"/"Derecha" puedes
                               agregar una foto al lado — de tu local, de un corte, lo que quieras mostrar.
                             </span>
@@ -1852,10 +1938,10 @@ export function PanelPersonalizacion() {
                               </div>
 
                               <div className="flex flex-col gap-1">
-                                <span className="versalitas text-xs text-gris-calido-500">
+                                <span className="versalitas text-xs text-gris-calido-500 max-md:text-[13px]">
                                   Tamaño de la foto
                                 </span>
-                                <div className="flex gap-2">
+                                <div className="flex gap-2 max-md:flex-wrap">
                                   {[
                                     ['chica', 'Chica'],
                                     ['mediana', 'Mediana'],
@@ -1865,7 +1951,7 @@ export function PanelPersonalizacion() {
                                       key={valor}
                                       type="button"
                                       onClick={() => actualizarSeccion(seccion.id, { imagen_tamano: valor })}
-                                      className={`versalitas rounded-md border px-3 py-2 text-xs transition-colors ${
+                                      className={`versalitas rounded-md border px-3 py-2 text-xs transition-colors max-md:min-h-11 max-md:rounded-lg max-md:px-3.5 max-md:text-[13px] ${
                                         (seccion.imagen_tamano ?? 'mediana') === valor
                                           ? 'border-cobre text-cobre-texto'
                                           : 'border-gris-calido-200 text-gris-calido-500'
@@ -1893,8 +1979,8 @@ export function PanelPersonalizacion() {
                           />
 
                           <div className="flex flex-col gap-1">
-                            <span className="versalitas text-xs text-gris-calido-500">Estilo</span>
-                            <div className="flex gap-2">
+                            <span className="versalitas text-xs text-gris-calido-500 max-md:text-[13px]">Estilo</span>
+                            <div className="flex gap-2 max-md:flex-wrap">
                               {[
                                 ['carrusel', 'Carrusel'],
                                 ['lista', 'Lista'],
@@ -1903,7 +1989,7 @@ export function PanelPersonalizacion() {
                                   key={valor}
                                   type="button"
                                   onClick={() => actualizarSeccion(seccion.id, { estilo: valor })}
-                                  className={`versalitas rounded-md border px-3 py-2 text-xs transition-colors ${
+                                  className={`versalitas rounded-md border px-3 py-2 text-xs transition-colors max-md:min-h-11 max-md:rounded-lg max-md:px-3.5 max-md:text-[13px] ${
                                     (seccion.estilo ?? 'carrusel') === valor
                                       ? 'border-cobre text-cobre-texto'
                                       : 'border-gris-calido-200 text-gris-calido-500'
@@ -1913,15 +1999,15 @@ export function PanelPersonalizacion() {
                                 </button>
                               ))}
                             </div>
-                            <span className="text-xs text-gris-calido-500">
+                            <span className="text-xs text-gris-calido-500 max-md:text-[13px] max-md:leading-snug">
                               "Carrusel" muestra una reseña a la vez (mejor con pocas). "Lista" muestra
                               todas en tarjetas, una al lado de la otra (mejor con varias cargadas).
                             </span>
                           </div>
 
                           <div className="flex flex-col gap-1">
-                            <span className="versalitas text-xs text-gris-calido-500">Tamaño del texto</span>
-                            <div className="flex gap-2">
+                            <span className="versalitas text-xs text-gris-calido-500 max-md:text-[13px]">Tamaño del texto</span>
+                            <div className="flex gap-2 max-md:flex-wrap">
                               {[
                                 ['chica', 'Chica'],
                                 ['mediana', 'Mediana'],
@@ -1932,7 +2018,7 @@ export function PanelPersonalizacion() {
                                   key={valor}
                                   type="button"
                                   onClick={() => actualizarSeccion(seccion.id, { tamano: valor })}
-                                  className={`versalitas rounded-md border px-3 py-2 text-xs transition-colors ${
+                                  className={`versalitas rounded-md border px-3 py-2 text-xs transition-colors max-md:min-h-11 max-md:rounded-lg max-md:px-3.5 max-md:text-[13px] ${
                                     (seccion.tamano ?? 'mediana') === valor
                                       ? 'border-cobre text-cobre-texto'
                                       : 'border-gris-calido-200 text-gris-calido-500'
@@ -1945,7 +2031,7 @@ export function PanelPersonalizacion() {
                           </div>
 
                           <label className="flex flex-col gap-1">
-                            <span className="versalitas text-xs text-gris-calido-500">Tipografía</span>
+                            <span className="versalitas text-xs text-gris-calido-500 max-md:text-[13px]">Tipografía</span>
                             <select
                               name="testimonios_fuente"
                               value={seccion.fuente ?? ''}
@@ -1967,7 +2053,7 @@ export function PanelPersonalizacion() {
 
                           <div className="flex flex-wrap items-end gap-6">
                             <label className="flex flex-col gap-2">
-                              <span className="versalitas text-xs text-gris-calido-500">Color del texto</span>
+                              <span className="versalitas text-xs text-gris-calido-500 max-md:text-[13px]">Color del texto</span>
                               <div className="flex items-center gap-2">
                                 <input
                                   type="color"
@@ -1981,7 +2067,7 @@ export function PanelPersonalizacion() {
                                     type="button"
                                     onClick={() => actualizarSeccion(seccion.id, { color_texto: null })}
                                     aria-label="Quitar color del texto"
-                                    className="text-xs text-gris-calido-500 hover:text-red-700"
+                                    className="text-xs text-gris-calido-500 hover:text-red-700 max-md:min-h-11 max-md:min-w-11"
                                   >
                                     ✕
                                   </button>
@@ -1991,7 +2077,7 @@ export function PanelPersonalizacion() {
 
                             {(seccion.estilo ?? 'carrusel') === 'lista' && (
                               <label className="flex flex-col gap-2">
-                                <span className="versalitas text-xs text-gris-calido-500">
+                                <span className="versalitas text-xs text-gris-calido-500 max-md:text-[13px]">
                                   Color de las tarjetas
                                 </span>
                                 <div className="flex items-center gap-2">
@@ -2009,7 +2095,7 @@ export function PanelPersonalizacion() {
                                       type="button"
                                       onClick={() => actualizarSeccion(seccion.id, { color_fondo: null })}
                                       aria-label="Quitar color de las tarjetas"
-                                      className="text-xs text-gris-calido-500 hover:text-red-700"
+                                      className="text-xs text-gris-calido-500 hover:text-red-700 max-md:min-h-11 max-md:min-w-11"
                                     >
                                       ✕
                                     </button>
@@ -2070,7 +2156,7 @@ export function PanelPersonalizacion() {
                                   <button
                                     type="button"
                                     onClick={() => quitarTestimonio(seccion.id, testimonio.id)}
-                                    className="text-xs text-gris-calido-500 hover:text-red-700"
+                                    className="text-xs text-gris-calido-500 hover:text-red-700 max-md:min-h-11 max-md:min-w-11"
                                   >
                                     Quitar
                                   </button>
@@ -2112,7 +2198,7 @@ export function PanelPersonalizacion() {
                 <button
                   type="button"
                   onClick={() => agregarSeccion('equipo')}
-                  className="versalitas rounded-md border border-gris-calido-200 px-3 py-2 text-xs text-gris-calido-700 hover:border-cobre hover:text-cobre-texto"
+                  className="versalitas rounded-md border border-gris-calido-200 px-3 py-2 text-xs text-gris-calido-700 hover:border-cobre hover:text-cobre-texto max-md:min-h-11 max-md:text-[13px]"
                 >
                   + Nuestro equipo
                 </button>
@@ -2124,7 +2210,7 @@ export function PanelPersonalizacion() {
                 <button
                   type="button"
                   onClick={() => agregarSeccion('horario')}
-                  className="versalitas rounded-md border border-gris-calido-200 px-3 py-2 text-xs text-gris-calido-700 hover:border-cobre hover:text-cobre-texto"
+                  className="versalitas rounded-md border border-gris-calido-200 px-3 py-2 text-xs text-gris-calido-700 hover:border-cobre hover:text-cobre-texto max-md:min-h-11 max-md:text-[13px]"
                 >
                   + Horario de atención
                 </button>
@@ -2137,7 +2223,7 @@ export function PanelPersonalizacion() {
                 <button
                   type="button"
                   onClick={() => agregarSeccion('servicios')}
-                  className="versalitas rounded-md border border-gris-calido-200 px-3 py-2 text-xs text-gris-calido-700 hover:border-cobre hover:text-cobre-texto"
+                  className="versalitas rounded-md border border-gris-calido-200 px-3 py-2 text-xs text-gris-calido-700 hover:border-cobre hover:text-cobre-texto max-md:min-h-11 max-md:text-[13px]"
                 >
                   + Servicios y precios
                 </button>
@@ -2152,10 +2238,10 @@ export function PanelPersonalizacion() {
             )}
           </section>
 
-          <section className="flex flex-col gap-6">
+          <section id="grupo-reserva" className="flex flex-col gap-6 max-md:scroll-mt-32 max-md:rounded-2xl max-md:border max-md:border-gris-calido-200 max-md:bg-white max-md:p-4">
             <TituloGrupo numero="04">Reglas de reserva</TituloGrupo>
             <label className="flex flex-col gap-2">
-              <span className="versalitas text-xs text-gris-calido-500">Anticipación máxima para reservar</span>
+              <span className="versalitas text-xs text-gris-calido-500 max-md:text-[13px]">Anticipación máxima para reservar</span>
               <select
                 name="dias_maximos_reserva"
                 value={form.dias_maximos_reserva}
@@ -2171,7 +2257,7 @@ export function PanelPersonalizacion() {
                 ))}
               </select>
             </label>
-            <p className="-mt-2 text-xs text-gris-calido-500">
+            <p className="-mt-2 text-xs text-gris-calido-500 max-md:text-[13px] max-md:leading-snug">
               Hasta cuántos días hacia adelante puede reservar un cliente en tu página pública.
               Ayuda a mantener la agenda ordenada — igual puedes agendar por teléfono o en
               persona más lejos si hace falta.
@@ -2182,10 +2268,35 @@ export function PanelPersonalizacion() {
               se mira la vista previa (que está siempre visible al lado, sin
               scrollear) y solo ahí tiene sentido decidir guardar. */}
           <div className="flex flex-col gap-3">
-            <Button as="button" type="submit" disabled={guardar.isPending || subiendo} className="w-fit">
+            <Button
+              as="button"
+              type="submit"
+              disabled={guardar.isPending || subiendo}
+              className="w-fit max-md:min-h-12 max-md:w-full max-md:rounded-xl max-md:py-3 max-md:text-base"
+            >
               {guardar.isPending ? 'Guardando…' : 'Guardar cambios'}
             </Button>
           </div>
+
+          {/* Celular: con cambios pendientes, una barra fija sobre la
+              navegación inferior deja guardar sin bajar hasta el final. */}
+          {hayCambiosSinGuardar && (
+            <div className="fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+4.25rem)] z-20 px-3 pb-2 md:hidden">
+              <div className="flex items-center gap-3 rounded-2xl bg-negro-barbero py-2 pl-4 pr-2 text-hueso shadow-xl">
+                <span className="flex-1 text-[15px] leading-tight">
+                  <span aria-hidden="true" className="mr-1.5 text-cobre">●</span>
+                  Cambios sin guardar
+                </span>
+                <button
+                  type="submit"
+                  disabled={guardar.isPending || subiendo}
+                  className="min-h-11 shrink-0 rounded-xl bg-cobre-oscuro px-5 text-[15px] font-semibold text-hueso active:brightness-110 disabled:opacity-60"
+                >
+                  {guardar.isPending ? 'Guardando…' : 'Guardar'}
+                </button>
+              </div>
+            </div>
+          )}
           </div>
 
           {/* Columna derecha: vista previa — "sticky" para que no haya que
@@ -2193,15 +2304,15 @@ export function PanelPersonalizacion() {
               formulario de la izquierda se desplaza, esta columna queda fija
               en pantalla (a partir de `lg`; en pantallas más chicas cae
               debajo del formulario, como una sección más). */}
-          <div className="lg:sticky lg:top-6">
-            <div className="mb-4 flex items-center justify-between">
-              <span className="versalitas text-xs text-gris-calido-700">— Vista previa</span>
+          <div id="grupo-vista-previa" className="lg:sticky lg:top-6 max-md:min-w-0 max-md:scroll-mt-32">
+            <div className="mb-4 flex items-center justify-between max-md:mb-3">
+              <span className="versalitas text-xs text-gris-calido-700 max-md:text-[13px]">— Vista previa</span>
               {/* En un celular real solo existe el modo Móvil — no tiene
                   sentido ofrecer "PC" (fuerza un ancho mínimo de 768px que
                   desborda la pantalla) ni mostrar un botón para alternar
                   a algo que va a romper el diseño de la página. */}
               {!esMobile && (
-                <div className="flex gap-2">
+                <div className="flex gap-2 max-md:flex-wrap">
                   <button
                     type="button"
                     onClick={() => setModoVista('pc')}
@@ -2246,13 +2357,13 @@ export function PanelPersonalizacion() {
                 aparecer perdidos al final de todo el contenido. Por eso no
                 hay ningún `overflow` puesto en esta caja de afuera — el único
                 scroll tiene que ser el del <iframe>, nunca dos superpuestos. */}
-            <div className="overflow-hidden rounded-lg border border-gris-calido-200 bg-white">
+            <div className="overflow-hidden rounded-lg border border-gris-calido-200 bg-white max-md:rounded-2xl">
               <div className={modoVista === 'movil' && !esMobile ? 'mx-auto w-[390px] py-4' : ''}>
                 <iframe
                   ref={iframeRef}
                   src="/_preview-barberia"
                   title="Vista previa de la página pública"
-                  className={`h-[80vh] border-0 bg-hueso ${
+                  className={`h-[80vh] border-0 bg-hueso max-md:h-[70dvh] ${
                     modoVista === 'movil'
                       ? esMobile
                         ? 'w-full'

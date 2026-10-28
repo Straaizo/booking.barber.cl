@@ -4,11 +4,13 @@ import { Loader } from '../../components/common/Loader'
 import { Button } from '../../components/common/Button'
 import { useHorariosDeBarbero, useCrearHorario, useActualizarHorario } from './hooks/useHorariosAdmin'
 import { useBarberosAdmin, useActualizarBarbero } from './hooks/useBarberosAdmin'
-import { FilaHorario } from './components/FilaHorario'
+import { useIsMobile } from '../../hooks/useIsMobile'
+import { FilaHorario, HojaNuevoBloque } from './components/FilaHorario'
 import { SelectorIntervaloReserva } from './components/SelectorIntervaloReserva'
 import { ExcepcionesHorario } from './components/ExcepcionesHorario'
 
 const DIAS = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
+const ETIQUETA_SECCION = 'mb-2 block px-1 font-sans! text-[13px] font-semibold uppercase tracking-[0.06em] text-gris-calido-500'
 
 export function PanelBarberoHorarios() {
   const { perfil } = useAuth()
@@ -21,6 +23,8 @@ export function PanelBarberoHorarios() {
 
   const [nuevo, setNuevo] = useState({ dia_semana: '1', hora_inicio: '09:00', hora_fin: '19:00' })
   const [errorEnvio, setErrorEnvio] = useState(null)
+  const [hojaNuevoAbierta, setHojaNuevoAbierta] = useState(false)
+  const esMovil = useIsMobile()
 
   async function agregarHorario(evento) {
     evento.preventDefault()
@@ -31,9 +35,85 @@ export function PanelBarberoHorarios() {
         hora_inicio: nuevo.hora_inicio,
         hora_fin: nuevo.hora_fin,
       })
+      setHojaNuevoAbierta(false)
     } catch {
       setErrorEnvio('No pudimos crear el horario. Intenta de nuevo.')
     }
+  }
+
+  // En el celular: misma lista compacta y hojas inferiores que el panel del dueño.
+  if (esMovil) {
+    return (
+      <div>
+        <h1 className="font-display text-[28px] font-light leading-tight tracking-tight text-negro-barbero">
+          Mis horarios
+        </h1>
+        <p className="mt-1 text-[15px] text-gris-calido-500">Solo se ofrecen horas dentro de tus bloques.</p>
+
+        <h2 className={`${ETIQUETA_SECCION} mt-7`}>Semana</h2>
+        {isLoading && (
+          <div className="py-12">
+            <Loader label="Cargando horarios" />
+          </div>
+        )}
+        {isError && (
+          <p role="alert" className="py-4 text-[15px] text-red-700">
+            No pudimos cargar tus horarios. Recarga la página o intenta más tarde.
+          </p>
+        )}
+        {horarios && (
+          <div className="divide-y divide-gris-calido-100 overflow-hidden rounded-2xl border border-gris-calido-200 bg-white">
+            {horarios.length === 0 && (
+              <p className="px-4 py-4 text-[15px] text-gris-calido-500">Todavía no tienes horarios cargados.</p>
+            )}
+            {horarios.map((horario) => (
+              <FilaHorario
+                key={horario.id}
+                horario={horario}
+                onGuardar={(cambios) => actualizarHorario.mutateAsync({ id: horario.id, cambios })}
+              />
+            ))}
+            <button
+              type="button"
+              onClick={() => setHojaNuevoAbierta(true)}
+              className="flex min-h-14 w-full items-center gap-3 px-4 text-left text-base font-medium text-cobre-texto active:bg-gris-calido-100"
+            >
+              <span aria-hidden="true" className="text-xl leading-none">
+                +
+              </span>
+              Nuevo bloque
+            </button>
+          </div>
+        )}
+
+        {barbero && (
+          <>
+            <h2 className={`${ETIQUETA_SECCION} mt-7`}>Reservas</h2>
+            <SelectorIntervaloReserva
+              barbero={barbero}
+              onGuardar={(valor) =>
+                actualizarBarbero.mutateAsync({
+                  id: barbero.id,
+                  cambios: { intervalo_reserva_minutos: valor },
+                })
+              }
+            />
+            <h2 className={`${ETIQUETA_SECCION} mt-7`}>Días puntuales</h2>
+            <ExcepcionesHorario barberoId={barbero.id} />
+          </>
+        )}
+
+        <HojaNuevoBloque
+          abierto={hojaNuevoAbierta}
+          onCerrar={() => setHojaNuevoAbierta(false)}
+          nuevo={nuevo}
+          setNuevo={setNuevo}
+          onSubmit={agregarHorario}
+          creando={crearHorario.isPending}
+          error={errorEnvio}
+        />
+      </div>
+    )
   }
 
   return (

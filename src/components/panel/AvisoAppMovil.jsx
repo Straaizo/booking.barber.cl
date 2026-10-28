@@ -72,38 +72,23 @@ export function AvisoAppMovil() {
   if (!ES_APP_INSTALADA) {
     contenido = (
       <>
-        <p className="font-display text-lg leading-snug">Instala la app</p>
-        <p className="mt-1 text-[15px] leading-relaxed text-gris-calido-200">
-          Abre tu panel desde la pantalla de inicio, como cualquier app
-          {recibeReservas ? ', y recibe un aviso con cada reserva nueva.' : '.'}
+        <p className="text-base font-semibold leading-snug">Instala la app</p>
+        <p className="mt-0.5 text-sm leading-snug text-gris-calido-200">
+          {recibeReservas ? 'Tu panel en la pantalla de inicio y avisos de cada reserva.' : 'Tu panel en la pantalla de inicio.'}
         </p>
         {puedeInstalar ? (
           <button
             type="button"
             onClick={instalar}
-            className="mt-4 min-h-12 w-full rounded-xl bg-cobre text-base font-semibold text-hueso active:brightness-90"
+            className="mt-3 min-h-12 w-full rounded-xl bg-cobre text-base font-semibold text-hueso active:brightness-90"
           >
             Instalar app
           </button>
         ) : ES_IOS ? (
-          <ol className="mt-4 flex flex-col gap-2.5 text-[15px] text-hueso">
-            <li className="flex items-center gap-3">
-              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white/10 text-sm">1</span>
-              <span className="flex items-center gap-1.5">
-                Toca <IconoCompartirIOS className="h-5 w-5 text-cobre-claro" /> <strong>Compartir</strong> en Safari
-              </span>
-            </li>
-            <li className="flex items-center gap-3">
-              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white/10 text-sm">2</span>
-              <span>
-                Elige <strong>Agregar a inicio</strong>
-              </span>
-            </li>
-            <li className="flex items-center gap-3">
-              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white/10 text-sm">3</span>
-              <span>Abre la app desde tu pantalla de inicio</span>
-            </li>
-          </ol>
+          <p className="mt-3 flex flex-wrap items-center gap-x-1.5 gap-y-1 rounded-xl bg-white/8 px-3 py-2.5 text-[15px] text-hueso">
+            Toca <IconoCompartirIOS className="h-5 w-5 text-cobre-claro" /> <strong>Compartir</strong> →{' '}
+            <strong>Agregar a inicio</strong>
+          </p>
         ) : (
           <p className="mt-3 text-[15px] text-hueso">
             Abre el menú <strong>⋮</strong> del navegador y elige <strong>Instalar app</strong> o{' '}
@@ -115,18 +100,18 @@ export function AvisoAppMovil() {
   } else if (puedeActivarPush && pushListo === false) {
     contenido = (
       <>
-        <p className="flex items-center gap-2 font-display text-lg leading-snug">
-          <IconoCampana className="h-6 w-6 text-cobre-claro" />
+        <p className="flex items-center gap-2 text-base font-semibold leading-snug">
+          <IconoCampana className="h-5 w-5 text-cobre-claro" />
           Activa las notificaciones
         </p>
-        <p className="mt-1 text-[15px] leading-relaxed text-gris-calido-200">
+        <p className="mt-0.5 text-sm leading-snug text-gris-calido-200">
           Te avisamos al instante cuando un cliente reserva: nombre, servicio y hora.
         </p>
         <button
           type="button"
           onClick={alActivarPush}
           disabled={procesando}
-          className="mt-4 min-h-12 w-full rounded-xl bg-cobre text-base font-semibold text-hueso active:brightness-90 disabled:opacity-70"
+          className="mt-3 min-h-12 w-full rounded-xl bg-cobre text-base font-semibold text-hueso active:brightness-90 disabled:opacity-70"
         >
           {procesando ? 'Activando…' : 'Activar notificaciones'}
         </button>
@@ -138,12 +123,12 @@ export function AvisoAppMovil() {
   if (!contenido) return null
 
   return (
-    <div className="relative mb-6 rounded-2xl bg-negro-barbero p-5 pr-12 text-hueso shadow-lg md:hidden">
+    <div className="relative mb-5 rounded-2xl bg-negro-barbero p-4 pr-11 text-hueso shadow-lg md:hidden">
       <button
         type="button"
         onClick={ocultar}
         aria-label="Ahora no"
-        className="absolute right-2 top-2 flex h-10 w-10 items-center justify-center rounded-full text-gris-calido-400 active:bg-white/10"
+        className="absolute right-1 top-1 flex h-11 w-11 items-center justify-center rounded-full text-gris-calido-400 active:bg-white/10"
       >
         <IconoX className="h-4 w-4" />
       </button>

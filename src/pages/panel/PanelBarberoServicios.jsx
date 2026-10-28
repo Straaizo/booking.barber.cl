@@ -1,4 +1,5 @@
 import { useAuth } from '../../hooks/useAuth'
+import { useIsMobile } from '../../hooks/useIsMobile'
 import { Loader } from '../../components/common/Loader'
 import { formatoCLP, ofertaVigente } from '../../utils/formatos'
 import { useServiciosDeBarberia } from './hooks/useServiciosPanel'
@@ -14,6 +15,86 @@ import { useServiciosDeBarberia } from './hooks/useServiciosPanel'
 export function PanelBarberoServicios() {
   const { perfil } = useAuth()
   const { data: servicios, isLoading, isError } = useServiciosDeBarberia(perfil.barberia_id, perfil.barbero_id)
+  const esMovil = useIsMobile()
+
+  // En el celular: lista agrupada de solo lectura, una fila por servicio.
+  if (esMovil) {
+    return (
+      <div>
+        <h1 className="font-display text-[28px] font-light leading-tight tracking-tight text-negro-barbero">
+          Mis servicios
+        </h1>
+        <p className="mt-1 text-[15px] text-gris-calido-500">
+          Los administra tu dueño. Si algo está mal, pídele que lo actualice.
+        </p>
+
+        <div className="mt-6">
+          {isLoading && (
+            <div className="py-12">
+              <Loader label="Cargando servicios" />
+            </div>
+          )}
+          {isError && (
+            <p role="alert" className="py-4 text-[15px] text-red-700">
+              No pudimos cargar los servicios. Recarga la página o intenta más tarde.
+            </p>
+          )}
+          {servicios && servicios.length === 0 && (
+            <p className="py-4 text-[15px] text-gris-calido-700">
+              Todavía no tienes servicios asignados. Pídele a tu dueño que los cree.
+            </p>
+          )}
+          {servicios && servicios.length > 0 && (
+            <div className="divide-y divide-gris-calido-100 overflow-hidden rounded-2xl border border-gris-calido-200 bg-white">
+              {servicios.map((servicio) => {
+                const enOferta = ofertaVigente(servicio)
+                return (
+                  <div key={servicio.id} className="flex min-h-[72px] items-center gap-3 px-4 py-3">
+                    {servicio.imagen_url ? (
+                      <img src={servicio.imagen_url} alt="" className="h-12 w-12 shrink-0 rounded-xl object-cover" />
+                    ) : (
+                      <span
+                        aria-hidden="true"
+                        className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-cobre/10 font-display text-lg text-cobre-texto"
+                      >
+                        {servicio.nombre.trim().charAt(0).toUpperCase()}
+                      </span>
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <span
+                        className={`block truncate text-base font-medium leading-snug ${servicio.activo ? 'text-negro-barbero' : 'text-gris-calido-400 line-through'}`}
+                      >
+                        {servicio.nombre}
+                      </span>
+                      <span className="block text-[15px] leading-snug text-gris-calido-500">
+                        {servicio.duracion_minutos} min
+                      </span>
+                    </div>
+                    <div className="numeros-tabulares shrink-0 text-right">
+                      {enOferta ? (
+                        <>
+                          <span className="block text-base font-semibold text-cobre-texto">
+                            {formatoCLP(servicio.precio_oferta)}
+                          </span>
+                          <span className="block text-[13px] text-gris-calido-400 line-through">
+                            {formatoCLP(servicio.precio_clp)}
+                          </span>
+                        </>
+                      ) : (
+                        <span className="block text-base font-semibold text-negro-barbero">
+                          {formatoCLP(servicio.precio_clp)}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div>

@@ -55,16 +55,17 @@ export function CambiarPassword({ onGuardar }) {
       <button
         type="button"
         onClick={() => setAbierto(true)}
-        className="versalitas flex items-center gap-1.5 text-xs text-gris-calido-500 transition-colors hover:text-cobre-texto"
+        className="flex items-center gap-1.5 text-xs text-gris-calido-500 transition-colors hover:text-cobre-texto md:font-semibold md:uppercase md:tracking-[0.07em] max-md:min-h-11 max-md:grow max-md:basis-[40%] max-md:justify-center max-md:gap-2 max-md:rounded-xl max-md:border max-md:border-gris-calido-200 max-md:text-[15px] max-md:text-negro-barbero max-md:active:bg-gris-calido-100"
       >
-        <IconoLlave className="h-3.5 w-3.5" />
-        Cambiar contraseña
+        <IconoLlave className="h-3.5 w-3.5 max-md:h-4 max-md:w-4 max-md:text-gris-calido-500" />
+        <span className="md:hidden">Contraseña</span>
+        <span className="max-md:hidden">Cambiar contraseña</span>
       </button>
     )
   }
 
   return (
-    <form onSubmit={guardar} className="flex flex-wrap items-center gap-2">
+    <form onSubmit={guardar} className="flex flex-wrap items-center gap-2 max-md:w-full max-md:basis-full">
       <input
         type="text"
         name="password_nueva"
@@ -72,12 +73,12 @@ export function CambiarPassword({ onGuardar }) {
         value={password}
         onChange={(e) => setPassword(e.target.value)}
         placeholder="Nueva contraseña"
-        className="min-h-9 w-40 border-b border-gris-calido-200 bg-transparent py-1 text-sm text-negro-barbero outline-none transition-colors focus:border-cobre"
+        className="min-h-9 w-40 border-b border-gris-calido-200 bg-transparent py-1 text-sm text-negro-barbero outline-none transition-colors focus:border-cobre max-md:min-h-12 max-md:w-full max-md:rounded-xl max-md:border max-md:bg-hueso/60 max-md:px-3.5"
       />
       <button
         type="submit"
         disabled={estado === 'guardando'}
-        className="versalitas text-xs text-cobre-texto transition-colors hover:text-cobre disabled:opacity-50"
+        className="text-xs text-cobre-texto transition-colors hover:text-cobre disabled:opacity-50 md:font-semibold md:uppercase md:tracking-[0.07em] max-md:min-h-11 max-md:grow max-md:basis-[40%] max-md:rounded-xl max-md:bg-cobre-oscuro max-md:text-[15px] max-md:font-semibold max-md:text-hueso"
       >
         Guardar
       </button>
@@ -87,12 +88,12 @@ export function CambiarPassword({ onGuardar }) {
           setAbierto(false)
           setPassword('')
         }}
-        className="versalitas text-xs text-gris-calido-500 transition-colors hover:text-negro-barbero"
+        className="text-xs text-gris-calido-500 transition-colors hover:text-negro-barbero md:font-semibold md:uppercase md:tracking-[0.07em] max-md:min-h-11 max-md:grow max-md:basis-[40%] max-md:rounded-xl max-md:border max-md:border-gris-calido-200 max-md:text-[15px] max-md:text-negro-barbero"
       >
         Cancelar
       </button>
       {estado && (
-        <span className={`versalitas text-xs ${estado === 'error' || estado === 'debil' ? 'text-red-700' : 'text-verde-barberia'}`}>
+        <span className={`versalitas text-xs max-md:w-full max-md:text-[13px] ${estado === 'error' || estado === 'debil' ? 'text-red-700' : 'text-verde-barberia'}`}>
           {ESTADOS_PASSWORD[estado]}
         </span>
       )}

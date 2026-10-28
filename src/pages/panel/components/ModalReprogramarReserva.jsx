@@ -136,13 +136,13 @@ export function ModalReprogramarReserva({ reserva, servicios, onGuardar, onCerra
           antes de reprogramar.
         </p>
       ) : (
-        <form onSubmit={guardar} className="flex flex-col gap-4">
-          <label className="flex flex-col gap-1">
-            <span className="versalitas text-xs text-gris-calido-500">Servicio</span>
+        <form onSubmit={guardar} className="flex flex-col gap-5 md:gap-4">
+          <label className="flex flex-col gap-1.5 md:gap-1">
+            <span className="text-[13px] font-semibold uppercase tracking-[0.06em] text-gris-calido-500 md:text-xs md:tracking-[0.07em]">Servicio</span>
             <select
               value={servicioId}
               onChange={(e) => setServicioId(Number(e.target.value))}
-              className="min-h-11 border-b border-gris-calido-200 bg-transparent py-2 text-sm text-negro-barbero outline-none transition-colors focus:border-cobre"
+              className="min-h-12 rounded-xl border border-gris-calido-200 bg-white px-3 py-2 text-sm md:min-h-11 md:rounded-none md:border-0 md:border-b md:bg-transparent md:px-0 text-negro-barbero outline-none transition-colors focus:border-cobre"
             >
               {servicios.map((s) => (
                 <option key={s.id} value={s.id}>
@@ -152,18 +152,18 @@ export function ModalReprogramarReserva({ reserva, servicios, onGuardar, onCerra
             </select>
           </label>
 
-          <label className="flex flex-col gap-1">
-            <span className="versalitas text-xs text-gris-calido-500">Fecha</span>
+          <label className="flex flex-col gap-1.5 md:gap-1">
+            <span className="text-[13px] font-semibold uppercase tracking-[0.06em] text-gris-calido-500 md:text-xs md:tracking-[0.07em]">Fecha</span>
             <input
               type="date"
               value={fechaInput}
               onChange={(e) => setFechaInput(e.target.value)}
-              className="min-h-11 w-full border-b border-gris-calido-200 bg-transparent py-2 text-sm text-negro-barbero outline-none transition-colors focus:border-cobre"
+              className="min-h-12 w-full rounded-xl border border-gris-calido-200 bg-white px-3 py-2 text-sm md:min-h-11 md:rounded-none md:border-0 md:border-b md:bg-transparent md:px-0 text-negro-barbero outline-none transition-colors focus:border-cobre"
             />
           </label>
 
           <div className="flex flex-col gap-2">
-            <span className="versalitas text-xs text-gris-calido-500">Hora</span>
+            <span className="text-[13px] font-semibold uppercase tracking-[0.06em] text-gris-calido-500 md:text-xs md:tracking-[0.07em]">Hora</span>
             {cargando ? (
               <div className="py-4">
                 <Loader label="Cargando horas" />
@@ -175,13 +175,13 @@ export function ModalReprogramarReserva({ reserva, servicios, onGuardar, onCerra
             ) : slots.length === 0 ? (
               <p className="text-sm text-gris-calido-500">Sin horas disponibles ese día para este servicio.</p>
             ) : (
-              <div className="flex flex-wrap gap-2">
+              <div className="grid grid-cols-4 gap-2 md:flex md:flex-wrap">
                 {slots.map((hora) => (
                   <button
                     key={hora}
                     type="button"
                     onClick={() => setHoraElegida(hora)}
-                    className={`numeros-tabulares min-h-11 min-w-16 rounded-full border px-3 text-sm font-medium transition-colors ${
+                    className={`numeros-tabulares min-h-12 min-w-16 rounded-xl border px-2 text-base font-medium md:min-h-11 md:rounded-full md:px-3 md:text-sm transition-colors ${
                       horaElegida === hora
                         ? 'border-cobre bg-cobre text-hueso'
                         : 'border-gris-calido-200 text-negro-barbero hover:border-cobre/50'
@@ -200,9 +200,18 @@ export function ModalReprogramarReserva({ reserva, servicios, onGuardar, onCerra
             </p>
           )}
 
-          <Button as="button" type="submit" disabled={guardando || !horaElegida} className="w-fit">
-            {guardando ? 'Guardando…' : 'Guardar cambios'}
-          </Button>
+          {/* En el celular el botón queda pegado abajo de la hoja: con muchas
+              horas disponibles no hay que bajar hasta el final para guardar. */}
+          <div className="max-md:sticky max-md:bottom-0 max-md:-mx-5 max-md:border-t max-md:border-gris-calido-100 max-md:bg-white max-md:px-5 max-md:pt-3 max-md:pb-[calc(env(safe-area-inset-bottom)+0.75rem)]">
+            <Button
+              as="button"
+              type="submit"
+              disabled={guardando || !horaElegida}
+              className="w-fit max-md:min-h-12 max-md:w-full max-md:rounded-xl max-md:disabled:opacity-50"
+            >
+              {guardando ? 'Guardando…' : 'Guardar cambios'}
+            </Button>
+          </div>
         </form>
       )}
     </ModalFormulario>

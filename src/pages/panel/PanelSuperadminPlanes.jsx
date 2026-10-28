@@ -32,14 +32,22 @@ function FilaPrecio({ plan, onGuardar }) {
   }
 
   return (
-    <div className="flex items-center justify-between gap-4 border-b border-gris-calido-200 py-4">
-      <div>
-        <span className="font-display block text-lg font-light text-negro-barbero">{plan.nombre}</span>
-        <span className="text-xs text-gris-calido-500">Hasta {plan.max_barberos} barberos</span>
-      </div>
-      <div className="flex items-center gap-3">
+    <div className="flex items-center justify-between gap-4 border-b border-gris-calido-200 py-4 max-md:gap-3 max-md:px-4 max-md:last:border-b-0">
+      <div className="max-md:min-w-0">
+        <span className="font-display block text-lg font-light text-negro-barbero max-md:text-xl">{plan.nombre}</span>
+        <span className="text-xs text-gris-calido-500 max-md:text-[14px]">Hasta {plan.max_barberos} barberos</span>
+        {/* En el celular el aviso va bajo el nombre: al lado del precio no cabe */}
         {estado && (
-          <span className={`versalitas text-xs ${estado === 'error' ? 'text-red-700' : 'text-verde-barberia'}`}>
+          <span
+            className={`versalitas mt-0.5 block text-[12px] md:hidden ${estado === 'error' ? 'text-red-700' : 'text-verde-barberia'}`}
+          >
+            {ESTADOS[estado]}
+          </span>
+        )}
+      </div>
+      <div className="flex items-center gap-3 max-md:shrink-0 max-md:gap-2">
+        {estado && (
+          <span className={`versalitas hidden text-xs md:inline ${estado === 'error' ? 'text-red-700' : 'text-verde-barberia'}`}>
             {ESTADOS[estado]}
           </span>
         )}
@@ -50,9 +58,9 @@ function FilaPrecio({ plan, onGuardar }) {
           value={valor}
           onChange={(e) => setValor(e.target.value)}
           onBlur={guardar}
-          className="numeros-tabulares w-24 border-b border-gris-calido-200 bg-transparent py-1 text-right text-negro-barbero outline-none transition-colors focus:border-cobre"
+          className="numeros-tabulares w-24 border-b border-gris-calido-200 bg-transparent py-1 text-right text-negro-barbero outline-none transition-colors focus:border-cobre max-md:min-h-11 max-md:w-28 max-md:rounded-xl max-md:border max-md:bg-hueso/60 max-md:px-3 max-md:[appearance:textfield] max-md:[&::-webkit-inner-spin-button]:appearance-none"
         />
-        <span className="text-xs text-gris-calido-500">/mes</span>
+        <span className="text-xs text-gris-calido-500 max-md:text-[14px]">/mes</span>
       </div>
     </div>
   )
@@ -72,14 +80,14 @@ export function PanelSuperadminPlanes() {
 
   return (
     <div>
-      <h1 className="font-display text-2xl font-light tracking-tight text-negro-barbero md:text-3xl">
+      <h1 className="font-display text-[28px] font-light leading-tight tracking-tight text-negro-barbero md:text-3xl md:leading-9">
         Precios
       </h1>
-      <p className="mt-2 max-w-lg text-sm text-gris-calido-700">
+      <p className="mt-2 max-w-lg text-sm text-gris-calido-700 max-md:text-[15px] max-md:text-gris-calido-500">
         Solo el precio mensual de cada plan — el nombre y el máximo de barberos no se editan acá.
       </p>
 
-      <div className="mt-8">
+      <div className="mt-8 max-md:mt-6">
         {isLoading && (
           <div className="py-12">
             <Loader label="Cargando planes" />
@@ -93,7 +101,7 @@ export function PanelSuperadminPlanes() {
         )}
 
         {planes && planes.length > 0 && (
-          <div className="border-t border-gris-calido-200">
+          <div className="border-t border-gris-calido-200 max-md:overflow-hidden max-md:rounded-2xl max-md:border max-md:bg-white">
             {planes.map((plan) => (
               <FilaPrecio
                 key={plan.id}

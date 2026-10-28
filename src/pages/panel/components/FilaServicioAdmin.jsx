@@ -5,11 +5,34 @@ import { SelectorArchivo } from '../../../components/common/SelectorArchivo'
 import { ModalAsignarBarberos } from './ModalAsignarBarberos'
 import { subirImagenBarberia, borrarImagenBarberia } from '../../../services/storageImagenes'
 import { errorDeOferta } from '../../../utils/ofertas'
+import { formatoCLP, ofertaVigente } from '../../../utils/formatos'
+import { useIsMobile } from '../../../hooks/useIsMobile'
 
 const ESTADOS = {
   guardando: 'Guardando…',
   guardado: 'Guardado',
   error: 'No se pudo guardar',
+}
+
+const ETIQUETA_MOVIL = 'text-[13px] font-semibold uppercase tracking-[0.06em] text-gris-calido-500'
+const CAMPO_MOVIL =
+  'numeros-tabulares min-h-12 w-full appearance-none rounded-xl [&::-webkit-inner-spin-button]:appearance-none border border-gris-calido-200 bg-white px-3.5 text-base text-negro-barbero outline-none transition-colors focus:border-cobre'
+
+function TextoEstadoMovil({ estado }) {
+  return (
+    <AnimatePresence mode="wait">
+      <motion.span
+        key={estado}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        role={estado === 'error' ? 'alert' : undefined}
+        className={`text-[13px] font-medium ${estado === 'error' ? 'text-red-700' : 'text-verde-barberia'}`}
+      >
+        {ESTADOS[estado]}
+      </motion.span>
+    </AnimatePresence>
+  )
 }
 
 export function FilaServicioAdmin({ servicio, barberiaId, barberos, onGuardar }) {
@@ -24,6 +47,8 @@ export function FilaServicioAdmin({ servicio, barberiaId, barberos, onGuardar })
   const [errorOferta, setErrorOferta] = useState(null)
   const [subiendoImagen, setSubiendoImagen] = useState(false)
   const [modalBarberosAbierto, setModalBarberosAbierto] = useState(false)
+  const [desplegado, setDesplegado] = useState(false)
+  const esMovil = useIsMobile()
 
   useEffect(() => {
     setCampos({
@@ -110,6 +135,230 @@ export function FilaServicioAdmin({ servicio, barberiaId, barberos, onGuardar })
     }
     setErrorOferta(null)
     guardar({ precio_oferta: valor })
+  }
+
+  // En el celular el servicio es una fila compacta (foto, nombre, duración y
+  // precio) que se despliega como acordeón con los mismos campos y el mismo
+  // guardado automático de la tarjeta de escritorio.
+  if (esMovil) {
+    const enOferta = ofertaVigente(servicio)
+    const textoBarberos =
+      (servicio.barbero_ids ?? []).length === 0
+        ? 'Todos'
+        : (barberos ?? [])
+            .filter((barbero) => servicio.barbero_ids.includes(barbero.id))
+            .map((barbero) => barbero.nombre)
+            .join(', ')
+    return (
+      <div data-fila-servicio>
+        <button
+          type="button"
+          onClick={() => setDesplegado((d) => !d)}
+          aria-expanded={desplegado}
+          className="flex min-h-[72px] w-full items-center gap-3 px-4 py-3 text-left active:bg-gris-calido-100"
+        >
+          {servicio.imagen_url ? (
+            <img src={servicio.imagen_url} alt="" className="h-12 w-12 shrink-0 rounded-xl object-cover" />
+          ) : (
+            <span
+              aria-hidden="true"
+              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-cobre/10 font-display text-lg text-cobre-texto"
+            >
+              {servicio.nombre.trim().charAt(0).toUpperCase()}
+            </span>
+          )}
+          <span className="min-w-0 flex-1">
+            <span
+              className={`block truncate text-base font-medium leading-snug ${servicio.activo ? 'text-negro-barbero' : 'text-gris-calido-400'}`}
+            >
+              {servicio.nombre}
+            </span>
+            <span className="numeros-tabulares flex flex-wrap items-center gap-x-1.5 text-[15px] leading-snug text-gris-calido-500">
+              <span>{servicio.duracion_minutos} min</span>
+              <span aria-hidden="true">·</span>
+              {enOferta ? (
+                <>
+                  <span className="font-medium text-cobre-texto">{formatoCLP(servicio.precio_oferta)}</span>
+                  <span className="text-[13px] text-gris-calido-400 line-through">{formatoCLP(servicio.precio_clp)}</span>
+                </>
+              ) : (
+                <span>{formatoCLP(servicio.precio_clp ?? 0)}</span>
+              )}
+            </span>
+          </span>
+          <span className="flex shrink-0 items-center gap-2">
+            {estado ? (
+              <TextoEstadoMovil estado={estado} />
+            ) : (
+              !servicio.activo && (
+                <span className="rounded-full bg-gris-calido-100 px-2 py-0.5 text-[13px] font-medium text-gris-calido-500">
+                  Oculto
+                </span>
+              )
+            )}
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+              className={`h-5 w-5 text-gris-calido-400 transition-transform duration-200 ${desplegado ? 'rotate-180' : ''}`}
+            >
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          </span>
+        </button>
+
+        <AnimatePresence initial={false}>
+          {desplegado && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.25 }}
+              className="overflow-hidden"
+            >
+              <div className="flex flex-col gap-4 border-t border-gris-calido-100 bg-hueso/40 px-4 pb-5 pt-4">
+                <div className="flex min-h-14 items-center justify-between gap-3 rounded-xl border border-gris-calido-200 bg-white px-4">
+                  <span className="text-base text-negro-barbero">
+                    {servicio.activo ? 'Publicado' : 'Oculto en tu página'}
+                  </span>
+                  <Interruptor
+                    activo={servicio.activo}
+                    etiqueta={`Publicado: ${servicio.nombre}`}
+                    onCambiar={(valor) => guardar({ activo: valor })}
+                  />
+                </div>
+
+                <label className="flex flex-col gap-1.5">
+                  <span className={ETIQUETA_MOVIL}>Nombre</span>
+                  <input
+                    type="text"
+                    name="nombre"
+                    value={campos.nombre}
+                    onChange={(e) => setCampos((c) => ({ ...c, nombre: e.target.value }))}
+                    onBlur={commitTexto}
+                    className={CAMPO_MOVIL}
+                  />
+                </label>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <label className="flex min-w-0 flex-col gap-1.5">
+                    <span className={ETIQUETA_MOVIL}>Duración (min)</span>
+                    <input
+                      type="number"
+                      min="0"
+                      inputMode="numeric"
+                      name="duracion_minutos"
+                      value={campos.duracion_minutos}
+                      onChange={(e) => setCampos((c) => ({ ...c, duracion_minutos: e.target.value }))}
+                      onBlur={() =>
+                        commitNumero('duracion_minutos', campos.duracion_minutos, servicio.duracion_minutos)
+                      }
+                      className={CAMPO_MOVIL}
+                    />
+                  </label>
+                  <label className="flex min-w-0 flex-col gap-1.5">
+                    <span className={ETIQUETA_MOVIL}>Precio</span>
+                    <input
+                      type="number"
+                      min="0"
+                      inputMode="numeric"
+                      name="precio_clp"
+                      value={campos.precio_clp}
+                      onChange={(e) => setCampos((c) => ({ ...c, precio_clp: e.target.value }))}
+                      onBlur={() => commitNumero('precio_clp', campos.precio_clp, servicio.precio_clp)}
+                      className={CAMPO_MOVIL}
+                    />
+                  </label>
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <div className="flex min-h-8 items-center justify-between">
+                    <span className={ETIQUETA_MOVIL}>Precio oferta</span>
+                    <Interruptor
+                      activo={servicio.oferta_activa}
+                      etiqueta={`Oferta activa de ${servicio.nombre}`}
+                      onCambiar={alternarOferta}
+                    />
+                  </div>
+                  <input
+                    type="number"
+                    min="0"
+                    inputMode="numeric"
+                    placeholder="Sin oferta"
+                    name="precio_oferta"
+                    value={campos.precio_oferta}
+                    onChange={(e) => setCampos((c) => ({ ...c, precio_oferta: e.target.value }))}
+                    onBlur={commitPrecioOferta}
+                    className={CAMPO_MOVIL}
+                  />
+                  {errorOferta && (
+                    <p role="alert" className="text-[15px] text-red-700">
+                      {errorOferta}
+                    </p>
+                  )}
+                </div>
+
+                <label className="flex flex-col gap-1.5">
+                  <span className={ETIQUETA_MOVIL}>Descripción</span>
+                  <textarea
+                    name="descripcion"
+                    rows={3}
+                    value={campos.descripcion}
+                    onChange={(e) => setCampos((c) => ({ ...c, descripcion: e.target.value }))}
+                    onBlur={commitDescripcion}
+                    placeholder="Qué incluye este servicio."
+                    className="resize-none rounded-xl border border-gris-calido-200 bg-white px-3.5 py-3 text-base text-negro-barbero outline-none transition-colors focus:border-cobre"
+                  />
+                </label>
+
+                <div className="flex items-center gap-3">
+                  {servicio.imagen_url ? (
+                    <img src={servicio.imagen_url} alt={servicio.nombre} className="h-16 w-20 shrink-0 rounded-xl object-cover" />
+                  ) : (
+                    <div className="flex h-16 w-20 shrink-0 items-center justify-center rounded-xl border border-dashed border-gris-calido-200 bg-white text-[13px] text-gris-calido-400">
+                      Sin foto
+                    </div>
+                  )}
+                  <SelectorArchivo
+                    etiqueta={servicio.imagen_url ? 'Cambiar foto' : 'Agregar foto'}
+                    cargando={subiendoImagen}
+                    onChange={cambiarImagen}
+                    className="min-h-11 flex-1 justify-center bg-white"
+                  />
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setModalBarberosAbierto(true)}
+                  className="flex min-h-14 items-center justify-between gap-3 rounded-xl border border-gris-calido-200 bg-white px-4 text-left"
+                >
+                  <span className="shrink-0 text-base text-negro-barbero">Barberos</span>
+                  <span className="flex min-w-0 items-center gap-1 text-[15px] text-gris-calido-500">
+                    <span className="truncate">{textoBarberos}</span>
+                    <span aria-hidden="true" className="text-lg leading-none text-gris-calido-400">
+                      ›
+                    </span>
+                  </span>
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <ModalAsignarBarberos
+          abierto={modalBarberosAbierto}
+          servicioNombre={servicio.nombre}
+          barberos={barberos}
+          barberoIds={servicio.barbero_ids ?? []}
+          onGuardar={(barbero_ids) => guardar({ barbero_ids })}
+          onCerrar={() => setModalBarberosAbierto(false)}
+        />
+      </div>
+    )
   }
 
   return (
