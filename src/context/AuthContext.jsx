@@ -3,6 +3,7 @@ import { supabase } from '../services/supabaseClient'
 import { obtenerPerfil, iniciarSesion, cerrarSesion, vincularGoogle, ErrorLogin } from '../services/authService'
 import { eliminarCuentaHuerfanaPropia } from '../services/usuariosService'
 import { desactivarPush } from '../services/pushService'
+import { queryClient } from '../services/queryClient'
 import {
   HAY_BACKEND_REAL,
   SUPERADMIN_PROVISORIO,
@@ -26,6 +27,10 @@ const PERFIL_SUPERADMIN_PROVISORIO = {
 }
 
 export const AuthContext = createContext(null)
+
+// Usuario de la última sesión vista — para vaciar la caché de datos solo
+// cuando de verdad cambia la cuenta (ver onAuthStateChange abajo).
+let ultimoUsuarioId = null
 
 // La sesión provisoria en sí (quién quedó logueado) sobrevive a un refresh
 // guardada acá — separada de "Ver como" (abajo), que es solo una vista previa
@@ -183,7 +188,10 @@ export function AuthProvider({ children }) {
       }
     }
 
-    supabase.auth.getSession().then(({ data }) => cargarPerfil(data.session))
+    supabase.auth.getSession().then(({ data }) => {
+      ultimoUsuarioId = data.session?.user?.id ?? null
+      cargarPerfil(data.session)
+    })
 
     const { data: suscripcion } = supabase.auth.onAuthStateChange((evento, sesionActual) => {
       // Supabase re-dispara este evento (TOKEN_REFRESHED/INITIAL_SESSION) cada
@@ -194,6 +202,15 @@ export function AuthProvider({ children }) {
       if (evento === 'TOKEN_REFRESHED' || evento === 'INITIAL_SESSION') {
         setSesion(sesionActual)
         return
+      }
+      // Cambio real de sesión (entra o sale alguien): se descarta todo lo
+      // que quedó en caché de la sesión anterior. Sin esto, al cambiar de
+      // cuenta en el mismo teléfono se mostraban datos pedidos con la cuenta
+      // anterior (ej. metas vacías del barbero al volver a entrar como dueño).
+      const usuarioId = sesionActual?.user?.id ?? null
+      if (usuarioId !== ultimoUsuarioId) {
+        queryClient.clear()
+        ultimoUsuarioId = usuarioId
       }
       setCargando(true)
       cargarPerfil(sesionActual)
@@ -226,6 +243,7 @@ export function AuthProvider({ children }) {
     // Antes de `cerrarSesion()`: borrar la fila necesita el JWT de esta sesión.
     await desactivarPush().catch(() => {})
     await cerrarSesion()
+    queryClient.clear()
   }
 
   // "Ver como" es una vista previa que solo el dueño puede activar sobre su

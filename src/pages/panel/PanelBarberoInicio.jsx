@@ -6,7 +6,7 @@ import { Loader } from '../../components/common/Loader'
 import { IconoCalendario } from '../../components/panel/IconosNav'
 import { diaSantiagoComoFechaLocal, hoyEnSantiago } from '../../utils/horaLocal'
 import { useReservasDeBarbero, useRealtimeReservas } from './hooks/useReservasBandeja'
-import { useMetasMes, useResumenMes } from './hooks/useResumen'
+import { useAvanceMetaBarberia, useMetasMes, useResumenMes } from './hooks/useResumen'
 
 const FORMATO_MES = new Intl.DateTimeFormat('es-CL', { month: 'long' })
 
@@ -36,10 +36,12 @@ function variacion(actual, anterior) {
 // Meta del mes en porcentaje y ritmo — nunca montos: el barbero ve cuánto
 // avanzó, no cuánto dinero representa. El ritmo compara ese avance con la
 // parte del mes que ya pasó (a mitad de mes, ir en 50% o más es ir al día).
-function TarjetaMeta({ meta, ingresos, mes }) {
+// Usa su meta propia si el dueño le asignó una; si no, la de la barbería.
+function TarjetaMeta({ porcentaje, deEquipo, mes }) {
   const nombre = FORMATO_MES.format(mes)
+  const titulo = deEquipo ? `Meta de la barbería · ${nombre}` : `Tu meta de ${nombre}`
 
-  if (!meta) {
+  if (porcentaje == null) {
     return (
       <section className="rounded-2xl bg-negro-barbero p-5 text-hueso md:max-w-xl">
         <p className="text-[13px] font-semibold uppercase tracking-[0.06em] text-gris-calido-400">Tu meta de {nombre}</p>
@@ -51,7 +53,6 @@ function TarjetaMeta({ meta, ingresos, mes }) {
     )
   }
 
-  const porcentaje = Math.round((ingresos / meta) * 100)
   const hoy = hoyEnSantiago()
   const diasDelMes = new Date(mes.getFullYear(), mes.getMonth() + 1, 0).getDate()
   const esperado = Math.round((hoy.getDate() / diasDelMes) * 100)
@@ -59,15 +60,22 @@ function TarjetaMeta({ meta, ingresos, mes }) {
 
   let ritmo
   if (porcentaje >= 100) ritmo = { texto: '🎉 ¡Meta cumplida!', clase: 'text-hueso' }
-  else if (diferencia >= 0) ritmo = { texto: diferencia >= 10 ? 'Vas adelantado ✓' : 'Vas al día ✓', clase: 'text-[#9fd3b1]' }
-  else ritmo = { texto: `Vas ${Math.abs(diferencia)}% atrasado`, clase: 'text-cobre-claro' }
+  else if (diferencia >= 0)
+    ritmo = {
+      texto: diferencia >= 10 ? (deEquipo ? 'Vamos adelantados ✓' : 'Vas adelantado ✓') : deEquipo ? 'Vamos al día ✓' : 'Vas al día ✓',
+      clase: 'text-[#9fd3b1]',
+    }
+  else {
+    const atraso = Math.abs(diferencia)
+    ritmo = { texto: deEquipo ? `Vamos ${atraso}% atrasados` : `Vas ${atraso}% atrasado`, clase: 'text-cobre-claro' }
+  }
 
   return (
     <section className="rounded-2xl bg-negro-barbero p-5 text-hueso shadow-lg md:max-w-xl">
-      <p className="text-[13px] font-semibold uppercase tracking-[0.06em] text-gris-calido-400">Tu meta de {nombre}</p>
+      <p className="text-[13px] font-semibold uppercase tracking-[0.06em] text-gris-calido-400">{titulo}</p>
       <div className="mt-1 flex items-baseline justify-between gap-2">
         <p className="text-[15px] text-gris-calido-200">
-          Vas en <strong className="numeros-tabulares text-[34px] font-semibold text-hueso">{porcentaje}%</strong>
+          {deEquipo ? 'Vamos en' : 'Vas en'} <strong className="numeros-tabulares text-[34px] font-semibold text-hueso">{porcentaje}%</strong>
         </p>
         <p className={`text-[15px] font-semibold ${ritmo.clase}`}>{ritmo.texto}</p>
       </div>
@@ -89,7 +97,9 @@ function TarjetaMeta({ meta, ingresos, mes }) {
         )}
       </div>
       {porcentaje < 100 && (
-        <p className="mt-2 text-[13px] text-gris-calido-400">La marca blanca es donde deberías ir hoy ({esperado}%).</p>
+        <p className="mt-2 text-[13px] text-gris-calido-400">
+          La marca blanca es donde {deEquipo ? 'deberíamos' : 'deberías'} ir hoy ({esperado}%).
+        </p>
       )}
     </section>
   )
@@ -129,6 +139,8 @@ export function PanelBarberoInicio() {
   const propio = resumen?.find((f) => f.barbero_id === perfil.barbero_id)
   const propioAnterior = resumenAnterior?.find((f) => f.barbero_id === perfil.barbero_id)
   const meta = metas?.find((m) => m.barbero_id === perfil.barbero_id)?.meta_ingresos_clp
+  const { data: avanceEquipo } = useAvanceMetaBarberia(mes, metas !== undefined && !meta)
+  const porcentajePropio = meta ? Math.round(((propio?.ingresos_agendados ?? 0) / meta) * 100) : null
 
   const { deHoy, proxima, sinConfirmar } = useMemo(() => {
     const confirmadas = (reservas ?? []).filter((r) => r.estado === 'confirmada')
@@ -165,7 +177,11 @@ export function PanelBarberoInicio() {
         </p>
       </div>
 
-      <TarjetaMeta meta={meta} ingresos={propio?.ingresos_agendados ?? 0} mes={mes} />
+      <TarjetaMeta
+        porcentaje={meta ? porcentajePropio : (avanceEquipo ?? null)}
+        deEquipo={!meta}
+        mes={mes}
+      />
 
       {sinConfirmar > 0 && (
         <Link

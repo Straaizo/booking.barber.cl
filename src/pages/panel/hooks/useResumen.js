@@ -73,6 +73,21 @@ export function useMetasMes(mes) {
   })
 }
 
+// Porcentaje de avance de la barbería hacia su meta general (sin montos) —
+// para el barbero sin meta propia. `null` si el mes no tiene meta general.
+export function useAvanceMetaBarberia(mes, habilitado = true) {
+  return useQuery({
+    queryKey: ['avance_meta_barberia', claveMes(mes)],
+    queryFn: async () => {
+      if (!HAY_BACKEND_REAL) return 64
+      const { data, error } = await supabase.rpc('avance_meta_barberia', { p_mes: claveMes(mes) })
+      if (error) throw error
+      return data
+    },
+    enabled: habilitado,
+  })
+}
+
 export function useGuardarMetas(mes) {
   const queryClient = useQueryClient()
   return useMutation({
