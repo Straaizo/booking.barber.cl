@@ -1,35 +1,16 @@
-import { NavLink, Outlet } from 'react-router-dom'
+import { Outlet } from 'react-router-dom'
 import { PanelShell } from '../../components/panel/PanelShell'
+import { IconoEtiqueta, IconoMegafono, IconoTienda } from '../../components/panel/IconosNav'
 
 const SECCIONES = [
-  { to: '/admin', etiqueta: 'Barberías', fin: true },
-  { to: '/admin/planes', etiqueta: 'Precios' },
-  { to: '/admin/novedades', etiqueta: 'Novedades' },
+  { to: '/admin', etiqueta: 'Barberías', fin: true, Icono: IconoTienda },
+  { to: '/admin/planes', etiqueta: 'Precios', Icono: IconoEtiqueta },
+  { to: '/admin/novedades', etiqueta: 'Novedades', Icono: IconoMegafono },
 ]
 
-function PestanaNav({ to, etiqueta, fin }) {
-  return (
-    <NavLink
-      to={to}
-      end={fin}
-      className={({ isActive }) =>
-        `versalitas whitespace-nowrap border-b-2 px-1 py-4 text-xs transition-colors ${
-          isActive
-            ? 'border-cobre text-negro-barbero'
-            : 'border-transparent text-gris-calido-500 hover:text-negro-barbero'
-        }`
-      }
-    >
-      {etiqueta}
-    </NavLink>
-  )
-}
-
 export function PanelSuperadminLayout() {
-  const nav = SECCIONES.map((seccion) => <PestanaNav key={seccion.to} {...seccion} />)
-
   return (
-    <PanelShell nav={<div className="flex gap-6">{nav}</div>} rutaCuenta="/admin/cuenta">
+    <PanelShell secciones={SECCIONES} rutaCuenta="/admin/cuenta">
       <Outlet />
     </PanelShell>
   )

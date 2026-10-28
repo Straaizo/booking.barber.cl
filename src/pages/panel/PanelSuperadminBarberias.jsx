@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { Loader } from '../../components/common/Loader'
 import { HoverLink } from '../../components/common/HoverLink'
 import { Button } from '../../components/common/Button'
@@ -60,10 +61,10 @@ function formatoFechaCorta(fecha) {
   return fecha.toLocaleDateString('es-CL', { day: 'numeric', month: 'short' })
 }
 
-function PildoraEstado({ estadoId }) {
+function PildoraEstado({ estadoId, className = 'text-[10px]' }) {
   return (
     <span
-      className={`versalitas inline-flex w-fit items-center whitespace-nowrap rounded-full px-2.5 py-1 text-[10px] ${ESTILO_ESTADO[estadoId]}`}
+      className={`versalitas inline-flex w-fit items-center whitespace-nowrap rounded-full px-2.5 py-1 ${className} ${ESTILO_ESTADO[estadoId]}`}
     >
       {NOMBRE_ESTADO_CORTO[estadoId]}
     </span>
@@ -100,6 +101,47 @@ function Estadistica({ etiqueta, valor, activa, onClick }) {
 // todo el resto de las columnas quedaba corrido entre el encabezado y las
 // filas (confirmado midiendo posiciones reales con Playwright, no a ojo).
 const COLUMNAS_GRID = 'grid grid-cols-2 gap-x-4 gap-y-2 md:grid-cols-[1fr_7rem_9rem_8rem_7rem] md:items-center'
+
+// En el celular cada barbería es una tarjeta tocable completa (no una fila de
+// tabla con un enlace chico al final) — el dedo necesita un objetivo grande.
+function TarjetaBarberia({ barberia }) {
+  const proximo =
+    barberia.estado_id === ESTADO_ACTIVO && barberia.fecha_activacion
+      ? proximoPago(barberia.fecha_activacion)
+      : null
+
+  return (
+    <Link
+      to={`/admin/barberias/${barberia.id}`}
+      className="flex items-center gap-3 rounded-2xl border border-gris-calido-200 bg-white p-4 transition-colors active:bg-gris-calido-100"
+    >
+      <div className="min-w-0 flex-1">
+        <div className="flex items-start justify-between gap-3">
+          <span className="min-w-0 truncate text-[17px] font-semibold leading-snug text-negro-barbero">
+            {barberia.nombre}
+          </span>
+          <PildoraEstado estadoId={barberia.estado_id} className="shrink-0 text-[11px]" />
+        </div>
+        <span className="mt-0.5 block truncate text-[14px] text-gris-calido-500">/{barberia.slug}</span>
+        <div className="mt-3 flex items-center gap-x-4 text-[14px] text-gris-calido-700">
+          <span className="min-w-0 truncate">
+            <span className="text-gris-calido-500">Plan </span>
+            {barberia.planes?.nombre ?? '—'}
+          </span>
+          {proximo && (
+            <span className="numeros-tabulares shrink-0">
+              <span className="text-gris-calido-500">Pago </span>
+              {formatoFechaCorta(proximo)}
+            </span>
+          )}
+        </div>
+      </div>
+      <svg viewBox="0 0 24 24" className="h-5 w-5 shrink-0 text-gris-calido-400" aria-hidden="true">
+        <path d="m9 6 6 6-6 6" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    </Link>
+  )
+}
 
 function FilaBarberia({ barberia }) {
   const proximo =
@@ -242,29 +284,44 @@ export function PanelSuperadminBarberias() {
     <div>
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="font-display text-2xl font-light tracking-tight text-negro-barbero md:text-3xl">
+          <h1 className="font-display text-[28px] font-light leading-tight tracking-tight text-negro-barbero md:text-3xl md:leading-9">
             Barberías
           </h1>
-          <p className="mt-2 max-w-lg text-sm text-gris-calido-700">
+          {barberias && (
+            <p className="mt-1 text-[15px] text-gris-calido-500 md:hidden">
+              {barberias.length} {barberias.length === 1 ? 'registrada' : 'registradas'} en la plataforma
+            </p>
+          )}
+          <p className="mt-2 hidden max-w-lg text-sm text-gris-calido-700 md:block">
             Todas las barberías registradas en la plataforma
             {barberias ? ` — ${barberias.length}` : ''}.
           </p>
         </div>
-        <Button as="button" type="button" onClick={() => setModalNuevaAbierto(true)} className="w-fit">
+        <Button as="button" type="button" onClick={() => setModalNuevaAbierto(true)}
+          className="w-fit max-md:min-h-12 max-md:w-full max-md:rounded-xl max-md:text-base"
+        >
           + Nueva barbería
         </Button>
       </div>
 
       {proximasAPagar.length > 0 && (
-        <div className="mt-6 rounded-lg border border-cobre/30 bg-cobre/5 p-5">
-          <span className="versalitas text-xs text-cobre">— Próximos a pagar</span>
-          <div className="mt-3 flex flex-col gap-2">
+        <div className="mt-6 rounded-lg border border-cobre/30 bg-cobre/5 p-5 max-md:rounded-2xl max-md:p-4">
+          <span className="text-xs font-semibold uppercase tracking-[0.07em] text-cobre max-md:text-[13px] max-md:tracking-[0.06em] max-md:text-cobre-texto">
+            — Próximos a pagar
+          </span>
+          <div className="mt-3 flex flex-col gap-2 max-md:mt-2 max-md:gap-0">
             {proximasAPagar.map((barberia) => (
-              <div key={barberia.id} className="flex flex-wrap items-center justify-between gap-3">
-                <HoverLink href={`/admin/barberias/${barberia.id}`} className="text-sm">
+              <div
+                key={barberia.id}
+                className="flex flex-wrap items-center justify-between gap-3 max-md:min-h-11 max-md:flex-nowrap"
+              >
+                <HoverLink
+                  href={`/admin/barberias/${barberia.id}`}
+                  className="text-sm max-md:min-w-0 max-md:truncate max-md:text-[15px] max-md:font-medium"
+                >
                   {barberia.nombre}
                 </HoverLink>
-                <span className="numeros-tabulares versalitas text-xs text-gris-calido-600">
+                <span className="numeros-tabulares shrink-0 text-xs font-semibold uppercase tracking-[0.07em] text-gris-calido-600 max-md:text-[13px] max-md:tracking-[0.04em]">
                   {textoDiasHasta(barberia.dias)} ({formatoFechaCorta(proximoPago(barberia.fecha_activacion))})
                 </span>
               </div>
@@ -274,7 +331,7 @@ export function PanelSuperadminBarberias() {
       )}
 
       {barberias && barberias.length > 0 && (
-        <div className="mt-6 flex flex-wrap gap-3">
+        <div className="mt-6 hidden flex-wrap gap-3 md:flex">
           <Estadistica etiqueta="Total" valor={conteos.total} activa={filtroEstado === 'todas'} onClick={() => setFiltroEstado('todas')} />
           <Estadistica
             etiqueta="Activas"
@@ -303,7 +360,7 @@ export function PanelSuperadminBarberias() {
         </div>
       )}
 
-      <div className="mt-8">
+      <div className="mt-8 max-md:mt-6">
         {isLoading && (
           <div className="py-12">
             <Loader label="Cargando barberías" />
@@ -325,29 +382,34 @@ export function PanelSuperadminBarberias() {
         {barberias && barberias.length > 0 && (
           <>
             <div className="flex flex-wrap items-center gap-3">
-              <label className="relative flex min-w-[14rem] flex-1 items-center">
-                <IconoBuscar className="pointer-events-none absolute left-0 h-4 w-4 text-gris-calido-400" />
+              <label className="relative flex min-w-[14rem] flex-1 items-center max-md:basis-full">
+                <IconoBuscar className="pointer-events-none absolute left-0 h-4 w-4 text-gris-calido-400 max-md:left-4 max-md:h-5 max-md:w-5" />
                 <input
                   type="text"
                   value={busqueda}
                   onChange={(e) => setBusqueda(e.target.value)}
                   placeholder="Buscar por nombre o slug…"
-                  className="min-h-11 w-full border-b border-gris-calido-200 bg-transparent py-2 pl-6 text-sm text-negro-barbero outline-none transition-colors focus:border-cobre"
+                  className="min-h-11 w-full border-b border-gris-calido-200 bg-transparent py-2 pl-6 text-sm text-negro-barbero outline-none transition-colors focus:border-cobre max-md:min-h-12 max-md:rounded-xl max-md:border max-md:bg-white max-md:pl-11 max-md:pr-4"
                 />
               </label>
-              <div className="flex flex-wrap gap-2">
+              {/* En el celular los filtros van en una sola fila desplazable, con
+                  el conteo de cada estado (reemplaza las tarjetas de números). */}
+              <div className="flex flex-wrap gap-2 max-md:-mx-4 max-md:w-[calc(100%+2rem)] max-md:flex-nowrap max-md:overflow-x-auto max-md:px-4 max-md:[scrollbar-width:none]">
                 {FILTROS_ESTADO.map((filtro) => (
                   <button
                     key={filtro.id}
                     type="button"
                     onClick={() => setFiltroEstado(filtro.id)}
-                    className={`versalitas rounded-full px-3 py-1.5 text-[10px] transition-colors ${
+                    className={`rounded-full px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.07em] transition-colors max-md:min-h-10 max-md:shrink-0 max-md:px-4 max-md:text-[15px] max-md:font-medium max-md:normal-case max-md:tracking-normal ${
                       filtroEstado === filtro.id
-                        ? 'bg-cobre text-hueso'
-                        : 'bg-gris-calido-100 text-gris-calido-600 hover:bg-cobre/10'
+                        ? 'bg-cobre text-hueso max-md:bg-negro-barbero'
+                        : 'bg-gris-calido-100 text-gris-calido-600 hover:bg-cobre/10 max-md:border max-md:border-gris-calido-200 max-md:bg-white max-md:text-gris-calido-700'
                     }`}
                   >
                     {filtro.etiqueta}
+                    <span className="numeros-tabulares ml-1.5 opacity-60 md:hidden">
+                      {filtro.id === 'todas' ? conteos.total : conteos[filtro.id]}
+                    </span>
                   </button>
                 ))}
               </div>
@@ -358,7 +420,13 @@ export function PanelSuperadminBarberias() {
                 Ninguna barbería coincide con esa búsqueda o filtro.
               </p>
             ) : (
-              <div className="mt-4">
+              <>
+                <div className="mt-4 flex flex-col gap-3 md:hidden">
+                  {barberiasFiltradas.map((barberia) => (
+                    <TarjetaBarberia key={barberia.id} barberia={barberia} />
+                  ))}
+                </div>
+                <div className="mt-4 hidden md:block">
                 <div className={`${COLUMNAS_GRID} hidden border-b border-gris-calido-200 pb-2 pt-4 md:grid`}>
                   <span className="versalitas text-[10px] text-gris-calido-400">Nombre</span>
                   <span className="versalitas text-[10px] text-gris-calido-400">Plan</span>
@@ -369,7 +437,8 @@ export function PanelSuperadminBarberias() {
                 {barberiasFiltradas.map((barberia) => (
                   <FilaBarberia key={barberia.id} barberia={barberia} />
                 ))}
-              </div>
+                </div>
+              </>
             )}
           </>
         )}
@@ -384,7 +453,7 @@ export function PanelSuperadminBarberias() {
               contra su propia flechita. */}
           <div className="grid grid-cols-1 gap-4">
             <label className="flex flex-col gap-2">
-              <span className="versalitas text-xs text-gris-calido-500">Nombre</span>
+              <span className="text-xs font-semibold uppercase tracking-[0.07em] text-gris-calido-500 max-md:text-[13px] max-md:tracking-[0.06em]">Nombre</span>
               <input
                 type="text"
                 name="nombre"
@@ -397,7 +466,7 @@ export function PanelSuperadminBarberias() {
             </label>
 
             <label className="flex flex-col gap-2">
-              <span className="versalitas text-xs text-gris-calido-500">Slug (URL)</span>
+              <span className="text-xs font-semibold uppercase tracking-[0.07em] text-gris-calido-500 max-md:text-[13px] max-md:tracking-[0.06em]">Slug (URL)</span>
               <input
                 type="text"
                 name="slug"
@@ -421,7 +490,7 @@ export function PanelSuperadminBarberias() {
             </label>
 
             <label className="flex flex-col gap-2">
-              <span className="versalitas text-xs text-gris-calido-500">Plan</span>
+              <span className="text-xs font-semibold uppercase tracking-[0.07em] text-gris-calido-500 max-md:text-[13px] max-md:tracking-[0.06em]">Plan</span>
               <select
                 name="plan_id"
                 value={nueva.plan_id}
@@ -438,7 +507,9 @@ export function PanelSuperadminBarberias() {
             </label>
           </div>
 
-          <Button as="button" type="submit" disabled={crearBarberia.isPending} className="w-fit">
+          <Button as="button" type="submit" disabled={crearBarberia.isPending}
+            className="w-fit max-md:min-h-12 max-md:w-full max-md:rounded-xl max-md:text-base"
+          >
             {crearBarberia.isPending ? 'Creando…' : 'Crear barbería'}
           </Button>
           {errorEnvio && (
@@ -446,7 +517,7 @@ export function PanelSuperadminBarberias() {
               {errorEnvio}
             </p>
           )}
-          <p className="max-w-md text-xs text-gris-calido-500">
+          <p className="max-w-md text-xs text-gris-calido-500 max-md:text-[14px]">
             La barbería se crea en estado "Pendiente de activación". Actívala desde su página de
             auditoría cuando esté lista.
           </p>

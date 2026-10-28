@@ -11,6 +11,18 @@ import { ROL_SUPERADMIN } from '../../utils/roles'
 
 const LARGO_MINIMO_PASSWORD = 8
 
+// En el celular cada sección se arma como un grupo de Ajustes de iOS:
+// etiqueta afuera, filas grandes adentro de una tarjeta y la nota abajo. En
+// PC (md+) las clases `max-md:` no aplican y todo queda como siempre.
+const CLASE_SECCION =
+  'rounded-lg border border-gris-calido-200 bg-white p-5 max-md:flex max-md:flex-col max-md:rounded-none max-md:border-0 max-md:bg-transparent max-md:p-0'
+const CLASE_TITULO_SECCION =
+  'versalitas text-xs text-cobre max-md:mb-2 max-md:px-1 max-md:font-sans max-md:text-[13px] max-md:tracking-[0.06em] max-md:text-gris-calido-500'
+const CLASE_NOTA_SECCION =
+  'mt-1 text-sm text-gris-calido-500 max-md:order-last max-md:mt-2 max-md:px-1 max-md:text-[13px] max-md:leading-snug'
+const CLASE_FILA_ACCION =
+  'mt-3 flex items-center gap-2 rounded-md border border-gris-calido-200 px-4 py-2 text-sm text-negro-barbero transition-colors hover:border-cobre hover:text-cobre-texto disabled:opacity-50 max-md:mt-0 max-md:min-h-14 max-md:w-full max-md:gap-3 max-md:rounded-2xl max-md:bg-white max-md:text-left max-md:text-base max-md:active:bg-gris-calido-100'
+
 const ESTADOS_PASSWORD = {
   guardando: 'Guardando…',
   guardado: 'Contraseña actualizada',
@@ -48,7 +60,7 @@ function FormularioCambiarPassword({ onGuardado }) {
   return (
     <form onSubmit={guardar} className="flex flex-col gap-3">
       <label className="flex flex-col gap-2">
-        <span className="versalitas text-xs text-gris-calido-500">Nueva contraseña</span>
+        <span className="versalitas text-xs text-gris-calido-500 max-md:text-[13px]">Nueva contraseña</span>
         <input
           type="text"
           autoFocus
@@ -61,12 +73,12 @@ function FormularioCambiarPassword({ onGuardado }) {
       <button
         type="submit"
         disabled={estado === 'guardando'}
-        className="mt-1 rounded-md bg-cobre-oscuro px-4 py-2.5 text-sm font-semibold text-hueso transition-[filter] hover:brightness-110 disabled:opacity-70"
+        className="mt-1 rounded-md bg-cobre-oscuro px-4 py-2.5 text-sm font-semibold text-hueso transition-[filter] hover:brightness-110 disabled:opacity-70 max-md:min-h-12 max-md:rounded-xl max-md:text-base"
       >
         {estado === 'guardando' ? 'Guardando…' : 'Guardar'}
       </button>
       {estado && (
-        <span className={`versalitas text-xs ${estado === 'error' || estado === 'debil' ? 'text-red-700' : 'text-verde-barberia'}`}>
+        <span className={`versalitas text-xs max-md:text-[13px] ${estado === 'error' || estado === 'debil' ? 'text-red-700' : 'text-verde-barberia'}`}>
           {ESTADOS_PASSWORD[estado]}
         </span>
       )}
@@ -93,36 +105,39 @@ export function PanelCuenta() {
   }
 
   return (
-    <div className="flex flex-col gap-8">
+    <div className="flex flex-col gap-7 md:gap-8">
       <div>
-        <h1 className="font-display text-2xl font-light tracking-tight text-negro-barbero">Configuración</h1>
-        <p className="mt-1 text-sm text-gris-calido-500">Los ajustes de tu propia cuenta — nadie más los ve.</p>
+        <h1 className="font-display text-2xl font-light tracking-tight text-negro-barbero max-md:text-[28px] max-md:leading-tight">Configuración</h1>
+        <p className="mt-1 text-sm text-gris-calido-500 max-md:text-[15px]">Los ajustes de tu propia cuenta — nadie más los ve.</p>
       </div>
 
-      <section className="rounded-lg border border-gris-calido-200 bg-white p-5">
-        <h2 className="versalitas text-xs text-cobre">Datos de la cuenta</h2>
-        <dl className="mt-3 flex flex-col gap-2 text-sm">
-          <div className="flex gap-2">
-            <dt className="text-gris-calido-500">Nombre</dt>
-            <dd className="text-negro-barbero">{perfil?.nombre}</dd>
+      <section className={CLASE_SECCION}>
+        <h2 className={CLASE_TITULO_SECCION}>Datos de la cuenta</h2>
+        <dl className="mt-3 flex flex-col gap-2 text-sm max-md:mt-0 max-md:gap-0 max-md:divide-y max-md:divide-gris-calido-100 max-md:rounded-2xl max-md:border max-md:border-gris-calido-200 max-md:bg-white max-md:text-base">
+          <div className="flex gap-2 max-md:min-h-14 max-md:items-center max-md:justify-between max-md:gap-4 max-md:px-4">
+            <dt className="text-gris-calido-500 max-md:shrink-0">Nombre</dt>
+            <dd className="text-negro-barbero max-md:min-w-0 max-md:truncate max-md:text-right">{perfil?.nombre}</dd>
           </div>
-          <div className="flex gap-2">
-            <dt className="text-gris-calido-500">Usuario</dt>
-            <dd className="text-negro-barbero">{perfil?.usuario}</dd>
+          <div className="flex gap-2 max-md:min-h-14 max-md:items-center max-md:justify-between max-md:gap-4 max-md:px-4">
+            <dt className="text-gris-calido-500 max-md:shrink-0">Usuario</dt>
+            <dd className="text-negro-barbero max-md:min-w-0 max-md:truncate max-md:text-right">{perfil?.usuario}</dd>
           </div>
         </dl>
       </section>
 
-      <section className="rounded-lg border border-gris-calido-200 bg-white p-5">
-        <h2 className="versalitas text-xs text-cobre">Contraseña</h2>
-        <p className="mt-1 text-sm text-gris-calido-500">Cámbiala cuando quieras, sin avisarle a nadie.</p>
+      <section className={CLASE_SECCION}>
+        <h2 className={CLASE_TITULO_SECCION}>Contraseña</h2>
+        <p className={CLASE_NOTA_SECCION}>Cámbiala cuando quieras, sin avisarle a nadie.</p>
         <button
           type="button"
           onClick={() => setModalPasswordAbierto(true)}
-          className="mt-3 flex items-center gap-2 rounded-md border border-gris-calido-200 px-4 py-2 text-sm text-negro-barbero transition-colors hover:border-cobre hover:text-cobre-texto"
+          className={`${CLASE_FILA_ACCION} max-md:border-gris-calido-200`}
         >
-          <IconoLlave className="h-4 w-4" />
+          <IconoLlave className="h-4 w-4 max-md:h-5 max-md:w-5 max-md:text-cobre-texto" />
           Cambiar contraseña
+          <span aria-hidden="true" className="ml-auto text-2xl leading-none text-gris-calido-400 md:hidden">
+            ›
+          </span>
         </button>
       </section>
 
@@ -135,9 +150,9 @@ export function PanelCuenta() {
       {HAY_BACKEND_REAL && perfil && perfil.rol_id !== ROL_SUPERADMIN && <SeccionNotificaciones />}
 
       {vincularGoogle && (
-        <section className="rounded-lg border border-gris-calido-200 bg-white p-5">
-          <h2 className="versalitas text-xs text-cobre">Inicio de sesión con Google</h2>
-          <p className="mt-1 text-sm text-gris-calido-500">
+        <section className={CLASE_SECCION}>
+          <h2 className={CLASE_TITULO_SECCION}>Inicio de sesión con Google</h2>
+          <p className={CLASE_NOTA_SECCION}>
             {googleVinculado
               ? 'Ya puedes entrar con tu cuenta de Google, además de tu usuario y contraseña.'
               : 'Vincula tu cuenta de Google para poder entrar con ella, sin dejar de usar tu usuario y contraseña.'}
@@ -146,9 +161,9 @@ export function PanelCuenta() {
             type="button"
             onClick={alVincularGoogle}
             disabled={googleVinculado}
-            className="mt-3 flex items-center gap-2 rounded-md border border-gris-calido-200 px-4 py-2 text-sm text-negro-barbero transition-colors hover:border-cobre hover:text-cobre-texto disabled:opacity-50"
+            className={CLASE_FILA_ACCION}
           >
-            <IconoGoogle className="h-4 w-4" />
+            <IconoGoogle className="h-4 w-4 max-md:h-5 max-md:w-5" />
             {googleVinculado ? 'Google vinculado' : 'Vincular con Google'}
           </button>
         </section>

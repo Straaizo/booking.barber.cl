@@ -102,9 +102,13 @@ export function SeccionAutenticacionDosPasos() {
   const hayVerificados = factores.some((f) => f.status === 'verified')
 
   return (
-    <section className="rounded-lg border border-gris-calido-200 bg-white p-5">
-      <h2 className="versalitas text-xs text-cobre">Verificación en dos pasos</h2>
-      <p className="mt-1 text-sm text-gris-calido-500">
+    // En el celular: grupo tipo Ajustes de iOS (ver PanelCuenta) — la
+    // explicación larga pasa a ser la nota de abajo del grupo.
+    <section className="rounded-lg border border-gris-calido-200 bg-white p-5 max-md:flex max-md:flex-col max-md:rounded-none max-md:border-0 max-md:bg-transparent max-md:p-0">
+      <h2 className="versalitas text-xs text-cobre max-md:mb-2 max-md:px-1 max-md:font-sans max-md:text-[13px] max-md:tracking-[0.06em] max-md:text-gris-calido-500">
+        Verificación en dos pasos
+      </h2>
+      <p className="mt-1 text-sm text-gris-calido-500 max-md:order-last max-md:mt-2 max-md:px-1 max-md:text-[13px] max-md:leading-snug">
         Además de tu contraseña, pide un código de 6 dígitos de tu app de autenticación (Google
         Authenticator, Microsoft Authenticator, Authy, la que uses) en cada sesión nueva. En la app
         vas a ver la cuenta como <span className="numeros-tabulares">Booking Barber</span> — el
@@ -112,14 +116,14 @@ export function SeccionAutenticacionDosPasos() {
       </p>
 
       {cargando ? (
-        <p className="mt-3 text-sm text-gris-calido-400">Revisando…</p>
+        <p className="mt-3 text-sm text-gris-calido-400 max-md:mt-0 max-md:flex max-md:min-h-14 max-md:items-center max-md:rounded-2xl max-md:border max-md:border-gris-calido-200 max-md:bg-white max-md:px-4 max-md:text-base">Revisando…</p>
       ) : (
         <>
           {factores.length > 0 && (
-            <ul className="mt-4 flex flex-col divide-y divide-gris-calido-100 border-y border-gris-calido-100">
+            <ul className="mt-4 flex flex-col divide-y divide-gris-calido-100 border-y border-gris-calido-100 max-md:mb-3 max-md:mt-0 max-md:rounded-2xl max-md:border max-md:border-gris-calido-200 max-md:bg-white max-md:px-4">
               {factores.map((f) => (
-                <li key={f.id} className="flex items-center justify-between gap-3 py-3">
-                  <div className="flex items-center gap-2 text-sm">
+                <li key={f.id} className="flex items-center justify-between gap-3 py-3 max-md:min-h-14">
+                  <div className="flex items-center gap-2 text-sm max-md:text-[15px]">
                     {f.status === 'verified' ? (
                       <>
                         <IconoCandado className="h-4 w-4 shrink-0 text-verde-barberia" />
@@ -133,7 +137,7 @@ export function SeccionAutenticacionDosPasos() {
                     type="button"
                     onClick={() => setFactorAQuitar(f)}
                     aria-label="Quitar"
-                    className="flex items-center gap-1.5 text-xs text-red-700 underline decoration-red-700/40 hover:decoration-red-700"
+                    className="flex items-center gap-1.5 text-xs text-red-700 underline decoration-red-700/40 hover:decoration-red-700 max-md:-mr-2 max-md:min-h-11 max-md:shrink-0 max-md:px-2 max-md:text-sm max-md:no-underline"
                   >
                     <IconoX className="h-3.5 w-3.5" />
                     Quitar
@@ -144,33 +148,33 @@ export function SeccionAutenticacionDosPasos() {
           )}
 
           {inscripcion ? (
-            <div className="mt-4 flex flex-col gap-4">
-              <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center">
+            <div className="mt-4 flex flex-col gap-4 max-md:mt-0 max-md:rounded-2xl max-md:border max-md:border-gris-calido-200 max-md:bg-white max-md:p-4">
+              <div className="flex flex-col items-start gap-3 max-sm:items-center sm:flex-row sm:items-center">
                 <img
                   src={inscripcion.totp.qr_code}
                   alt="Código QR para activar la verificación en dos pasos"
-                  className="h-36 w-36 shrink-0 rounded-md border border-gris-calido-200"
+                  className="h-36 w-36 shrink-0 rounded-md border border-gris-calido-200 max-md:h-44 max-md:w-44"
                 />
-                <div className="text-sm text-gris-calido-700">
+                <div className="text-sm text-gris-calido-700 max-md:w-full max-md:text-[15px]">
                   <p>Escanea el código con tu app de autenticación.</p>
                   <p className="mt-2">¿No puedes escanear? Ingresa esta clave a mano:</p>
-                  <p className="numeros-tabulares mt-1 break-all rounded bg-gris-calido-100 px-2 py-1 text-xs text-negro-barbero">
+                  <p className="numeros-tabulares mt-1 break-all rounded bg-gris-calido-100 px-2 py-1 text-xs text-negro-barbero max-md:rounded-lg max-md:px-3 max-md:py-2 max-md:text-sm">
                     {inscripcion.totp.secret}
                   </p>
                 </div>
               </div>
 
               <div className="flex flex-col gap-2">
-                <span className="versalitas text-xs text-gris-calido-500">Código de la app</span>
+                <span className="versalitas text-xs text-gris-calido-500 max-md:text-[13px]">Código de la app</span>
                 <CampoCodigoOTP key={intento} onCompleto={confirmar} deshabilitado={procesando} />
-                {procesando && <span className="versalitas text-xs text-gris-calido-400">Confirmando…</span>}
+                {procesando && <span className="versalitas text-xs text-gris-calido-400 max-md:text-[13px]">Confirmando…</span>}
               </div>
 
               <button
                 type="button"
                 onClick={cancelarInscripcion}
                 disabled={procesando}
-                className="versalitas w-fit text-xs text-gris-calido-500 hover:text-negro-barbero"
+                className="versalitas w-fit text-xs text-gris-calido-500 hover:text-negro-barbero max-md:min-h-12 max-md:w-full max-md:rounded-xl max-md:border max-md:border-gris-calido-200 max-md:text-[13px]"
               >
                 Cancelar
               </button>
@@ -180,9 +184,9 @@ export function SeccionAutenticacionDosPasos() {
               type="button"
               onClick={empezar}
               disabled={procesando}
-              className="mt-4 flex items-center gap-2 rounded-md border border-gris-calido-200 px-4 py-2 text-sm text-negro-barbero transition-colors hover:border-cobre hover:text-cobre-texto disabled:opacity-60"
+              className="mt-4 flex items-center gap-2 rounded-md border border-gris-calido-200 px-4 py-2 text-sm text-negro-barbero transition-colors hover:border-cobre hover:text-cobre-texto disabled:opacity-60 max-md:mt-0 max-md:min-h-14 max-md:w-full max-md:gap-3 max-md:rounded-2xl max-md:bg-white max-md:text-left max-md:text-base max-md:active:bg-gris-calido-100"
             >
-              <IconoCandado className="h-4 w-4" />
+              <IconoCandado className="h-4 w-4 max-md:h-5 max-md:w-5 max-md:shrink-0 max-md:text-cobre-texto" />
               {procesando ? 'Un momento…' : hayVerificados ? 'Agregar otro dispositivo' : 'Activar verificación en dos pasos'}
             </button>
           )}
@@ -190,7 +194,7 @@ export function SeccionAutenticacionDosPasos() {
       )}
 
       {error && (
-        <p role="alert" className="mt-3 text-sm text-red-700">
+        <p role="alert" className="mt-3 text-sm text-red-700 max-md:px-1 max-md:text-[15px]">
           {error}
         </p>
       )}

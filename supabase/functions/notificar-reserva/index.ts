@@ -72,13 +72,13 @@ Deno.serve(async (req) => {
 
     const rolPorUsuario = new Map(destinatarios.map((d) => [d.id, d.rol_id]))
     const fecha = FORMATO_FECHA.format(new Date(reserva.fecha_hora))
-    const detalle = `${reserva.cliente_nombre} · ${reserva.servicio_nombre_snapshot}`
+    const detalle = `👤 ${reserva.cliente_nombre}\n✂️ ${reserva.servicio_nombre_snapshot}\n🕒 ${fecha}`
 
     const envios = suscripciones.map(async (suscripcion) => {
       const esDueno = rolPorUsuario.get(suscripcion.usuario_id) === ROL_ADMIN
       const payload = JSON.stringify({
-        titulo: 'Nueva reserva',
-        cuerpo: esDueno && barbero ? `${detalle}\n${fecha} con ${barbero.nombre}` : `${detalle}\n${fecha}`,
+        titulo: '💈 ¡Nueva reserva!',
+        cuerpo: esDueno && barbero ? `${detalle}\n💇 Con ${barbero.nombre}` : detalle,
         url: esDueno ? '/panel/reservas' : '/panel/barbero/reservas',
         tag: `reserva-${reserva.id}`,
       })

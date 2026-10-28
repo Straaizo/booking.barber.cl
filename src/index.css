@@ -102,6 +102,20 @@ h3 {
   font-weight: 600;
 }
 
+/* Panel en el celular: Safari de iOS hace zoom automático al enfocar
+   cualquier campo con letra menor a 16px (y no vuelve solo) — en el panel
+   todos los campos quedan en 16px en pantallas chicas para evitarlo. */
+@media (max-width: 767px) {
+  .panel-app input:not([type='checkbox']):not([type='radio']),
+  .panel-app select,
+  .panel-app textarea {
+    font-size: 16px;
+  }
+  .panel-app {
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
 /* Cursor propio en desktop con puntero fino; en touch se conserva el cursor nativo */
 @media (hover: hover) and (pointer: fine) {
   .tiene-cursor-propio,
