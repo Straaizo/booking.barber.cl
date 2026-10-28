@@ -39,9 +39,11 @@ const RETOMAR_TRAS_INACTIVIDAD_MS = 1200
 // Todo lo que la pantalla de login necesita, en un solo componente que usan
 // tanto la composición desktop como la mobile. Expone dos señales distintas
 // hacia afuera, a propósito — no son lo mismo:
-// - `onCambioFoco`: hay foco en ALGÚN campo (dispara con el autoFocus inicial
-//   y se mantiene mientras el usuario sigue dentro del formulario). La usa
-//   mobile para achicar el panel de imagen en cuanto se abre el teclado.
+// - `onCambioFoco`: hay foco en ALGÚN campo (se mantiene mientras el
+//   usuario sigue dentro del formulario). La usa mobile para achicar el panel
+//   de imagen en cuanto se abre el teclado. Sin autoFocus a propósito: la
+//   pantalla se ve completa al entrar y el teclado solo aparece cuando la
+//   persona toca un campo.
 // - `onEscribiendo`: el usuario está tipeando activamente (con un margen de
 //   inactividad antes de apagarse). La usa el carrusel para pausarse — atarlo
 //   a `onCambioFoco` en vez de esto fue el bug original: con autoFocus en el
@@ -126,7 +128,6 @@ export function FormularioAcceso({ onCambioFoco, onEscribiendo, compacto = false
           {...register('usuario')}
           type="text"
           autoComplete="username"
-          autoFocus
           placeholder="tu.usuario"
           className="min-h-11 border-b border-gris-calido-200 bg-transparent py-2 text-base text-negro-barbero outline-none transition-colors focus:border-cobre"
         />

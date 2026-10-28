@@ -5,6 +5,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '../../hooks/useAuth'
 import { useIsMobile } from '../../hooks/useIsMobile'
 import { usePullToRefresh } from '../../hooks/usePullToRefresh'
+import { useActualizacionApp } from '../../hooks/useActualizacionApp'
 import { IconoRefrescar } from './IconoRefrescar'
 import { rutaPorRol, ROL_ADMIN, ROL_BARBERO } from '../../utils/roles'
 import { HoverLink } from '../common/HoverLink'
@@ -115,6 +116,7 @@ export function PanelShell({ secciones, children, ancho = 'normal', rutaCuenta }
   }
   const girando = actualizando || actualizandoBoton
   const seccionesMovil = secciones.filter((s) => !s.soloEscritorio)
+  const { hayNueva, actualizar: actualizarApp } = useActualizacionApp()
   const seccionesMenu = secciones.filter((s) => s.soloEscritorio)
 
   useEffect(() => {
@@ -277,6 +279,36 @@ export function PanelShell({ secciones, children, ancho = 'normal', rutaCuenta }
           ))}
         </div>
       </nav>
+
+      {/* Aviso de versión nueva: sobre la barra inferior en el celular,
+          abajo a la derecha en PC. */}
+      <AnimatePresence>
+        {hayNueva && (
+          <motion.div
+            role="status"
+            initial={{ y: 40, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 40, opacity: 0 }}
+            transition={{ type: 'spring', damping: 26, stiffness: 300 }}
+            className="fixed inset-x-3 bottom-[calc(env(safe-area-inset-bottom)+4.75rem)] z-40 flex items-center gap-3 rounded-2xl bg-negro-barbero py-3 pl-4 pr-3 text-hueso shadow-xl md:inset-x-auto md:bottom-6 md:right-6 md:max-w-sm"
+          >
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-cobre/20 text-cobre-claro">
+              <IconoRefrescar className="h-5 w-5" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-[15px] font-semibold leading-tight">Nueva versión disponible</p>
+              <p className="text-[13px] text-gris-calido-400">Actualiza para ver las mejoras.</p>
+            </div>
+            <button
+              type="button"
+              onClick={actualizarApp}
+              className="min-h-11 shrink-0 rounded-xl bg-cobre px-4 text-[15px] font-semibold text-hueso active:brightness-90"
+            >
+              Actualizar
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <AnimatePresence>
         {menuAbierto && (

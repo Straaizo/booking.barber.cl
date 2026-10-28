@@ -237,8 +237,10 @@ function TarjetaReservaMovil({ reserva, enHistorial, puedeConfirmar, onConfirmar
   )
 }
 
-// Avance de la meta del mes que le definió el dueño — no aparece si no
-// tiene una.
+// Avance de la meta del mes que le definió el dueño — solo en porcentaje,
+// sin montos. El "ritmo" compara ese avance con la parte del mes que ya
+// pasó: a mitad de mes, ir en 50% o más es ir al día. No aparece si no
+// tiene meta.
 function TarjetaMeta({ barberoId, mes }) {
   const { data: resumen } = useResumenMes(mes)
   const { data: metas } = useMetasMes(mes)
@@ -247,24 +249,48 @@ function TarjetaMeta({ barberoId, mes }) {
   if (!meta || !fila) return null
 
   const porcentaje = Math.round((fila.ingresos_agendados / meta) * 100)
+  const hoy = hoyEnSantiago()
+  const diasDelMes = new Date(mes.getFullYear(), mes.getMonth() + 1, 0).getDate()
+  const esperado = Math.round((hoy.getDate() / diasDelMes) * 100)
+  const diferencia = porcentaje - esperado
+
+  let ritmo
+  if (porcentaje >= 100) ritmo = { texto: '🎉 ¡Meta cumplida!', clase: 'text-hueso' }
+  else if (diferencia >= 0) ritmo = { texto: diferencia >= 10 ? 'Vas adelantado ✓' : 'Vas al día ✓', clase: 'text-[#9fd3b1]' }
+  else ritmo = { texto: `Vas ${Math.abs(diferencia)}% atrasado`, clase: 'text-cobre-claro' }
+
   return (
     <section className="mt-5 rounded-2xl bg-negro-barbero p-4 text-hueso md:max-w-xl">
-      <div className="flex items-baseline justify-between gap-2">
-        <p className="text-[13px] font-semibold uppercase tracking-[0.06em] text-gris-calido-400">
-          Tu meta de {nombreMes(mes).split(' ')[0].toLowerCase()}
-        </p>
-        <p className="text-[15px] font-semibold">{porcentaje}%</p>
-      </div>
-      <p className="numeros-tabulares mt-1 text-[15px] text-gris-calido-200">
-        <strong className="text-[20px] text-hueso">{formatoCLP(fila.ingresos_agendados)}</strong> de {formatoCLP(meta)}
+      <p className="text-[13px] font-semibold uppercase tracking-[0.06em] text-gris-calido-400">
+        Tu meta de {nombreMes(mes).split(' ')[0].toLowerCase()}
       </p>
-      <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-white/15">
-        <div
-          className={`h-full rounded-full transition-[width] duration-700 ${porcentaje >= 100 ? 'bg-verde-barberia' : 'bg-cobre'}`}
-          style={{ width: `${Math.min(100, porcentaje)}%` }}
-        />
+      <div className="mt-1 flex items-baseline justify-between gap-2">
+        <p className="text-[15px] text-gris-calido-200">
+          Vas en <strong className="numeros-tabulares text-[26px] font-semibold text-hueso">{porcentaje}%</strong>
+        </p>
+        <p className={`text-[15px] font-semibold ${ritmo.clase}`}>{ritmo.texto}</p>
       </div>
-      {porcentaje >= 100 && <p className="mt-2 text-[14px] text-gris-calido-200">🎉 ¡Meta cumplida!</p>}
+      {/* Barra de avance + marca de dónde debería ir a esta altura del mes. */}
+      <div className="relative mt-3">
+        <div className="h-2.5 overflow-hidden rounded-full bg-white/15">
+          <div
+            className={`h-full rounded-full transition-[width] duration-700 ${porcentaje >= 100 ? 'bg-verde-barberia' : 'bg-cobre'}`}
+            style={{ width: `${Math.min(100, porcentaje)}%` }}
+          />
+        </div>
+        {porcentaje < 100 && (
+          <span
+            className="absolute -top-1 h-[18px] w-0.5 rounded-full bg-hueso"
+            style={{ left: `${esperado}%` }}
+            aria-hidden="true"
+          />
+        )}
+      </div>
+      {porcentaje < 100 && (
+        <p className="mt-2 text-[13px] text-gris-calido-400">
+          La marca blanca es donde deberías ir hoy ({esperado}%).
+        </p>
+      )}
     </section>
   )
 }

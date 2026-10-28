@@ -7,20 +7,25 @@ import { ROL_SUPERADMIN } from '../../utils/roles'
 import { IconoCampana, IconoCompartirIOS } from './IconosNav'
 import { IconoX } from './IconoX'
 
-const CLAVE_OCULTO = 'booking_barber_aviso_app_oculto'
+const CLAVE_OCULTO_HASTA = 'booking_barber_aviso_app_oculto_hasta'
+const DIAS_OCULTO = 3
 
 function leerOculto() {
   try {
-    return sessionStorage.getItem(CLAVE_OCULTO) === '1'
+    return Number(localStorage.getItem(CLAVE_OCULTO_HASTA) || 0) > Date.now()
   } catch {
     return false
   }
 }
 
 // Guía en 2 pasos dentro del panel (solo celular): primero instalar la app,
-// después activar las notificaciones de reserva nueva. "Ahora no" lo esconde
-// solo por esta sesión — vuelve a aparecer la próxima vez que se abra el
-// panel hasta que el paso esté hecho.
+// después activar las notificaciones de reserva nueva.
+// - Si el teléfono ya dio permiso de notificaciones (ej. volvió a entrar
+//   después de cerrar sesión, que borra la suscripción), se vuelve a
+//   suscribir solo, sin preguntar ni mostrar nada.
+// - Si el permiso está bloqueado, no se insiste: solo se puede cambiar
+//   desde Ajustes, y eso se explica en Configuración.
+// - "Ahora no" lo esconde por unos días, no para siempre.
 export function AvisoAppMovil() {
   const { perfil } = useAuth()
   const { puedeInstalar, instalar } = useInstalacionApp()
@@ -34,16 +39,29 @@ export function AvisoAppMovil() {
 
   useEffect(() => {
     if (!puedeActivarPush) return
-    pushActivo()
-      .then(setPushListo)
-      .catch(() => setPushListo(false))
+    let activo = true
+    const marcar = (valor) => activo && setPushListo(valor)
+    async function revisar() {
+      if (Notification.permission === 'denied') return marcar(true)
+      if (await pushActivo()) return marcar(true)
+      if (Notification.permission === 'granted') {
+        // Permiso ya concedido: activar no muestra ningún diálogo.
+        await activarPush()
+        return marcar(true)
+      }
+      marcar(false)
+    }
+    revisar().catch(() => marcar(false))
+    return () => {
+      activo = false
+    }
   }, [puedeActivarPush])
 
   function ocultar() {
     try {
-      sessionStorage.setItem(CLAVE_OCULTO, '1')
+      localStorage.setItem(CLAVE_OCULTO_HASTA, String(Date.now() + DIAS_OCULTO * 86_400_000))
     } catch {
-      /* sin sessionStorage el aviso solo se oculta hasta recargar */
+      /* sin localStorage el aviso solo se oculta hasta recargar */
     }
     setOculto(true)
   }
