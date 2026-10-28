@@ -26,3 +26,9 @@ dist-ssr
 *.sw?
 
 .vercel
+
+# Documentación interna y esquema de base de datos — solo locales
+BITACORA_PROYECTO.md
+ARQUITECTURA.md
+supabase/migrations/
+.claude/

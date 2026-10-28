@@ -2,6 +2,7 @@ import { createContext, useEffect, useState } from 'react'
 import { supabase } from '../services/supabaseClient'
 import { obtenerPerfil, iniciarSesion, cerrarSesion, vincularGoogle, ErrorLogin } from '../services/authService'
 import { eliminarCuentaHuerfanaPropia } from '../services/usuariosService'
+import { desactivarPush } from '../services/pushService'
 import {
   HAY_BACKEND_REAL,
   SUPERADMIN_PROVISORIO,
@@ -222,6 +223,8 @@ export function AuthProvider({ children }) {
       guardarSesionProvisoria(null)
       return
     }
+    // Antes de `cerrarSesion()`: borrar la fila necesita el JWT de esta sesión.
+    await desactivarPush().catch(() => {})
     await cerrarSesion()
   }
 

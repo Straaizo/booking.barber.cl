@@ -5,6 +5,7 @@ import { IconoLlave } from '../../components/panel/IconoLlave'
 import { IconoGoogle } from '../../components/common/IconoGoogle'
 import { cambiarPasswordPropia } from '../../services/authService'
 import { SeccionAutenticacionDosPasos } from './components/SeccionAutenticacionDosPasos'
+import { SeccionNotificaciones } from './components/SeccionNotificaciones'
 import { HAY_BACKEND_REAL } from '../../mocks/datosProvisoriosSuperadmin'
 import { ROL_SUPERADMIN } from '../../utils/roles'
 
@@ -129,6 +130,9 @@ export function PanelCuenta() {
           que más vale la pena reforzar. No tiene sentido en modo de prueba —
           no hay backend de Auth real contra el que inscribir un factor. */}
       {HAY_BACKEND_REAL && perfil?.rol_id === ROL_SUPERADMIN && <SeccionAutenticacionDosPasos />}
+
+      {/* Superadmin no recibe reservas — solo barbero y dueño. */}
+      {HAY_BACKEND_REAL && perfil && perfil.rol_id !== ROL_SUPERADMIN && <SeccionNotificaciones />}
 
       {vincularGoogle && (
         <section className="rounded-lg border border-gris-calido-200 bg-white p-5">

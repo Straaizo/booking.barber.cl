@@ -6,6 +6,7 @@ import { rutaPorRol, ROL_SUPERADMIN } from '../utils/roles'
 import { HAY_BACKEND_REAL } from '../mocks/datosProvisoriosSuperadmin'
 import { nivelDeSesion, primerFactorVerificado } from '../services/mfaService'
 import { DesafioMFA } from './DesafioMFA'
+import { useModoApp } from '../hooks/useModoApp'
 
 function Verificando() {
   return (
@@ -22,6 +23,7 @@ export function RutaProtegida({ rolesPermitidos }) {
   // no aplica — cuenta sin el factor activo, o no es superadmin).
   const [faltaMFA, setFaltaMFA] = useState(null)
   const [factorId, setFactorId] = useState(null)
+  useModoApp()
 
   useEffect(() => {
     if (!autenticado || !perfil) return

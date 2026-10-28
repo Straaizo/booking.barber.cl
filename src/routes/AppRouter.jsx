@@ -4,6 +4,7 @@ import { Home } from '../pages/Home/Home'
 import { RutaProtegida } from './RutaProtegida'
 import { Loader } from '../components/common/Loader'
 import { ROL_BARBERO, ROL_ADMIN, ROL_SUPERADMIN } from '../utils/roles'
+import { ES_APP_INSTALADA } from '../services/pushService'
 
 // `Home` es la única página que se carga sin lazy — es la puerta de entrada
 // más visitada (bookingbarber.cl) y no vale la pena el viaje de red extra
@@ -69,7 +70,10 @@ const router = createBrowserRouter([
       </Suspense>
     ),
     children: [
-      { path: '/', element: <Home /> },
+      // Dentro de la app instalada (PWA) la landing de marketing no existe:
+      // cualquier salto a "/" (ej. el logo del panel) vuelve al login, que a
+      // su vez redirige al panel si hay sesión.
+      { path: '/', element: ES_APP_INSTALADA ? <Navigate to="/login" replace /> : <Home /> },
       { path: '/login', element: <Login /> },
   // Superficie de render aislada para la vista previa PC/Móvil del panel de
   // personalización — vive en un <iframe>, recibe sus datos por postMessage,

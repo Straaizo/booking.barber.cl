@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
 import { useIsMobile } from '../../hooks/useIsMobile'
+import { useModoApp } from '../../hooks/useModoApp'
 import { rutaPorRol } from '../../utils/roles'
 import { Loader } from '../../components/common/Loader'
 import { IconoErrorAnimado } from '../../components/common/IconoErrorAnimado'
@@ -21,6 +22,7 @@ export function Login() {
   const { autenticado, perfil, cargando: verificandoSesion, errorPerfil, limpiarErrorPerfil } = useAuth()
   const esMobile = useIsMobile()
   const navigate = useNavigate()
+  useModoApp()
 
   useEffect(() => {
     if (autenticado && perfil) {
