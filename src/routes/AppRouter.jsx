@@ -5,6 +5,7 @@ import { RutaProtegida } from './RutaProtegida'
 import { Loader } from '../components/common/Loader'
 import { ROL_BARBERO, ROL_ADMIN, ROL_SUPERADMIN } from '../utils/roles'
 import { ES_APP_INSTALADA } from '../services/pushService'
+import { AvisoGirarTelefono } from '../components/common/AvisoGirarTelefono'
 
 // `Home` es la única página que se carga sin lazy — es la puerta de entrada
 // más visitada (bookingbarber.cl) y no vale la pena el viaje de red extra
@@ -71,6 +72,7 @@ const router = createBrowserRouter([
         {/* Cada pantalla nueva abre arriba (antes heredaba el scroll de la
             anterior); al volver atrás, recupera donde se había quedado. */}
         <ScrollRestoration />
+        {ES_APP_INSTALADA && <AvisoGirarTelefono />}
         <Suspense fallback={<CargandoPagina />}>
           <Outlet />
         </Suspense>

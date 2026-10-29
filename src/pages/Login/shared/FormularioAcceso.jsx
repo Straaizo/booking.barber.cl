@@ -12,6 +12,7 @@ import { iniciarSesionConGoogle } from '../../../services/authService'
 import { HAY_BACKEND_REAL, ADMIN_PROVISORIO, SUPERADMIN_PROVISORIO } from '../../../mocks/datosProvisoriosSuperadmin'
 
 const NUMERO_CONTACTO = import.meta.env.VITE_WHATSAPP_CONTACTO
+const ES_TACTIL = typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches
 
 // Mismo motivo que el Loader de identidad (navaja abriéndose/cerrándose),
 // en versión chica para vivir dentro del botón — nunca un spinner genérico.
@@ -79,6 +80,11 @@ export function FormularioAcceso({ onCambioFoco, onEscribiendo, compacto = false
       if (!formularioRef.current) return
       if (!formularioRef.current.contains(document.activeElement)) {
         onCambioFoco?.(false)
+        // En el iPhone (sobre todo en la app instalada) la vista queda
+        // corrida hacia arriba al cerrarse el teclado: los campos quedan
+        // fuera de pantalla y un hueco en blanco abajo. Se devuelve arriba
+        // apenas se cierra, cuando ya no hay ningún campo con foco.
+        if (ES_TACTIL) setTimeout(() => window.scrollTo(0, 0), 100)
       }
     })
   }
@@ -96,6 +102,10 @@ export function FormularioAcceso({ onCambioFoco, onEscribiendo, compacto = false
   }
 
   async function alEnviar(datos) {
+    // En el celular se cierra el teclado antes de enviar: si la contraseña
+    // es incorrecta, el error y los campos quedan a la vista en vez de
+    // quedar tapados detrás de un teclado a medio cerrar.
+    if (ES_TACTIL) document.activeElement?.blur?.()
     await enviar(datos)
   }
 

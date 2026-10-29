@@ -22,7 +22,7 @@ export function LoginMobile() {
   const slideTexto = SLIDES_LOGIN[indiceTexto]
 
   return (
-    <div className="flex min-h-screen flex-col bg-hueso">
+    <div className="flex min-h-dvh flex-col bg-hueso">
       <div
         className={`relative shrink-0 overflow-hidden bg-negro-barbero transition-[height] duration-300 ease-in-out ${
           campoConFoco ? 'h-16' : 'h-[30vh] max-h-56 min-h-[150px]'
