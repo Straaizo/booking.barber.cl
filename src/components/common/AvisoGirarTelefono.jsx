@@ -1,15 +1,47 @@
+import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
+
+// Orientación REAL del dispositivo, no la forma de la ventana: con el teclado
+// abierto (en algunos Android achica la ventana) la vista queda más ancha que
+// alta y un `@media (orientation: landscape)` mostraría este aviso en medio
+// de escribir. Solo cuenta en teléfonos (lado corto de la pantalla < 500px).
+function telefonoAcostado() {
+  try {
+    const ladoCorto = Math.min(window.screen.width, window.screen.height)
+    if (ladoCorto >= 500) return false
+    const tipo = window.screen.orientation?.type
+    if (tipo) return tipo.startsWith('landscape')
+    return Math.abs(window.orientation ?? 0) === 90
+  } catch {
+    return false
+  }
+}
 
 // iOS ignora el `orientation: portrait` del manifest y no hay forma web de
 // bloquear la rotación en iPhone — la app instalada se acuesta igual. En vez
-// de dejar el panel deformado en horizontal, se tapa todo con este aviso
-// (solo en pantallas bajas: un celular acostado, nunca un computador ni un
-// tablet grande). Lo monta el router solo dentro de la app instalada.
+// de dejar el panel deformado en horizontal, se tapa todo con este aviso.
+// Lo monta el router solo dentro de la app instalada.
 export function AvisoGirarTelefono() {
+  const [acostado, setAcostado] = useState(telefonoAcostado)
+
+  useEffect(() => {
+    const revisar = () => setAcostado(telefonoAcostado())
+    window.screen.orientation?.addEventListener?.('change', revisar)
+    window.addEventListener('orientationchange', revisar)
+    window.addEventListener('resize', revisar)
+    return () => {
+      window.screen.orientation?.removeEventListener?.('change', revisar)
+      window.removeEventListener('orientationchange', revisar)
+      window.removeEventListener('resize', revisar)
+    }
+  }, [])
+
+  if (!acostado) return null
+
   return (
     <div
       role="alert"
-      className="fixed inset-0 z-[200] hidden flex-col items-center justify-center gap-5 bg-negro-barbero px-8 text-center text-hueso [@media(orientation:landscape)_and_(max-height:500px)]:flex"
+      className="fixed inset-0 z-[200] flex flex-col items-center justify-center gap-5 bg-negro-barbero px-8 text-center text-hueso"
     >
       <motion.svg
         width="44"

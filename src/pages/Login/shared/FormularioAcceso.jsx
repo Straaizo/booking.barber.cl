@@ -68,8 +68,18 @@ export function FormularioAcceso({ onCambioFoco, onEscribiendo, compacto = false
     formState: { errors },
   } = useForm({ resolver: zodResolver(esquemaLogin) })
 
-  function avisarFoco() {
+  function avisarFoco(evento) {
     onCambioFoco?.(true)
+    // En mobile, al enfocar se achica el panel de imagen (300ms). iOS ya
+    // calculó cuánto desplazar la vista ANTES de ese cambio, así que el campo
+    // terminaba por encima de la pantalla (sobre todo con el mensaje de error
+    // alargando la página). Se vuelve a centrar cuando termina la animación.
+    const campo = evento.target
+    if (ES_TACTIL && campo instanceof HTMLInputElement) {
+      setTimeout(() => {
+        if (document.activeElement === campo) campo.scrollIntoView({ block: 'center' })
+      }, 350)
+    }
   }
 
   function avisarPosibleDesenfoque() {
