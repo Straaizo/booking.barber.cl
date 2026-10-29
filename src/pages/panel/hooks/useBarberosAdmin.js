@@ -33,8 +33,8 @@ function clave(barberiaId) {
 // (`barbero_id, barberia_id` juntas, ver 20260819120000_schema.sql), no una
 // columna simple. Con el embed, TODO barbero volvía con `usuario: null` sin
 // ningún error visible, aunque la cuenta existiera de verdad en `usuarios`
-// — confirmado con una consulta directa a la base (Miguel Diaz sí tenía
-// cuenta, "mdiaz", y el panel igual mostraba "+ Crear cuenta").
+// — confirmado con una consulta directa a la base (el barbero sí tenía
+// cuenta, y el panel igual mostraba "+ Crear cuenta").
 async function obtenerBarberos(barberiaId) {
   const { data: barberos, error } = await supabase
     .from('barberos')

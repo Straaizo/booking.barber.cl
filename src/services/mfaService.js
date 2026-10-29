@@ -2,7 +2,7 @@ import { supabase } from './supabaseClient'
 
 // Verificación en dos pasos (TOTP — Google Authenticator, Microsoft
 // Authenticator, Authy, cualquiera sirve: es un estándar, no algo propio de
-// una app en particular) — solo para superadmin, ver SeccionAutenticacionDosPasos
+// una app en particular) — opcional para cualquier rol, ver SeccionAutenticacionDosPasos
 // (panel/cuenta) y RutaProtegida (el filtro que exige el código en cada
 // sesión antes de dejar pasar al panel).
 //

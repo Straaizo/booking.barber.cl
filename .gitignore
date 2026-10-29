@@ -32,3 +32,6 @@ BITACORA_PROYECTO.md
 ARQUITECTURA.md
 supabase/migrations/
 .claude/
+
+# Plantilla de variables — solo local
+.env.example

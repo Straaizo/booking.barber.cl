@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Navigate, Outlet, useLocation } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { Loader } from '../components/common/Loader'
-import { rutaPorRol, ROL_SUPERADMIN } from '../utils/roles'
+import { rutaPorRol } from '../utils/roles'
 import { HAY_BACKEND_REAL } from '../mocks/datosProvisoriosSuperadmin'
 import { nivelDeSesion, primerFactorVerificado } from '../services/mfaService'
 import { DesafioMFA } from './DesafioMFA'
@@ -20,17 +20,16 @@ export function RutaProtegida({ rolesPermitidos }) {
   const { autenticado, perfil, cargando } = useAuth()
   const ubicacion = useLocation()
   // null = todavía sin revisar; true = falta el código; false = ya está (o
-  // no aplica — cuenta sin el factor activo, o no es superadmin).
+  // no aplica — cuenta sin el factor activo).
   const [faltaMFA, setFaltaMFA] = useState(null)
   const [factorId, setFactorId] = useState(null)
   useModoApp()
 
   useEffect(() => {
     if (!autenticado || !perfil) return
-    // Solo superadmin puede tener este factor (ver PanelCuenta) — para
-    // cualquier otro rol, o en modo de prueba (sin Auth real contra el que
-    // preguntar), no hay nada que revisar.
-    if (!HAY_BACKEND_REAL || perfil.rol_id !== ROL_SUPERADMIN) {
+    // Cualquier rol puede activar el factor (ver PanelCuenta); en modo de
+    // prueba (sin Auth real contra el que preguntar) no hay nada que revisar.
+    if (!HAY_BACKEND_REAL) {
       setFaltaMFA(false)
       return
     }

@@ -7,7 +7,7 @@
 // (`suscripciones_push`).
 //
 // Secretos requeridos (supabase secrets set ...):
-//   VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT (ej: mailto:soporte@...)
+//   VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT (ej: mailto:contacto@tu-dominio)
 //   WEBHOOK_SECRET — el mismo valor va en el header `x-webhook-secret` del webhook.
 //
 // Desplegar con: supabase functions deploy notificar-reserva --no-verify-jwt

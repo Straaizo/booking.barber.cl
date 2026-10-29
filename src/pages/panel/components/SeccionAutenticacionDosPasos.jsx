@@ -14,11 +14,11 @@ function formatoFecha(iso) {
   return new Date(iso).toLocaleDateString('es-CL', { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
-// Solo para superadmin (ver el chequeo en PanelCuenta) — cualquier app TOTP
+// Opcional para cualquier rol (ver PanelCuenta) — cualquier app TOTP
 // sirve (Google Authenticator, Microsoft Authenticator, Authy, etc.), no hay
 // nada específico de una marca acá: es el mismo estándar para todas. Una vez
 // hay al menos un factor activo, RutaProtegida exige el código en cada
-// sesión nueva antes de dejar entrar a /admin — acá solo se administran los
+// sesión nueva antes de dejar entrar al panel — acá solo se administran los
 // factores en sí (se pueden tener varios, ej: celular + respaldo).
 //
 // Lista TODOS los factores (verificados y a medio inscribir) — antes solo

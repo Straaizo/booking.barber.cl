@@ -197,6 +197,15 @@ Deno.serve(async (req) => {
     const esSuperadmin = quienLlama.rol_id === 1
     const esDueno = quienLlama.rol_id === 2
 
+    // `clienteAdmin` se salta las reglas de la base, así que el 2FA se exige
+    // acá también: `mi_perfil()` llamado COMO quien llama no devuelve nada si
+    // la cuenta tiene el 2FA activo (o es superadmin) y esta sesión no pasó
+    // por él — misma regla que usa toda la base, sin repetirla acá.
+    const { data: perfilSesion, error: errorSesion } = await clienteComoQuienLlama.rpc('mi_perfil')
+    if (errorSesion || !perfilSesion?.length) {
+      return responder({ error: 'Se requiere verificación en dos pasos.' }, 403)
+    }
+
     // ------------------------------------------------------------------
     // crear_dueno — solo superadmin.
     // ------------------------------------------------------------------

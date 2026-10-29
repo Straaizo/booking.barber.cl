@@ -9,21 +9,27 @@ async function simularReservaDemo(reserva) {
   return { id: `demo-reserva-${Date.now()}`, ...reserva }
 }
 
-async function insertarReserva(reserva) {
+// La reserva real pasa por la Edge Function `crear-reserva`, que valida el
+// captcha antes de insertar — la tabla ya no acepta inserts directos desde
+// el navegador. Los errores de negocio (horario tomado, enfriamiento por
+// teléfono, etc.) vuelven con su `code` P0001 igual que antes, así
+// `mensajeErrorReserva` los sigue mostrando tal cual. Nada más abajo
+// (onSuccess, onReservaCreada) usa un campo calculado por el servidor — el
+// propio objeto enviado alcanza.
+async function insertarReserva({ captcha, ...reserva }) {
   if (esBarberoDemo(reserva.barbero_id)) return simularReservaDemo(reserva)
   if (!HAY_BACKEND_REAL) return crearReservaProvisoria(reserva)
 
-  // Sin `.select()`: quien reserva público nunca tuvo (ni necesita) permiso
-  // de LEER `reservas` — solo de insertar (`reservas_insert_publico`, RLS).
-  // Pedir la fila de vuelta con `.select().single()` obliga a Postgres a
-  // releerla para el RETURNING, y como no hay ninguna política de lectura
-  // que alcance a un visitante anónimo, la fila queda invisible para esa
-  // relectura y Postgres rechaza el insert entero con un genérico "new row
-  // violates row-level security policy" — aunque el insert en sí era
-  // perfectamente válido. Nada más abajo (onSuccess, onReservaCreada) usa
-  // un campo calculado por el servidor — el propio objeto enviado alcanza.
-  const { error } = await supabase.from('reservas').insert(reserva)
-  if (error) throw error
+  const { error } = await supabase.functions.invoke('crear-reserva', { body: { ...reserva, captcha } })
+  if (error) {
+    let cuerpo = null
+    try {
+      cuerpo = await error.context?.json()
+    } catch {
+      cuerpo = null
+    }
+    throw Object.assign(new Error(cuerpo?.error ?? error.message), { code: cuerpo?.code })
+  }
   return reserva
 }
 

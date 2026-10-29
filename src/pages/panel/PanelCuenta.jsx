@@ -141,10 +141,11 @@ export function PanelCuenta() {
         </button>
       </section>
 
-      {/* Solo superadmin: es la cuenta con acceso a todas las barberías, la
-          que más vale la pena reforzar. No tiene sentido en modo de prueba —
-          no hay backend de Auth real contra el que inscribir un factor. */}
-      {HAY_BACKEND_REAL && perfil?.rol_id === ROL_SUPERADMIN && <SeccionAutenticacionDosPasos />}
+      {/* Opcional para todos los roles: quien lo activa queda obligado a
+          pasar por el código en cada sesión (lo exige la base, ver
+          `mi_perfil()`). No tiene sentido en modo de prueba — no hay backend
+          de Auth real contra el que inscribir un factor. */}
+      {HAY_BACKEND_REAL && perfil && <SeccionAutenticacionDosPasos />}
 
       {/* Superadmin no recibe reservas — solo barbero y dueño. */}
       {HAY_BACKEND_REAL && perfil && perfil.rol_id !== ROL_SUPERADMIN && <SeccionNotificaciones />}

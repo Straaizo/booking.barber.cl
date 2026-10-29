@@ -4,7 +4,7 @@ import { IconoCandado } from '../components/panel/IconoCandado'
 import { CampoCodigoOTP } from '../components/common/CampoCodigoOTP'
 import { confirmarCodigo } from '../services/mfaService'
 
-// Se muestra en vez del panel cuando la cuenta (superadmin, ver
+// Se muestra en vez del panel cuando la cuenta (cualquier rol, ver
 // RutaProtegida) tiene la verificación en dos pasos activada pero esta
 // sesión todavía no pasó por ella — pasa una vez por sesión, no en cada
 // página: una vez confirmado el código, Supabase deja la sesión en aal2 y

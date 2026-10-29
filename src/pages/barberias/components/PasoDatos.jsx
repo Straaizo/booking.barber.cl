@@ -1,8 +1,10 @@
+import { useState } from 'react'
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { esquemaDatosCliente } from './esquemaReserva'
 import { BackButton } from '../../../components/common/BackButton'
 import { Button } from '../../../components/common/Button'
+import { CaptchaTurnstile } from '../../../components/common/CaptchaTurnstile'
 
 // Solo dígitos, máximo 8 (lo que sigue al "9" fijo de todo celular chileno)
 // — cualquier otra tecla (letras, símbolos, un pegado con espacios o +56 de
@@ -17,7 +19,10 @@ function formatoVisual(ochoDigitos) {
   return ochoDigitos.length > 4 ? `${ochoDigitos.slice(0, 4)} ${ochoDigitos.slice(4)}` : ochoDigitos
 }
 
-export function PasoDatos({ resumen, onConfirmar, enviando, onVolver }) {
+export function PasoDatos({ resumen, onConfirmar, enviando, onVolver, requiereCaptcha }) {
+  const [tokenCaptcha, setTokenCaptcha] = useState(null)
+  const [intentoCaptcha, setIntentoCaptcha] = useState(0)
+  const [errorCaptcha, setErrorCaptcha] = useState(false)
   const {
     register,
     handleSubmit,
@@ -27,6 +32,23 @@ export function PasoDatos({ resumen, onConfirmar, enviando, onVolver }) {
     resolver: zodResolver(esquemaDatosCliente),
     defaultValues: { cliente_telefono: '9' },
   })
+
+  // El token del captcha sirve una sola vez: tras cada intento (salga bien o
+  // mal) se remonta el widget para tener uno nuevo si hay que reintentar.
+  async function enviar(datos) {
+    try {
+      await onConfirmar(requiereCaptcha ? { ...datos, captcha: tokenCaptcha } : datos)
+    } catch {
+      /* el mensaje de error lo muestra AsistenteReserva */
+    } finally {
+      if (requiereCaptcha) {
+        setTokenCaptcha(null)
+        setIntentoCaptcha((n) => n + 1)
+      }
+    }
+  }
+
+  const esperandoCaptcha = requiereCaptcha && !tokenCaptcha
 
   return (
     <div>
@@ -39,7 +61,7 @@ export function PasoDatos({ resumen, onConfirmar, enviando, onVolver }) {
         {resumen}
       </div>
 
-      <form onSubmit={handleSubmit(onConfirmar)} className="mt-8 flex flex-col gap-6">
+      <form onSubmit={handleSubmit(enviar)} className="mt-8 flex flex-col gap-6">
         <label className="flex flex-col gap-2">
           <span className="versalitas text-xs text-[var(--pb-texto-terciario)]">Nombre</span>
           <input
@@ -82,8 +104,29 @@ export function PasoDatos({ resumen, onConfirmar, enviando, onVolver }) {
           )}
         </label>
 
-        <Button as="button" type="submit" disabled={enviando} className="mt-2 w-full disabled:opacity-60">
-          {enviando ? 'Confirmando…' : 'Confirmar reserva'}
+        {requiereCaptcha && (
+          <CaptchaTurnstile
+            key={intentoCaptcha}
+            onToken={(token) => {
+              setTokenCaptcha(token)
+              if (token) setErrorCaptcha(false)
+            }}
+            onError={() => setErrorCaptcha(true)}
+          />
+        )}
+        {errorCaptcha && (
+          <span role="alert" className="text-xs text-red-700">
+            No pudimos verificar tu navegador. Recarga la página e intenta nuevamente.
+          </span>
+        )}
+
+        <Button
+          as="button"
+          type="submit"
+          disabled={enviando || esperandoCaptcha}
+          className="mt-2 w-full disabled:opacity-60"
+        >
+          {enviando ? 'Confirmando…' : esperandoCaptcha ? 'Verificando…' : 'Confirmar reserva'}
         </Button>
       </form>
     </div>

@@ -9,6 +9,8 @@ import { formatoCLP } from '../../../utils/formatos'
 import { EASE_ENTRADA } from '../../../components/animations/easing'
 import { clasesTarjeta } from '../../../utils/personalizacion'
 import { santiagoAFechaUTC } from '../../../utils/horaLocal'
+import { esBarberoDemo } from '../../../config/demo'
+import { HAY_BACKEND_REAL } from '../../../mocks/datosProvisoriosSuperadmin'
 
 const VARIANTES_PASO = {
   entra: { opacity: 0, x: 20 },
@@ -190,6 +192,7 @@ export function AsistenteReserva({ barberia }) {
                 enviando={crearReserva.isPending}
                 onConfirmar={confirmar}
                 onVolver={() => volverA('barbero_horario')}
+                requiereCaptcha={HAY_BACKEND_REAL && !esBarberoDemo(barbero?.id)}
               />
             )}
             {paso === 'confirmado' && <Confirmacion resumen={resumen} />}
