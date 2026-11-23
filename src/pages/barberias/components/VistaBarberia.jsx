@@ -89,11 +89,13 @@ function SeccionGaleria({ seccion, nombreBarberia, esOscuro }) {
 // Tamaños del texto acompañante del carrusel — techo intencional en
 // "enorme" (36px en desktop): más grande que eso, compartiendo columna con
 // una foto en un layout de ~40% de ancho, empieza a cortar mal las líneas.
+// En el teléfono el texto comparte fila con la foto (media pantalla cada
+// uno), así que ahí cada tamaño es un escalón más chico.
 const TAMANOS_TEXTO_CARRUSEL = {
-  chica: 'text-base md:text-lg',
-  mediana: 'text-lg md:text-xl',
-  grande: 'text-2xl md:text-3xl',
-  enorme: 'text-3xl md:text-4xl',
+  chica: 'text-sm md:text-lg',
+  mediana: 'text-base md:text-xl',
+  grande: 'text-lg md:text-3xl',
+  enorme: 'text-xl md:text-4xl',
 }
 // Alternativa a la grilla: una foto grande a la vez, deslizando — mismo
 // lenguaje visual que el carrusel de equipo (flechas + puntos, autoplay
@@ -171,7 +173,7 @@ function CarruselGaleria({
     : (ANCHOS_CARRUSEL_CENTRO[imagenTamano] ?? ANCHOS_CARRUSEL_CENTRO.mediana)
 
   const imagenYControles = (
-    <div className={`flex w-full flex-col items-center gap-4 ${anchoImagen}`}>
+    <div className={`flex flex-col items-center gap-4 ${conTexto ? 'w-1/2 shrink-0' : 'w-full'} ${anchoImagen}`}>
       <button
         type="button"
         onClick={() => onAbrir(indice)}
@@ -243,8 +245,8 @@ function CarruselGaleria({
 
   return (
     <div
-      className={`flex flex-col gap-8 px-6 py-10 md:items-center md:gap-10 md:px-10 ${
-        posicion === 'derecha' ? 'md:flex-row-reverse' : 'md:flex-row'
+      className={`flex items-center gap-4 px-6 py-10 md:gap-10 md:px-10 ${
+        posicion === 'derecha' ? 'flex-row-reverse' : 'flex-row'
       }`}
     >
       {imagenYControles}
@@ -504,8 +506,8 @@ function SeccionImagenTexto({ seccion, esOscuro }) {
     <>
       <SectionRule indice="—" texto={seccion.titulo || 'Nuestro espacio'} tono={esOscuro ? 'claro' : 'oscuro'} />
       <div
-        className={`flex flex-col gap-6 px-6 py-10 md:items-center md:gap-10 md:px-10 ${
-          imagenADerecha ? 'md:flex-row-reverse' : 'md:flex-row'
+        className={`flex items-center gap-4 px-6 py-10 md:gap-10 md:px-10 ${
+          imagenADerecha ? 'flex-row-reverse' : 'flex-row'
         }`}
       >
         {seccion.imagen && (
@@ -514,7 +516,7 @@ function SeccionImagenTexto({ seccion, esOscuro }) {
             alt={seccion.titulo || ''}
             loading="lazy"
             decoding="async"
-            className="aspect-[4/3] w-full rounded-lg object-cover md:w-3/5"
+            className={`aspect-[4/3] rounded-lg object-cover md:w-3/5 ${seccion.texto ? 'w-1/2 shrink-0' : 'w-full'}`}
           />
         )}
         {seccion.texto && (
@@ -792,7 +794,7 @@ function SeccionHorario({ titulo, barberos, posicion, imagen, imagenTamano, esOs
       <SectionRule indice="—" texto={titulo || 'Horario de atención'} tono={esOscuro ? 'claro' : 'oscuro'} />
       {conImagen ? (
         <div
-          className={`flex flex-col gap-8 px-6 py-8 md:items-center md:gap-10 md:px-10 ${
+          className={`flex flex-col gap-4 px-6 py-8 md:items-center md:gap-10 md:px-10 ${
             posicion === 'derecha' ? 'md:flex-row-reverse' : 'md:flex-row'
           }`}
         >
@@ -801,7 +803,7 @@ function SeccionHorario({ titulo, barberos, posicion, imagen, imagenTamano, esOs
             alt=""
             loading="lazy"
             decoding="async"
-            className={`aspect-[4/3] w-full rounded-lg object-cover ${
+            className={`aspect-[16/7] w-full rounded-lg object-cover md:aspect-[4/3] ${
               ANCHOS_CARRUSEL_CON_TEXTO[imagenTamano] ?? ANCHOS_CARRUSEL_CON_TEXTO.mediana
             } ${ALTURAS_CARRUSEL_CON_TEXTO[imagenTamano] ?? ALTURAS_CARRUSEL_CON_TEXTO.mediana}`}
           />
@@ -875,7 +877,7 @@ function SeccionServicios({ titulo, servicios, posicion, imagen, imagenTamano, e
       <SectionRule indice="—" texto={titulo || 'Servicios y precios'} tono={esOscuro ? 'claro' : 'oscuro'} />
       {conImagen ? (
         <div
-          className={`flex flex-col gap-8 px-6 py-8 md:items-center md:gap-10 md:px-10 ${
+          className={`flex flex-col gap-4 px-6 py-8 md:items-center md:gap-10 md:px-10 ${
             posicion === 'derecha' ? 'md:flex-row-reverse' : 'md:flex-row'
           }`}
         >
@@ -884,7 +886,7 @@ function SeccionServicios({ titulo, servicios, posicion, imagen, imagenTamano, e
             alt=""
             loading="lazy"
             decoding="async"
-            className={`aspect-[4/3] w-full rounded-lg object-cover ${
+            className={`aspect-[16/7] w-full rounded-lg object-cover md:aspect-[4/3] ${
               ANCHOS_CARRUSEL_CON_TEXTO[imagenTamano] ?? ANCHOS_CARRUSEL_CON_TEXTO.mediana
             } ${ALTURAS_CARRUSEL_CON_TEXTO[imagenTamano] ?? ALTURAS_CARRUSEL_CON_TEXTO.mediana}`}
           />
