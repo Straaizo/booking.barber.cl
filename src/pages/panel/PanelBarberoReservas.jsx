@@ -104,9 +104,13 @@ function FilaReserva({ reserva, enHistorial, puedeConfirmar, onConfirmar, onEdit
         <span className={`block font-medium ${cancelada ? 'text-gris-calido-400 line-through' : 'text-negro-barbero'}`}>
           {reserva.cliente_nombre}
         </span>
-        <HoverLink href={linkWhatsApp(reserva.cliente_telefono)} className="text-xs text-gris-calido-500">
-          {reserva.cliente_telefono}
-        </HoverLink>
+        {reserva.cliente_telefono ? (
+          <HoverLink href={linkWhatsApp(reserva.cliente_telefono)} className="text-xs text-gris-calido-500">
+            {reserva.cliente_telefono}
+          </HoverLink>
+        ) : (
+          <span className="text-xs text-gris-calido-500">Sin reserva (presencial)</span>
+        )}
       </div>
 
       <div className="col-span-2 md:col-span-1">

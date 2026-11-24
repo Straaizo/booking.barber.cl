@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { BackButton } from '../../../components/common/BackButton'
 import { FilaBarberoServicio } from './FilaBarberoServicio'
 import { formatoFechaCorta } from '../../../utils/formatos'
-import { hoyEnSantiago } from '../../../utils/horaLocal'
+import { hoyEnSantiago, horaMinutoEnSantiago } from '../../../utils/horaLocal'
 
 // Reemplaza a los antiguos "Elige un barbero" + "Elige día y hora" (2 pasos
 // separados, a ciegas: había que comprometerse con un barbero antes de saber
@@ -14,17 +14,40 @@ import { hoyEnSantiago } from '../../../utils/horaLocal'
 // Arranca de `hoyEnSantiago()` (no `new Date()`): el "hoy" del negocio es
 // siempre el de Chile, sin importar el huso configurado en el celular de
 // quien está reservando.
-function proximosDias(cantidad) {
+function proximosDias(cantidad, desde = 0) {
   const hoy = hoyEnSantiago()
   return Array.from({ length: cantidad }, (_, i) => {
     const fecha = new Date(hoy)
-    fecha.setDate(hoy.getDate() + i)
+    fecha.setDate(hoy.getDate() + desde + i)
     return fecha
   })
 }
 
+// Pasada la hora de cierre de hoy (el cierre más tardío entre los barberos
+// que atienden hoy), el día deja de ofrecerse. Si hoy nadie tiene horario
+// semanal se deja como estaba: puede haber una excepción abierta.
+function yaCerroHoy(barberos) {
+  try {
+    const diaSemana = hoyEnSantiago().getDay()
+    const cierres = barberos
+      .flatMap((b) => b.horarios_disponibles ?? [])
+      .filter((h) => h.activo && h.dia_semana === diaSemana)
+      .map((h) => {
+        const [hora, minuto] = h.hora_fin.split(':').map(Number)
+        return hora * 60 + minuto
+      })
+    if (cierres.length === 0) return false
+    const { hora, minuto } = horaMinutoEnSantiago(new Date())
+    return hora * 60 + minuto >= Math.max(...cierres)
+  } catch {
+    return false
+  }
+}
+
 export function PasoBarberoHorario({ servicio, barberos, diasMaximosReserva, onSeleccionar, onVolver }) {
-  const dias = proximosDias(diasMaximosReserva ?? 14)
+  // Sin hoy se corre un día la ventana, para seguir mostrando la misma
+  // cantidad (el servidor cuenta los días desde este momento, no desde hoy 00:00).
+  const dias = proximosDias(diasMaximosReserva ?? 14, yaCerroHoy(barberos) ? 1 : 0)
   const [fechaSeleccionada, setFechaSeleccionada] = useState(dias[0])
 
   return (

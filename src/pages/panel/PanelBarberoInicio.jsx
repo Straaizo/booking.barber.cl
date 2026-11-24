@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { useAuth } from '../../hooks/useAuth'
@@ -7,6 +7,14 @@ import { IconoCalendario } from '../../components/panel/IconosNav'
 import { diaSantiagoComoFechaLocal, hoyEnSantiago } from '../../utils/horaLocal'
 import { useReservasDeBarbero, useRealtimeReservas } from './hooks/useReservasBandeja'
 import { useAvanceMetaBarberia, useMetasMes, useResumenMes } from './hooks/useResumen'
+import { useServiciosDeBarberia } from './hooks/useServiciosPanel'
+import {
+  useAnularAtencionPresencial,
+  useHorasAtencionPresencial,
+  useRegistrarAtencionPresencial,
+} from './hooks/useAtencionPresencial'
+import { HAY_BACKEND_REAL } from '../../mocks/datosProvisoriosSuperadmin'
+import { formatoCLP, ofertaVigente } from '../../utils/formatos'
 
 const FORMATO_MES = new Intl.DateTimeFormat('es-CL', { month: 'long' })
 
@@ -124,6 +132,199 @@ function Cifra({ etiqueta, valor, delta, inversa = false }) {
   )
 }
 
+// Cliente que llega sin reserva: el barbero responde qué servicio hizo y a
+// qué hora, y queda registrado como atendido (suma a su mes). Se puede
+// deshacer justo después si fue un error.
+function TarjetaSinReserva({ barberiaId, barberoId }) {
+  const [abierta, setAbierta] = useState(false)
+  const [servicioId, setServicioId] = useState(null)
+  const [inicio, setInicio] = useState(null)
+  const [nombre, setNombre] = useState('')
+  const [registrada, setRegistrada] = useState(null)
+
+  const { data: servicios } = useServiciosDeBarberia(barberiaId, barberoId)
+  const { data: horas, isLoading: cargandoHoras } = useHorasAtencionPresencial(abierta ? servicioId : null)
+  const registrar = useRegistrarAtencionPresencial(barberoId)
+  const anular = useAnularAtencionPresencial(barberoId)
+
+  const activos = (servicios ?? []).filter((s) => s.activo)
+  const servicio = activos.find((s) => s.id === servicioId)
+
+  // Por defecto, la hora más cercana a ahora.
+  useEffect(() => {
+    if (!horas?.length) return setInicio(null)
+    const ahora = Date.now()
+    setInicio(
+      horas.reduce((mejor, h) =>
+        Math.abs(new Date(h) - ahora) < Math.abs(new Date(mejor) - ahora) ? h : mejor
+      )
+    )
+  }, [horas])
+
+  function cerrar() {
+    setAbierta(false)
+    setServicioId(null)
+    setInicio(null)
+    setNombre('')
+    registrar.reset()
+  }
+
+  async function alRegistrar() {
+    try {
+      const id = await registrar.mutateAsync({ servicioId, inicio, nombre: nombre.trim() })
+      setRegistrada({ id, servicio: servicio?.nombre, inicio })
+      cerrar()
+    } catch {
+      // el mensaje queda en registrar.error
+    }
+  }
+
+  async function alDeshacer() {
+    try {
+      await anular.mutateAsync(registrada.id)
+      setRegistrada(null)
+    } catch {
+      // el mensaje queda en anular.error
+    }
+  }
+
+  const precio = servicio ? (ofertaVigente(servicio) ? servicio.precio_oferta : servicio.precio_clp) : null
+  const pregunta = 'mb-2 text-[14px] font-semibold text-negro-barbero'
+  const chip = (activa) =>
+    `min-h-11 rounded-full border px-4 text-[15px] transition-colors ${
+      activa ? 'border-negro-barbero bg-negro-barbero text-hueso' : 'border-gris-calido-200 bg-white text-negro-barbero'
+    }`
+
+  return (
+    <section className="md:max-w-xl">
+      <h2 className="mb-2 px-1 font-sans! text-[13px] font-semibold uppercase tracking-[0.06em] text-gris-calido-500">
+        Cliente sin reserva
+      </h2>
+      <div className="rounded-2xl border border-gris-calido-200 bg-white p-4">
+        {registrada && !abierta && (
+          <div className="mb-3 flex items-center justify-between gap-3 rounded-xl bg-verde-barberia/10 px-3 py-2.5">
+            <p className="text-[14px] text-verde-barberia">
+              Registrada: <strong>{registrada.servicio}</strong> a las {formatoHora(registrada.inicio)}. Ya suma a tu mes.
+            </p>
+            <button
+              type="button"
+              onClick={alDeshacer}
+              disabled={anular.isPending}
+              className="min-h-11 shrink-0 px-2 text-[14px] font-medium text-cobre-texto disabled:opacity-60"
+            >
+              Deshacer
+            </button>
+          </div>
+        )}
+        {anular.error && (
+          <p role="alert" className="mb-3 text-[14px] text-red-700">
+            {anular.error.message}
+          </p>
+        )}
+
+        {!abierta ? (
+          <>
+            <button
+              type="button"
+              onClick={() => {
+                setRegistrada(null)
+                setAbierta(true)
+              }}
+              className="flex min-h-12 w-full items-center justify-center rounded-xl bg-negro-barbero px-4 text-[15px] font-semibold text-hueso active:opacity-90"
+            >
+              + Llegó alguien sin reserva
+            </button>
+            <p className="mt-2 text-[13px] text-gris-calido-500">
+              Regístralo para que su hora quede ocupada y sume a tu mes.
+            </p>
+          </>
+        ) : (
+          <div className="flex flex-col gap-5">
+            <div>
+              <p className={pregunta}>¿Qué servicio eligió?</p>
+              <div className="flex flex-wrap gap-2">
+                {activos.map((s) => (
+                  <button key={s.id} type="button" onClick={() => setServicioId(s.id)} className={chip(s.id === servicioId)}>
+                    {s.nombre}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {servicioId && (
+              <div>
+                <p className={pregunta}>¿A qué hora fue?</p>
+                {cargandoHoras ? (
+                  <Loader label="Cargando horas" />
+                ) : horas?.length ? (
+                  <div className="flex flex-wrap gap-2">
+                    {horas.map((h) => (
+                      <button
+                        key={h}
+                        type="button"
+                        onClick={() => setInicio(h)}
+                        className={`numeros-tabulares ${chip(h === inicio)}`}
+                      >
+                        {formatoHora(h)}
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-[14px] text-gris-calido-500">
+                    No hay horas libres hoy para este servicio dentro de tu horario.
+                  </p>
+                )}
+              </div>
+            )}
+
+            {inicio && (
+              <label className="flex flex-col gap-2">
+                <span className={pregunta.replace('mb-2 ', '')}>Nombre del cliente (opcional)</span>
+                <input
+                  type="text"
+                  value={nombre}
+                  onChange={(e) => setNombre(e.target.value)}
+                  maxLength={80}
+                  placeholder="Cliente presencial"
+                  className="min-h-11 rounded-xl border border-gris-calido-200 px-3 text-base text-negro-barbero outline-none focus:border-cobre"
+                />
+              </label>
+            )}
+
+            {registrar.error && (
+              <p role="alert" className="text-[14px] text-red-700">
+                {registrar.error.message || 'No pudimos registrar la atención. Intenta de nuevo.'}
+              </p>
+            )}
+
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={cerrar}
+                className="min-h-12 flex-1 rounded-xl border border-gris-calido-200 px-4 text-[15px] font-medium text-negro-barbero"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={alRegistrar}
+                disabled={!servicioId || !inicio || registrar.isPending}
+                className="min-h-12 flex-[2] rounded-xl bg-negro-barbero px-4 text-[15px] font-semibold text-hueso disabled:opacity-50"
+              >
+                {registrar.isPending
+                  ? 'Registrando…'
+                  : precio != null && inicio
+                    ? `Registrar · ${formatoCLP(precio)}`
+                    : 'Registrar atención'}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </section>
+  )
+}
+
 export function PanelBarberoInicio() {
   const { perfil } = useAuth()
   const hoy = hoyEnSantiago()
@@ -203,6 +404,8 @@ export function PanelBarberoInicio() {
           <span aria-hidden="true" className="text-xl">›</span>
         </Link>
       )}
+
+      {HAY_BACKEND_REAL && <TarjetaSinReserva barberiaId={perfil.barberia_id} barberoId={perfil.barbero_id} />}
 
       <section className="md:max-w-xl">
         <h2 className="mb-2 px-1 font-sans! text-[13px] font-semibold uppercase tracking-[0.06em] text-gris-calido-500">

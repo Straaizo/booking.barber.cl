@@ -4,7 +4,7 @@ import { HAY_BACKEND_REAL, listarServiciosAdminProvisorios } from '../../../mock
 import { conBarberoIds } from '../../../utils/servicios'
 
 const COLUMNAS =
-  'id, nombre, descripcion, imagen_url, duracion_minutos, precio_clp, precio_oferta, oferta_activa, activo'
+  'id, nombre, descripcion, imagen_url, duracion_minutos, precio_clp, precio_oferta, oferta_activa, oferta_vence, activo'
 
 function claveServicios(barberoId) {
   return ['servicios_panel_barbero', barberoId]
