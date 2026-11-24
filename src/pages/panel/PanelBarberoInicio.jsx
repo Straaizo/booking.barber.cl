@@ -132,6 +132,13 @@ function Cifra({ etiqueta, valor, delta, inversa = false }) {
   )
 }
 
+// Los nombres vienen escritos como los cargó el dueño ("CORTE", "Corte +
+// barba"...); acá se muestran todos con la misma forma: solo la primera mayúscula.
+function nombreUniforme(nombre) {
+  const minusculas = nombre.trim().toLocaleLowerCase('es-CL')
+  return minusculas.charAt(0).toLocaleUpperCase('es-CL') + minusculas.slice(1)
+}
+
 // Cliente que llega sin reserva: el barbero responde qué servicio hizo y a
 // qué hora, y queda registrado como atendido (suma a su mes). Se puede
 // deshacer justo después si fue un error.
@@ -172,7 +179,7 @@ function TarjetaSinReserva({ barberiaId, barberoId }) {
   async function alRegistrar() {
     try {
       const id = await registrar.mutateAsync({ servicioId, inicio, nombre: nombre.trim() })
-      setRegistrada({ id, servicio: servicio?.nombre, inicio })
+      setRegistrada({ id, servicio: nombreUniforme(servicio?.nombre ?? ''), inicio })
       cerrar()
     } catch {
       // el mensaje queda en registrar.error
@@ -242,12 +249,29 @@ function TarjetaSinReserva({ barberiaId, barberoId }) {
           <div className="flex flex-col gap-5">
             <div>
               <p className={pregunta}>¿Qué servicio eligió?</p>
-              <div className="flex flex-wrap gap-2">
-                {activos.map((s) => (
-                  <button key={s.id} type="button" onClick={() => setServicioId(s.id)} className={chip(s.id === servicioId)}>
-                    {s.nombre}
-                  </button>
-                ))}
+              <div className="flex flex-col gap-2">
+                {activos.map((s) => {
+                  const elegido = s.id === servicioId
+                  return (
+                    <button
+                      key={s.id}
+                      type="button"
+                      onClick={() => setServicioId(s.id)}
+                      aria-pressed={elegido}
+                      className={`flex min-h-14 w-full items-center gap-3 rounded-xl border px-4 py-3 text-left transition-colors ${
+                        elegido ? 'border-negro-barbero bg-negro-barbero text-hueso' : 'border-gris-calido-200 bg-white text-negro-barbero'
+                      }`}
+                    >
+                      <span className="min-w-0 flex-1 text-[15px] font-medium leading-snug">{nombreUniforme(s.nombre)}</span>
+                      <span className={`shrink-0 text-right text-[13px] ${elegido ? 'text-hueso/70' : 'text-gris-calido-500'}`}>
+                        <span className="numeros-tabulares block text-[15px] font-semibold">
+                          {formatoCLP(ofertaVigente(s) ? s.precio_oferta : s.precio_clp)}
+                        </span>
+                        {s.duracion_minutos} min
+                      </span>
+                    </button>
+                  )
+                })}
               </div>
             </div>
 
