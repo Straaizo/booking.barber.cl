@@ -186,6 +186,7 @@ function nuevaSeccion(tipo) {
       posicion: 'centro',
       imagen: null,
       imagen_tamano: 'mediana',
+      vista: 'semana',
     }
   }
   if (tipo === 'servicios') {
@@ -196,6 +197,7 @@ function nuevaSeccion(tipo) {
       posicion: 'centro',
       imagen: null,
       imagen_tamano: 'mediana',
+      mostrar_boton_reservar: false,
     }
   }
   if (tipo === 'testimonios') {
@@ -1889,6 +1891,33 @@ export function PanelPersonalizacion() {
                           </p>
 
                           <div className="flex flex-col gap-1">
+                            <span className="versalitas text-xs text-gris-calido-500 max-md:text-[13px]">Vista</span>
+                            <div className="flex gap-2 max-md:flex-wrap">
+                              {[
+                                ['semana', 'Semana completa'],
+                                ['resumido', 'Resumido'],
+                              ].map(([valor, etiqueta]) => (
+                                <button
+                                  key={valor}
+                                  type="button"
+                                  onClick={() => actualizarSeccion(seccion.id, { vista: valor })}
+                                  className={`versalitas rounded-md border px-3 py-2 text-xs transition-colors max-md:min-h-11 max-md:rounded-lg max-md:px-3.5 max-md:text-[13px] ${
+                                    (seccion.vista ?? 'resumido') === valor
+                                      ? 'border-cobre text-cobre-texto'
+                                      : 'border-gris-calido-200 text-gris-calido-500'
+                                  }`}
+                                >
+                                  {etiqueta}
+                                </button>
+                              ))}
+                            </div>
+                            <span className="text-xs text-gris-calido-500 max-md:text-[13px] max-md:leading-snug">
+                              "Semana completa" muestra los 7 días con el de hoy destacado. Siempre se ve
+                              arriba si está abierto ahora.
+                            </span>
+                          </div>
+
+                          <div className="flex flex-col gap-1">
                             <span className="versalitas text-xs text-gris-calido-500 max-md:text-[13px]">Posición</span>
                             <div className="flex gap-2 max-md:flex-wrap">
                               {[
@@ -2050,6 +2079,31 @@ export function PanelPersonalizacion() {
                               </div>
                             </>
                           )}
+
+                          <div className="flex flex-col gap-1">
+                            <span className="versalitas text-xs text-gris-calido-500 max-md:text-[13px]">
+                              Botón "Reservar tu hora"
+                            </span>
+                            <div className="flex gap-2 max-md:flex-wrap">
+                              {[
+                                [false, 'Ocultar'],
+                                [true, 'Mostrar'],
+                              ].map(([valor, etiqueta]) => (
+                                <button
+                                  key={etiqueta}
+                                  type="button"
+                                  onClick={() => actualizarSeccion(seccion.id, { mostrar_boton_reservar: valor })}
+                                  className={`versalitas rounded-md border px-3 py-2 text-xs transition-colors max-md:min-h-11 max-md:rounded-lg max-md:px-3.5 max-md:text-[13px] ${
+                                    Boolean(seccion.mostrar_boton_reservar) === valor
+                                      ? 'border-cobre text-cobre-texto'
+                                      : 'border-gris-calido-200 text-gris-calido-500'
+                                  }`}
+                                >
+                                  {etiqueta}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
                         </div>
                       )}
 

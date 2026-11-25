@@ -74,6 +74,7 @@ function normalizarSeccion(seccion) {
       posicion: 'centro',
       imagen: null,
       imagen_tamano: 'mediana',
+      vista: 'resumido',
       ...seccion,
     }
   }
@@ -86,6 +87,7 @@ function normalizarSeccion(seccion) {
       posicion: 'centro',
       imagen: null,
       imagen_tamano: 'mediana',
+      mostrar_boton_reservar: false,
       ...seccion,
     }
   }

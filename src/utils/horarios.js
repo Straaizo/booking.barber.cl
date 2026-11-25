@@ -74,6 +74,70 @@ export function resumenHorarioSemanal(horarios) {
     }))
 }
 
+// Los 7 días (lunes a domingo) con su rango del local, o null si nadie atiende.
+export function horarioSemanaCompleta(horarios) {
+  const hoy = hoyEnSantiago().getDay()
+  return ORDEN_SEMANA_VISIBLE.map((dia) => {
+    const bloques = (horarios ?? []).filter((h) => h.activo && h.dia_semana === dia)
+    if (bloques.length === 0) return { dia, etiqueta: NOMBRES_DIA[dia], horario: null, esHoy: dia === hoy }
+    const inicio = bloques.reduce((min, h) => (h.hora_inicio < min ? h.hora_inicio : min), bloques[0].hora_inicio)
+    const fin = bloques.reduce((max, h) => (h.hora_fin > max ? h.hora_fin : max), bloques[0].hora_fin)
+    return {
+      dia,
+      etiqueta: NOMBRES_DIA[dia],
+      horario: `${inicio.slice(0, 5)} – ${fin.slice(0, 5)}`,
+      esHoy: dia === hoy,
+    }
+  })
+}
+
+// "Abierto ahora · cierra a las X" o "Cerrado · abre <cuándo> a las X", según
+// el horario semanal y la hora de Chile. null si no hay ningún bloque activo.
+export function estadoAperturaAhora(horarios, ahora = new Date()) {
+  const activos = (horarios ?? []).filter((h) => h.activo)
+  if (activos.length === 0) return null
+
+  const hoy = hoyEnSantiago().getDay()
+  const { hora, minuto } = horaMinutoEnSantiago(ahora)
+  const minutosAhora = hora * 60 + minuto
+  const deHoy = activos.filter((h) => h.dia_semana === hoy)
+
+  const enCurso = deHoy.filter(
+    (h) => horaAMinutos(h.hora_inicio) <= minutosAhora && minutosAhora < horaAMinutos(h.hora_fin)
+  )
+  if (enCurso.length > 0) {
+    // Encadena bloques que se tocan o se solapan (ej: dos barberos con turnos seguidos).
+    let cierre = Math.max(...enCurso.map((h) => horaAMinutos(h.hora_fin)))
+    let extendido = true
+    while (extendido) {
+      extendido = false
+      for (const h of deHoy) {
+        const ini = horaAMinutos(h.hora_inicio)
+        const fin = horaAMinutos(h.hora_fin)
+        if (ini <= cierre && fin > cierre) {
+          cierre = fin
+          extendido = true
+        }
+      }
+    }
+    return { abierto: true, texto: `cierra a las ${minutosAHora(cierre)}` }
+  }
+
+  for (let desplazamiento = 0; desplazamiento < 7; desplazamiento++) {
+    const dia = (hoy + desplazamiento) % 7
+    const candidatos = activos
+      .filter((h) => h.dia_semana === dia)
+      .map((h) => horaAMinutos(h.hora_inicio))
+      .filter((ini) => desplazamiento > 0 || ini > minutosAhora)
+    if (candidatos.length === 0) continue
+    const apertura = minutosAHora(Math.min(...candidatos))
+    const cuando =
+      desplazamiento === 0 ? 'hoy' : desplazamiento === 1 ? 'mañana' : `el ${NOMBRES_DIA[dia].toLowerCase()}`
+    return { abierto: false, texto: `abre ${cuando} a las ${apertura}` }
+  }
+  return { abierto: false, texto: '' }
+}
+
 // dia_semana sigue Date.getDay(): 0 = domingo ... 6 = sábado. Una excepción
 // abierta (por ejemplo, el barbero entrando especialmente un día que
 // normalmente tiene el horario semanal en cero) también cuenta como día

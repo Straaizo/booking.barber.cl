@@ -1,19 +1,18 @@
 import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { FooterBarberia } from './FooterBarberia'
-import { HoverLink } from '../../../components/common/HoverLink'
 import { SectionRule } from '../../../components/common/SectionRule'
 import { TextReveal } from '../../../components/animations/TextReveal'
 import { ScrollReveal } from '../../../components/animations/ScrollReveal'
 import { AsistenteReserva } from '../components/AsistenteReserva'
 import { LightboxGaleria } from '../components/LightboxGaleria'
 import { oscurecerHex, aclararHex, esColorClaro } from '../../../utils/color'
-import { linkWhatsApp, linkGoogleMaps, formatoCLP, ofertaVigente } from '../../../utils/formatos'
+import { linkWhatsApp, linkGoogleMaps, linkWaze, formatoCLP, ofertaVigente } from '../../../utils/formatos'
 import { asegurarFuenteCargada, pilaFuente } from '../../../utils/fuentes'
 import { usePrefersReducedMotion } from '../../../hooks/usePrefersReducedMotion'
 import { ordenarEquipo, clasesTarjeta } from '../../../utils/personalizacion'
 import { seccionDisponibleParaPlan } from '../../../utils/planes'
-import { resumenHorarioSemanal } from '../../../utils/horarios'
+import { resumenHorarioSemanal, horarioSemanaCompleta, estadoAperturaAhora } from '../../../utils/horarios'
 
 // Grilla editorial, no una fila de fotos del mismo tamaño: las fotos
 // marcadas "grande" ocupan el doble de espacio (2 columnas × 2 filas), como
@@ -763,7 +762,14 @@ function EncabezadoTabla({ columnas, esOscuro }) {
 // si la tabla va sola y centrada ('centro', de siempre) o en una columna
 // con una foto del local al lado ('izquierda'/'derecha', para darle más
 // credibilidad) — mismo patrón que "Imagen y texto".
-function SeccionHorario({ titulo, barberos, posicion, imagen, imagenTamano, esOscuro, estiloTarjetas }) {
+function SeccionHorario({ titulo, barberos, posicion, imagen, imagenTamano, vista, esOscuro, estiloTarjetas }) {
+  // Recalcula "Abierto ahora" cada minuto si la página queda abierta.
+  const [ahora, setAhora] = useState(() => new Date())
+  useEffect(() => {
+    const id = setInterval(() => setAhora(new Date()), 60_000)
+    return () => clearInterval(id)
+  }, [])
+
   const horarios = (barberos ?? [])
     .filter((b) => b.activo)
     .flatMap((b) => b.horarios_disponibles ?? [])
@@ -771,21 +777,58 @@ function SeccionHorario({ titulo, barberos, posicion, imagen, imagenTamano, esOs
   if (resumen.length === 0) return null
 
   const conImagen = posicion !== 'centro' && Boolean(imagen)
+  const estado = estadoAperturaAhora(horarios, ahora)
+
+  const filas =
+    vista === 'semana'
+      ? horarioSemanaCompleta(horarios).map((d) => ({
+          clave: d.dia,
+          etiqueta: d.etiqueta,
+          horario: d.horario ?? 'Cerrado',
+          cerrado: !d.horario,
+          esHoy: d.esHoy,
+        }))
+      : resumen.map((linea) => ({ clave: linea.etiqueta, etiqueta: linea.etiqueta, horario: linea.horario }))
 
   const tabla = (
-    <div className={`w-full overflow-hidden ${clasesTarjeta(estiloTarjetas, esOscuro)}`}>
-      <EncabezadoTabla columnas={{ plantilla: '1fr auto', etiquetas: ['Día', 'Horario'] }} esOscuro={esOscuro} />
-      {resumen.map((linea, i) => (
-        <div
-          key={linea.etiqueta}
-          className={`numeros-tabulares grid grid-cols-[1fr_auto] gap-4 px-4 py-3 text-sm text-[var(--pb-texto-secundario)] md:text-base ${
-            i % 2 === 1 ? 'bg-[var(--pb-superficie-sutil)]' : ''
-          }`}
-        >
-          <span>{linea.etiqueta}</span>
-          <span className="text-right font-medium text-[var(--pb-texto)]">{linea.horario}</span>
-        </div>
-      ))}
+    <div className="w-full">
+      {estado && (
+        <p className="mb-4 flex items-center gap-2 text-sm text-[var(--pb-texto-secundario)] md:text-base">
+          <span
+            aria-hidden="true"
+            className={`h-2.5 w-2.5 shrink-0 rounded-full ${estado.abierto ? 'bg-emerald-500' : 'bg-red-500'}`}
+          />
+          <span className="font-semibold text-[var(--pb-texto)]">{estado.abierto ? 'Abierto ahora' : 'Cerrado'}</span>
+          {estado.texto && <span>· {estado.texto}</span>}
+        </p>
+      )}
+      <div className={`w-full overflow-hidden ${clasesTarjeta(estiloTarjetas, esOscuro)}`}>
+        <EncabezadoTabla columnas={{ plantilla: '1fr auto', etiquetas: ['Día', 'Horario'] }} esOscuro={esOscuro} />
+        {filas.map((fila, i) => (
+          <div
+            key={fila.clave}
+            className={`numeros-tabulares grid grid-cols-[1fr_auto] items-center gap-4 border-l-4 px-4 py-3 text-sm md:text-base ${
+              fila.esHoy
+                ? `border-cobre ${esOscuro ? 'bg-cobre/20' : 'bg-cobre/10'}`
+                : `border-transparent ${i % 2 === 1 ? 'bg-[var(--pb-superficie-sutil)]' : ''}`
+            }`}
+          >
+            <span className={`flex items-center gap-2 ${fila.esHoy ? 'font-semibold text-[var(--pb-texto)]' : 'text-[var(--pb-texto-secundario)]'}`}>
+              {fila.etiqueta}
+              {fila.esHoy && (
+                <span className="versalitas rounded-full bg-cobre px-2 py-0.5 text-[10px] text-hueso">Hoy</span>
+              )}
+            </span>
+            <span
+              className={`text-right font-medium ${
+                fila.cerrado ? 'text-[var(--pb-texto-terciario)]' : 'text-[var(--pb-texto)]'
+              }`}
+            >
+              {fila.horario}
+            </span>
+          </div>
+        ))}
+      </div>
     </div>
   )
 
@@ -810,7 +853,7 @@ function SeccionHorario({ titulo, barberos, posicion, imagen, imagenTamano, esOs
           <div className="w-full md:flex-1">{tabla}</div>
         </div>
       ) : (
-        <div className="mx-auto max-w-md px-6 py-8 md:px-10">{tabla}</div>
+        <div className="mx-auto max-w-md px-5 py-10 md:px-10 md:py-8">{tabla}</div>
       )}
     </>
   )
@@ -823,11 +866,21 @@ function SeccionHorario({ titulo, barberos, posicion, imagen, imagenTamano, esOs
 // sola a partir de los servicios reales — nunca se edita a mano — pero es
 // una sección más, reordenable, con la misma `posicion`/`imagen` que
 // "Horario de atención" (ver SeccionHorario, mismo patrón exacto).
-function SeccionServicios({ titulo, servicios, posicion, imagen, imagenTamano, esOscuro, estiloTarjetas }) {
+function SeccionServicios({ titulo, servicios, posicion, imagen, imagenTamano, mostrarBotonReservar, esOscuro, estiloTarjetas }) {
   const activos = (servicios ?? []).filter((s) => s.activo)
   if (activos.length === 0) return null
 
   const conImagen = posicion !== 'centro' && Boolean(imagen)
+
+  // Opcional desde Personalización (oculto por defecto).
+  const botonReservar = mostrarBotonReservar && (
+    <a
+      href="#reservar"
+      className="mt-6 flex min-h-12 w-full items-center justify-center rounded-lg bg-cobre px-5 text-sm font-semibold text-hueso transition-colors hover:bg-cobre-oscuro md:inline-flex md:w-auto"
+    >
+      Reservar tu hora
+    </a>
+  )
 
   const tabla = (
     <div className={`w-full overflow-hidden ${clasesTarjeta(estiloTarjetas, esOscuro)}`}>
@@ -892,25 +945,13 @@ function SeccionServicios({ titulo, servicios, posicion, imagen, imagenTamano, e
           />
           <div className="w-full md:flex-1">
             {tabla}
-            <HoverLink
-            href="#reservar"
-            tono="cobre"
-            className="mt-6 inline-block text-sm font-medium text-[var(--pb-texto)]"
-          >
-              Reservar tu hora →
-            </HoverLink>
+            {botonReservar}
           </div>
         </div>
       ) : (
-        <div className="mx-auto max-w-lg px-6 py-8 md:px-10">
+        <div className="mx-auto max-w-lg px-5 py-10 md:px-10 md:py-8">
           {tabla}
-          <HoverLink
-            href="#reservar"
-            tono="cobre"
-            className="mt-6 inline-block text-sm font-medium text-[var(--pb-texto)]"
-          >
-            Reservar tu hora →
-          </HoverLink>
+          {botonReservar}
         </div>
       )}
     </>
@@ -973,6 +1014,9 @@ export function VistaBarberia({ barberia }) {
   const claseTexto = headerClaro ? 'text-negro-barbero' : 'text-hueso'
   const claseEslogan = headerClaro ? 'text-cobre-texto' : 'text-cobre-claro'
   const claseContacto = headerClaro ? 'text-gris-calido-700' : 'text-gris-calido-200'
+  const clasePildora = `inline-flex min-h-10 items-center gap-2 rounded-full border border-cobre/60 px-4 text-sm font-medium backdrop-blur-sm transition-colors hover:bg-cobre/25 ${
+    headerClaro ? 'bg-black/5' : 'bg-white/10'
+  }`
   // El degradado de la portada usa el color de header (o su reemplazo de
   // siempre) como tinte — así la foto no queda con el mismo velo negro
   // genérico en todas las barberías, sigue la paleta que cada una eligió.
@@ -1050,29 +1094,48 @@ export function VistaBarberia({ barberia }) {
 
         {(barberia.direccion || (barberia.telefono_whatsapp && personalizacion.estilo_whatsapp !== 'burbuja')) && (
           <ScrollReveal delay={0.15}>
-            <div className={`relative z-10 mx-auto mt-8 flex max-w-lg flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm md:mx-0 md:max-w-none md:justify-start ${claseContacto}`}>
-              {barberia.direccion && <span>{barberia.direccion}</span>}
+            <div className={`relative z-10 mx-auto mt-8 flex max-w-lg flex-col items-center gap-3 text-sm md:mx-0 md:max-w-none md:items-start ${claseContacto}`}>
               {barberia.direccion && (
-                <HoverLink
-                  href={linkGoogleMaps(barberia.direccion)}
-                  target="_blank"
-                  rel="noreferrer"
-                  tono="cobre"
-                >
-                  Ver en el mapa
-                </HoverLink>
+                <p className="flex items-center gap-2">
+                  <span aria-hidden="true">📍</span>
+                  <span>{barberia.direccion}</span>
+                </p>
               )}
-              {barberia.telefono_whatsapp && personalizacion.estilo_whatsapp !== 'burbuja' && (
-                <HoverLink
-                  href={linkWhatsApp(
-                    barberia.telefono_whatsapp,
-                    `Hola, tengo una consulta para ${barberia.nombre}`
-                  )}
-                  tono="cobre"
-                >
-                  Escribir por WhatsApp
-                </HoverLink>
-              )}
+              <div className="flex flex-wrap justify-center gap-2 md:justify-start">
+                {barberia.direccion && (
+                  <>
+                    <a
+                      href={linkGoogleMaps(barberia.direccion)}
+                      target="_blank"
+                      rel="noreferrer"
+                      className={`${clasePildora} ${claseTexto}`}
+                    >
+                      <span aria-hidden="true">🗺️</span> Google Maps
+                    </a>
+                    <a
+                      href={linkWaze(barberia.direccion)}
+                      target="_blank"
+                      rel="noreferrer"
+                      className={`${clasePildora} ${claseTexto}`}
+                    >
+                      <span aria-hidden="true">🚗</span> Waze
+                    </a>
+                  </>
+                )}
+                {barberia.telefono_whatsapp && personalizacion.estilo_whatsapp !== 'burbuja' && (
+                  <a
+                    href={linkWhatsApp(
+                      barberia.telefono_whatsapp,
+                      `Hola, tengo una consulta para ${barberia.nombre}`
+                    )}
+                    target="_blank"
+                    rel="noreferrer"
+                    className={`${clasePildora} ${claseTexto}`}
+                  >
+                    <span aria-hidden="true">💬</span> WhatsApp
+                  </a>
+                )}
+              </div>
             </div>
           </ScrollReveal>
         )}
@@ -1132,6 +1195,7 @@ export function VistaBarberia({ barberia }) {
               posicion={seccion.posicion}
               imagen={seccion.imagen}
               imagenTamano={seccion.imagen_tamano}
+              vista={seccion.vista}
               esOscuro={esOscuro}
               estiloTarjetas={personalizacion.estilo_tarjetas}
             />
@@ -1146,6 +1210,7 @@ export function VistaBarberia({ barberia }) {
               posicion={seccion.posicion}
               imagen={seccion.imagen}
               imagenTamano={seccion.imagen_tamano}
+              mostrarBotonReservar={Boolean(seccion.mostrar_boton_reservar)}
               esOscuro={esOscuro}
               estiloTarjetas={personalizacion.estilo_tarjetas}
             />

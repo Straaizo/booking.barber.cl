@@ -31,6 +31,10 @@ export function linkGoogleMaps(direccion) {
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(direccion)}`
 }
 
+export function linkWaze(direccion) {
+  return `https://waze.com/ul?q=${encodeURIComponent(direccion)}&navigate=yes`
+}
+
 export function formatoFechaCorta(fecha) {
   return fecha.toLocaleDateString('es-CL', {
     weekday: 'short',
