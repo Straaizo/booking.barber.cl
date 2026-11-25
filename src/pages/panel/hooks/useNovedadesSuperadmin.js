@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../../services/supabaseClient'
 
-const COLUMNAS = 'id, titulo, descripcion, etiqueta, fecha, orden, activo'
+const COLUMNAS = 'id, titulo, descripcion, etiqueta, imagen_url, fecha, orden, activo'
 const CLAVE = ['novedades_superadmin']
 
 // A diferencia de la lectura pública (`useNovedadesPublicas`, solo activas),

@@ -7,7 +7,7 @@ import {
   useActualizarNovedad,
   useEliminarNovedad,
 } from './hooks/useNovedadesSuperadmin'
-import { FilaNovedad } from './components/FilaNovedad'
+import { FilaNovedad, CampoImagenNovedad } from './components/FilaNovedad'
 import { ModalConfirmacion } from '../../components/panel/ModalConfirmacion'
 
 function hoyISO() {
@@ -17,7 +17,7 @@ function hoyISO() {
   return `${ahora.getFullYear()}-${mes}-${dia}`
 }
 
-const NUEVA_VACIA = { titulo: '', descripcion: '', etiqueta: '' }
+const NUEVA_VACIA = { titulo: '', descripcion: '', etiqueta: '', imagen_url: null }
 
 export function PanelSuperadminNovedades() {
   const { data: novedades, isLoading, isError } = useNovedadesSuperadmin()
@@ -52,6 +52,7 @@ export function PanelSuperadminNovedades() {
         titulo: nueva.titulo.trim(),
         descripcion: nueva.descripcion.trim(),
         etiqueta: nueva.etiqueta.trim() || null,
+        imagen_url: nueva.imagen_url,
         fecha: hoyISO(),
         orden: (novedades?.length ?? 0) + 1,
         activo: 1,
@@ -164,6 +165,10 @@ export function PanelSuperadminNovedades() {
               className="border-b border-gris-calido-200 bg-transparent py-2 text-sm text-negro-barbero outline-none transition-colors focus:border-cobre max-md:rounded-xl max-md:border max-md:bg-white max-md:px-3.5 max-md:py-3 max-md:text-base"
             />
           </label>
+          <CampoImagenNovedad
+            url={nueva.imagen_url}
+            onCambiar={(imagen_url) => setNueva((n) => ({ ...n, imagen_url }))}
+          />
           <Button as="button" type="submit" disabled={crear.isPending} className="w-fit max-md:min-h-12 max-md:w-full max-md:rounded-xl max-md:text-base">
             {crear.isPending ? 'Creando…' : 'Crear novedad'}
           </Button>

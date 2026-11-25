@@ -7,7 +7,7 @@ import { supabase } from '../../../services/supabaseClient'
 async function obtenerNovedadesPublicas() {
   const { data, error } = await supabase
     .from('novedades')
-    .select('id, titulo, descripcion, etiqueta, fecha')
+    .select('id, titulo, descripcion, etiqueta, imagen_url, fecha')
     .eq('activo', 1)
     .order('orden')
   if (error) throw error

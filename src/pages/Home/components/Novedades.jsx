@@ -78,6 +78,15 @@ export function Novedades() {
               <p className="font-display mt-4 text-xl font-normal tracking-tight text-negro-barbero md:text-2xl">
                 {novedad.titulo}
               </p>
+              {novedad.imagen_url && (
+                <img
+                  src={novedad.imagen_url}
+                  alt=""
+                  loading="lazy"
+                  decoding="async"
+                  className="mt-5 aspect-[16/10] w-full rounded-lg object-cover"
+                />
+              )}
               <p className="mt-3 text-sm leading-relaxed text-gris-calido-700 md:text-base">
                 {novedad.descripcion}
               </p>

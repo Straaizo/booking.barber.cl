@@ -2,8 +2,75 @@ import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Interruptor } from '../../../components/panel/Interruptor'
 import { IconoPapelera } from '../../../components/panel/IconoPapelera'
+import { SelectorArchivo } from '../../../components/common/SelectorArchivo'
+import { subirImagenBarberia, borrarImagenBarberia } from '../../../services/storageImagenes'
 
 const ESTADOS = { guardando: 'Guardando…', guardado: 'Guardado', error: 'No se pudo guardar' }
+
+// Imagen opcional de la novedad (se muestra entre título y descripción).
+export function CampoImagenNovedad({ url, onCambiar }) {
+  const [subiendo, setSubiendo] = useState(false)
+  const [error, setError] = useState(null)
+
+  async function subir(evento) {
+    const archivo = evento.target.files?.[0]
+    evento.target.value = ''
+    if (!archivo) return
+    setError(null)
+    setSubiendo(true)
+    try {
+      const nuevaUrl = await subirImagenBarberia(archivo, { barberiaId: 'novedades', maxAncho: 1400, maxAlto: 1400 })
+      await onCambiar(nuevaUrl)
+      borrarImagenBarberia(url)
+    } catch {
+      setError('No se pudo subir la imagen.')
+    } finally {
+      setSubiendo(false)
+    }
+  }
+
+  async function quitar() {
+    setError(null)
+    try {
+      await onCambiar(null)
+      borrarImagenBarberia(url)
+    } catch {
+      setError('No se pudo quitar la imagen.')
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-2">
+      <span className="text-xs font-semibold uppercase tracking-[0.07em] text-gris-calido-500 max-md:text-[13px] max-md:tracking-[0.06em]">
+        Imagen (opcional)
+      </span>
+      <div className="flex flex-wrap items-center gap-3">
+        {url ? (
+          <img src={url} alt="" className="h-16 w-24 rounded-md object-cover" />
+        ) : (
+          <span className="flex h-16 w-24 items-center justify-center rounded-md border border-dashed border-gris-calido-200 text-xs text-gris-calido-400">
+            Sin imagen
+          </span>
+        )}
+        <SelectorArchivo etiqueta={url ? 'Cambiar imagen' : 'Subir imagen'} cargando={subiendo} onChange={subir} />
+        {url && !subiendo && (
+          <button
+            type="button"
+            onClick={quitar}
+            className="versalitas min-h-11 text-xs text-gris-calido-500 hover:text-red-700 md:min-h-0"
+          >
+            Quitar
+          </button>
+        )}
+      </div>
+      {error && (
+        <p role="alert" className="text-sm text-red-700">
+          {error}
+        </p>
+      )}
+    </div>
+  )
+}
 
 export function FilaNovedad({ novedad, onGuardar, onEliminar }) {
   const [campos, setCampos] = useState({
@@ -156,6 +223,20 @@ export function FilaNovedad({ novedad, onGuardar, onEliminar }) {
           className="border-b border-gris-calido-200 bg-transparent py-1 text-sm text-negro-barbero outline-none transition-colors focus:border-cobre max-md:rounded-xl max-md:border max-md:bg-white max-md:px-3.5 max-md:py-3 max-md:text-base"
         />
       </label>
+
+      <CampoImagenNovedad
+        url={novedad.imagen_url}
+        onCambiar={async (imagen_url) => {
+          setEstado('guardando')
+          try {
+            await onGuardar({ imagen_url })
+            setEstado('guardado')
+          } catch (error) {
+            setEstado('error')
+            throw error
+          }
+        }}
+      />
       </div>
 
       <div className="flex items-center justify-between gap-4 max-md:-mx-4 max-md:-mb-4 max-md:border-t max-md:border-gris-calido-100 max-md:px-4 max-md:py-2">
